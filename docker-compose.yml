@@ -1,0 +1,38 @@
+# Cora AI — Local-First Docker Stack
+# Usage: docker-compose up -d --build
+
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      # Override .env values for the container network
+      - DATABASE_URL=sqlite:////app/data/cora.db
+      - QDRANT_URL=http://qdrant:6333
+      - CORS_ORIGINS=http://localhost:8000,http://localhost:8080
+    volumes:
+      - cora_data:/app/data
+    depends_on:
+      qdrant:
+        condition: service_healthy
+    restart: unless-stopped
+
+  qdrant:
+    image: qdrant/qdrant:v1.18.2
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/localhost/6333 && printf \"GET /healthz HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n\" >&3 && cat <&3 | head -1 | grep -q \"200 OK\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  cora_data:
+  qdrant_data:

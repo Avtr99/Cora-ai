@@ -1,0 +1,64 @@
+/* Chat interface styling */
+
+@keyframes focusHighlight {
+  0% { background-color: rgba(124, 58, 237, 0.05); }
+  50% { background-color: rgba(124, 58, 237, 0.15); }
+  100% { background-color: rgba(124, 58, 237, 0.05); }
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(2.5);
+    opacity: 0;
+  }
+}
+
+.animate-pulse-ring {
+  animation: pulse-ring 1.2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+.animate-pulse-dot {
+  animation: pulse-dot 1.5s ease-in-out infinite;
+}
+
+.focus-highlight {
+  animation: focusHighlight 1.5s ease;
+}
+
+/* Make sure the message is always positioned nicely */
+.scroll-mt-16 {
+  scroll-margin-top: 4rem;
+}
+
+/* Reasoning panel micro-animation */
+.reasoning-content {
+  opacity: 0;
+  transform: translateY(-2px);
+  transition: opacity 150ms ease, transform 200ms ease;
+}
+
+details[open] .reasoning-content {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reasoning-content {
+    transition: none;
+  }
+}

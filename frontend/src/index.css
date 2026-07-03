@@ -1,0 +1,182 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* Reserve the scrollbar gutter at all times so that dynamically changing
+     page height (e.g. chart re-render on the Pricing page) does not cause a
+     horizontal layout shift when the scrollbar appears/disappears.
+
+     `overflow-y: auto` is required — `scrollbar-gutter` only takes effect
+     on scroll containers (overflow: auto | scroll | hidden). Without it,
+     `html` defaults to `overflow: visible` and the gutter is never reserved.
+
+     ── Radix Dialog interaction ────────────────────────────────────────
+     react-remove-scroll-bar (used by Radix Dialog) sets:
+       body[data-scroll-locked] { margin-right: <scrollbarWidth>px !important }
+     to compensate for the scrollbar vanishing when body{overflow:hidden}
+     propagates to the viewport. But when html has `overflow-y: auto`, that
+     propagation is blocked (per CSS-Overflow-3 §3.2) — the viewport
+     scrollbar/gutter stays, so the extra margin-right would double-count
+     the reserved gutter and CAUSE a shift. The override below neutralises
+     that margin so the gutter alone handles the compensation. */
+  html {
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+  }
+  html body[data-scroll-locked] {
+    margin-right: 0 !important;
+  }
+
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+
+    /* --card / --popover / --background share 0 0% 100% intentionally;
+       each has a distinct semantic role and may diverge in custom themes. */
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;  /* same as --foreground & --popover-foreground by design */
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
+
+    /* --secondary / --muted / --accent share 210 40% 96.1% in light theme;
+       --secondary-foreground / --primary / --accent-foreground share 222.2 47.4% 11.2%.
+       These are shadcn/ui semantic aliases — values diverge in dark mode & custom themes. */
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --focus: 215.4 16.3% 46.9%;         /* subtle, neutral focus ring color */
+
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
+
+    --radius: 0.5rem;
+
+    /* ── Shadow tokens ───────────────────────────────────────────────────
+       Named elevation scale. Use via Tailwind: shadow-card, shadow-xs etc.
+       Defined here so they resolve cleanly (no arbitrary value noise).      */
+    --shadow-xs:         0 1px 2px rgba(0, 0, 0, 0.05);
+    --shadow-card:       0 2px 8px rgba(0, 0, 0, 0.04);
+    --shadow-card-md:    0 2px 8px rgba(0, 0, 0, 0.06);
+    --shadow-card-sm:    0 2px 6px rgba(0, 0, 0, 0.04);
+    --shadow-bottom-bar: 0 -4px 16px rgba(0, 0, 0, 0.08);
+    --shadow-modal:      0 32px 64px -12px rgba(0, 0, 0, 0.14);
+    --shadow-scroll-btn: 0 2px 8px rgba(0, 0, 0, 0.08);
+    --shadow-tooltip:    0 4px 16px rgba(0, 0, 0, 0.08);
+
+    /* Glow / gradient tokens (single-use decorative surfaces) */
+    --glow-searchbar: linear-gradient(135deg, rgba(147, 51, 234, 0.15) 0%, rgba(236, 72, 153, 0.15) 100%);
+
+    /* Map marker drop-shadows */
+    --shadow-marker:        drop-shadow(0px 2px 4px rgba(0, 0, 0, 0.12));
+    --shadow-marker-active: drop-shadow(0px 4px 8px rgba(0, 0, 0, 0.25));
+
+    /* ── Animation variable fallbacks ───────────────────────────────────
+       tailwindcss-animate sets these to `initial` in its base layer, which
+       CSS-health tools flag as "broken reference". Providing explicit
+       no-op defaults silences the warnings without affecting animations
+       (the plugin resets them per-element when animation classes fire).    */
+    --tw-enter-opacity:     1;
+    --tw-enter-scale:       1;
+    --tw-enter-rotate:      0deg;
+    --tw-enter-translate-x: 0px;
+    --tw-enter-translate-y: 0px;
+    --tw-exit-opacity:      1;
+    --tw-exit-scale:        1;
+    --tw-exit-rotate:       0deg;
+    --tw-exit-translate-x:  0px;
+    --tw-exit-translate-y:  0px;
+
+    /* Brand purple: used for key actions and accents */
+    --brand: 262 83% 56%;
+    --brand-foreground: 0 0% 100%;   /* intentionally white — foreground on brand surfaces */
+
+    /* Brand palette tokens — consumed by brand.* Tailwind utilities */
+    --brand-primary:   243 37% 38%;
+    --brand-secondary: 256 55% 55%;
+    --brand-link:      256 59% 40%;
+    --brand-hover:     255 60% 32%;
+
+    --sidebar-background: 0 0% 98%;  /* intentionally same as --sidebar-primary-foreground */
+
+    --sidebar-foreground: 240 5.3% 26.1%;
+
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --focus: 215 20.2% 65.1%;           /* subtle, neutral focus ring color in dark mode */
+
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    /* Slightly brighter brand on dark for contrast */
+    --sidebar-primary: 262 83% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Global brand token (matches sidebar-primary for consistency) */
+    --brand: 262 83% 60%;
+    --brand-foreground: 0 0% 100%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}

@@ -1,0 +1,111 @@
+.markdown-content {
+  font-size: 0.875rem; /* text-sm */
+  font-family: 'Inter', sans-serif; /* font-inter */
+}
+
+.markdown-content p {
+  margin-bottom: 0.75rem;
+  line-height: 1.6;
+}
+
+.markdown-content strong {
+  font-weight: bold;
+  font-family: 'Inter', sans-serif;
+}
+
+.markdown-content em {
+  font-style: italic;
+}
+
+.markdown-content ul {
+  list-style-type: disc;
+  padding-left: 1.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.markdown-content ol {
+  list-style-type: decimal;
+  padding-left: 1.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.markdown-content li {
+  margin-bottom: 0.25rem;
+}
+
+.markdown-content h1, 
+.markdown-content h2, 
+.markdown-content h3,
+.markdown-content h4, 
+.markdown-content h5, 
+.markdown-content h6 {
+  font-family: 'Poppins', sans-serif;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  color: #111827; /* text-gray-900 for better contrast on light bubbles */
+}
+
+.dark .markdown-content h1,
+.dark .markdown-content h2,
+.dark .markdown-content h3,
+.dark .markdown-content h4,
+.dark .markdown-content h5,
+.dark .markdown-content h6 {
+  color: #e5e7eb; /* text-gray-200 for better contrast on dark */
+}
+
+.markdown-content h1 {
+  font-size: 1.25rem;
+}
+
+.markdown-content h2 {
+  font-size: 1.125rem;
+}
+
+.markdown-content h3 {
+  font-size: 1rem;
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+}
+
+.markdown-content code {
+  background-color: #f3f4f6;
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.dark .markdown-content code {
+  background-color: #1f2937;
+}
+
+.markdown-content pre {
+  background-color: #f3f4f6;
+  padding: 0.75rem;
+  border-radius: 0.375rem;
+  margin-bottom: 0.75rem;
+  overflow-x: auto;
+}
+
+.dark .markdown-content pre {
+  background-color: #1f2937;
+}
+
+/* Blockquote styling uses a React Node override in ChatMarkdownContent.tsx */
+
+.markdown-content a {
+  color: #5b21b6; /* darker violet for improved contrast */
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.markdown-content a:hover {
+  text-decoration: underline;
+}
+
+.dark .markdown-content a {
+  color: #c4b5fd; /* lighter violet in dark for contrast */
+}
+
+/* Table styles — now handled by component overrides in ChatMarkdownContent.tsx */

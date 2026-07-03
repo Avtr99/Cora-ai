@@ -1,0 +1,21 @@
+# Pre-commit hooks for Cora AI
+# Setup after cloning: pip install pre-commit && pre-commit install
+# This runs locally before every commit, catching secrets before they reach git history.
+#
+# Hook versions are pinned below; update them manually or with a tool of your choice.
+
+repos:
+  # Secret scanning — catches API keys, tokens, credentials before commit
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+        name: "Scan for leaked secrets (API keys, tokens, credentials)"
+
+  # Python linting — matches the CI ruff check
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.11.13
+    hooks:
+      - id: ruff
+        args: ["--fix"]
+      - id: ruff-format

@@ -1,0 +1,36 @@
+# =============================================================================
+# Cora AI — Ingestion / Heavy ML Dependencies
+# =============================================================================
+# These dependencies are required for the Document Store:
+#   - Standard PDF conversion via Docling classical pipeline (layout + OCR + tables)
+#   - PyMuPDF for llm_api page rendering (rasterizes PDF pages to images)
+#
+# Install on top of requirements-core.txt:
+#   pip install -r requirements-core.txt -r requirements-ingestion.txt
+# =============================================================================
+
+# Document Store PDF conversion (required for PDF ingestion)
+# Docling: standard/classical, non-VLM PDF pipeline (layout model + RapidOCR +
+# TableFormer). No VLM is loaded by default. Pinned per the 7-day release rule
+# (2.108.0 is <7 days old at pin time; 2.106.0 is the safe floor).
+# A/B OCR engines (optional, not installed by default):
+#   Tesseract: apt-get install tesseract-ocr tesseract-ocr-eng && pip install "docling[tesserocr]"
+#   OnnxTR:    pip install "docling-ocr-onnxtr[cpu]"
+docling[rapidocr]>=2.106.0,<2.108.0
+
+# PyTorch CPU-only: Docling 2.107+ imports torch/torchvision unconditionally
+# (granite_vision.py, table_structure_model_v2.py) even when VLM features are
+# off. Install CPU-only wheels to avoid the 451MB CUDA build. --no-deps keeps
+# the install minimal (torch only needs filelock, sympy, networkx, jinja2).
+torch>=2.11.0,<3.0
+torchvision>=0.26.0,<1.0
+
+# PyMuPDF: page rendering for llm_api input (rasterizes PDF pages to PNG images).
+# The standard path no longer uses PyMuPDF — Docling handles text extraction.
+pymupdf>=1.24.0,<2.0
+
+# Optional: FastEmbed local CPU embeddings
+# FastEmbed is NOT wired into the current provider factory (only voyage/cohere/ollama/openai
+# are supported). If you add a FastEmbed provider in src/embeddings/provider_factory.py,
+# uncomment the line below to install it:
+# fastembed>=0.3.0,<1.0

@@ -1,0 +1,63 @@
+# Version control
+.git
+.gitignore
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+*.egg-info/
+
+# Environment files (secrets — never bake into image)
+.env
+.env.local
+.env.*.local
+
+# Test / lint caches
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# IDE
+.vscode/
+.idea/
+.windsurf/
+.claude/
+.devin/
+
+# Documentation (not needed in runtime image)
+docs/
+*.md
+!README.md
+
+# Tests (not needed in production image)
+tests/
+
+# Scripts (ingestion/evaluation — not needed in production image)
+# Exception: scripts/docker/ is needed for the model prebake step in the Dockerfile
+scripts/
+!scripts/docker/
+
+# Docker files (don't include in build context)
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Local data, logs, databases
+*.log
+*.db
+*.sqlite3
+data/
+logs/
+.ingestion_checkpoints/
+
+# Frontend node_modules and dist (rebuilt inside the image)
+frontend/node_modules/
+frontend/dist/
+
+# OS files
+.DS_Store
+Thumbs.db

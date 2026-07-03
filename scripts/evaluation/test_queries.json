@@ -1,0 +1,107 @@
+[
+  {
+    "query": "What are the requirements for VM0048 REDD+ methodology?",
+    "description": "Registry-specific methodology query",
+    "expected_sources": ["VM0048"],
+    "expected_metadata_fields": ["registry", "document_id", "doc_type", "category"],
+    "category": "registry"
+  },
+  {
+    "query": "How does Article 6.4 differ from voluntary carbon market standards?",
+    "description": "Policy comparison query - should not filter by registry",
+    "expected_sources": null,
+    "expected_metadata_fields": ["doc_type", "category"],
+    "category": "comparison"
+  },
+  {
+    "query": "Gold Standard cookstove projects in Kenya",
+    "description": "Registry + topic query",
+    "expected_sources": ["Gold"],
+    "expected_metadata_fields": ["registry", "category"],
+    "filters": {"registry": "Gold Standard"},
+    "category": "registry"
+  },
+  {
+    "query": "ICVCM Core Carbon Principles requirements",
+    "description": "Standards body query - should classify as standard not registry",
+    "expected_sources": null,
+    "expected_metadata_fields": ["doc_type", "category", "standard"],
+    "filters": {"standard": "ICVCM"},
+    "category": "standard"
+  },
+  {
+    "query": "CDM ACM0001 baseline emission reduction methodology",
+    "description": "CDM registry query with methodology code",
+    "expected_sources": ["ACM0001"],
+    "expected_metadata_fields": ["registry", "document_id", "methodology_codes", "category"],
+    "category": "registry"
+  },
+  {
+    "query": "What is the difference between VM0007 and VM0048?",
+    "description": "Methodology comparison query",
+    "expected_sources": null,
+    "expected_metadata_fields": ["document_id", "registry", "category"],
+    "category": "comparison"
+  },
+  {
+    "query": "Paris Agreement Article 6 implementation rules",
+    "description": "Policy query - should find policy docs, not registry docs",
+    "expected_sources": null,
+    "expected_metadata_fields": ["doc_type", "category", "policy_framework"],
+    "filters": {"policy_framework": "Article 6.4"},
+    "category": "policy"
+  },
+  {
+    "query": "Voluntary carbon market pricing trends 2024",
+    "description": "Market intelligence query",
+    "expected_sources": null,
+    "expected_metadata_fields": ["doc_type", "category"],
+    "category": "general"
+  },
+  {
+    "query": "Verra VCS standard verification rules",
+    "description": "Registry standard query",
+    "expected_sources": ["Verra", "VCS"],
+    "expected_metadata_fields": ["registry", "doc_type", "category"],
+    "category": "registry"
+  },
+  {
+    "query": "REDD+ deforestation baseline requirements",
+    "description": "Topic-based query without registry",
+    "expected_sources": null,
+    "expected_metadata_fields": ["doc_type", "methodology_codes", "category"],
+    "category": "general"
+  },
+  {
+    "query": "SBTi net zero standard targets for corporations",
+    "description": "Standards body query - SBTi should be category=standard",
+    "expected_sources": null,
+    "expected_metadata_fields": ["category", "standard", "doc_type"],
+    "filters": {"standard": "SBTi"},
+    "category": "standard"
+  },
+  {
+    "query": "CORSIA eligible offset units and airline compliance",
+    "description": "Standards body query - CORSIA should be category=standard",
+    "expected_sources": null,
+    "expected_metadata_fields": ["category", "standard", "doc_type"],
+    "filters": {"standard": "CORSIA"},
+    "category": "standard"
+  },
+  {
+    "query": "VCMI claims code of practice for corporate claims",
+    "description": "Standards body query - VCMI should be category=standard",
+    "expected_sources": null,
+    "expected_metadata_fields": ["category", "standard", "doc_type"],
+    "filters": {"standard": "VCMI"},
+    "category": "standard"
+  },
+  {
+    "query": "Active carbon projects in Kenya with Gold Standard",
+    "description": "Structured metadata query - country + status + registry from CSV/JSON",
+    "expected_sources": null,
+    "expected_metadata_fields": ["country", "status", "registry", "category"],
+    "filters": {"country": "Kenya", "status": "Active"},
+    "category": "structured"
+  }
+]

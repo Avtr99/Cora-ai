@@ -1,0 +1,20 @@
+# =============================================================================
+# Cora AI — Development-only Python Dependencies
+# =============================================================================
+# Not required to run the server or ingest documents. Install in addition to
+# requirements.txt when running tests, RAGAS evaluation, or load tests:
+#
+#   pip install -r requirements.txt -r requirements-dev.txt
+# =============================================================================
+
+# Testing
+pytest>=9.1.1,<10.0
+pytest-asyncio>=1.4.0,<10.0
+pytest-cov>=7.1.0,<8.0
+
+# RAG Evaluation (RAGAS) — used by scripts/evaluation/evaluate_rag.py
+ragas>=0.4.3,<0.5
+datasets>=5.0.0,<6.0
+
+# Load Testing
+locust>=2.44.4,<3.0

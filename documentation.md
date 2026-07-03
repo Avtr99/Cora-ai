@@ -1,0 +1,190 @@
+# Cora Chat Readiness Feature
+
+## Overview
+
+The chat readiness feature prevents users from interacting with the chat when the
+backend is not running or when the required knowledge base (KB) / web search
+configuration is missing. It also shows a meaningful empty-state answer when the
+KB has no relevant documents and web search is disabled.
+
+## Backend
+
+### Settings status endpoint
+
+`GET /api/v1/settings/status` in `src/api/settings_routes.py` exposes the fields
+used by the frontend to decide whether the chat is usable:
+
+- `chat_ready` — `True` when the backend is reachable, the LLM is configured, and
+  the KB is ready.
+- `kb_ready` — `True` when the embedding provider is configured, Qdrant is
+  reachable, and the configured collection has points.
+- `search_ready` — `True` when the configured search provider is set up (e.g.
+  Tavily API key present, or a custom search endpoint configured).
+- `backend_reachable` — `True` when the health endpoint responds.
+- `web_search_configured` / `web_search_enabled` — web search configuration
+  status.
+
+### Empty KB response flag
+
+`src/agents/kb_route_handler.py` sets `result["kb_empty"] = True` when the
+knowledge base route retrieves zero documents and web search is disabled.
+Both `src/agents/orchestrator.py` and `src/agents/streaming_orchestrator.py`
+propagate this flag into the response metadata as `metadata.kb_empty`.
+
+## Frontend
+
+### `useChatReadiness` hook
+
+`frontend/src/hooks/useChatReadiness.ts` uses an explicit `/health` check plus
+`GET /api/v1/settings/status` to derive the readiness state. `config` and
+`documents` status queries are only enabled once the health check confirms the
+backend is reachable, and the hook treats a failed health query as `backendDown`
+even when TanStack Query still holds stale successful data from an earlier run.
+This prevents the UI from showing a misleading "Add documents or enable web search"
+message when the real issue is that the backend is offline.
+
+- `backendUp` — whether the backend health endpoint is reachable.
+- `chatReady` — whether the chat can accept input.
+- `notReadyReason` — one of `backend_down`, `llm_not_configured`, or
+  `no_answer_source`.
+- `disabledPlaceholder` — copy shown in the disabled search bar.
+- `kbDocCount`, `kbEmpty`, `webEnabled`, `ingestionInProgress` — supporting
+  status data.
+
+### `ChatReadinessBanner` component
+
+`frontend/src/components/chat/ChatReadinessBanner.tsx` renders a subtle inline
+notice above the composer when the chat is not ready. It uses muted text and
+quiet text links instead of a prominent warning card, keeping the empty-state
+UI unobtrusive. The backend-offline state is shown as the highest-priority
+message so users do not see setup prompts when the server simply isn't running.
+
+### `SearchBar` integration
+
+`frontend/src/components/ui/SearchBar.tsx` disables the input and submit button
+when `ready` is `False`, uses `disabledPlaceholder` as placeholder text, and
+greys out the bar with a muted background/border so the disabled state is clear
+without a loud warning color.
+
+### Empty KB answer state
+
+`frontend/src/contexts/chat/useBotResponse.ts` checks `finalResponse.metadata?.kb_empty`
+and replaces the empty / non-answer fallback with an actionable message that
+suggests rephrasing the question, adding documents, or enabling web search.
+
+### Settings dialog store
+
+`frontend/src/store/settingsDialogStore.ts` is a global Zustand store that
+controls the `SettingsDialog` open state and active tab. `UserMenu.tsx` and the
+chat readiness banner both use it so the settings dialog can be opened from
+multiple places with a single source of truth.
+
+### Onboarding welcome step
+
+`frontend/src/pages/OnboardingPage.tsx` and `frontend/src/components/onboarding/WelcomeStep.tsx`
+were redesigned to remove the generic three-card feature grid and replace the heavy
+config-detection banner with a cleaner, centered status summary. The onboarding
+load now calls `checkHealth()` first and shows the backend-down screen immediately
+if the server is unreachable, instead of waiting for all settings endpoints to fail.
+The progress indicator uses text labels for context, and the backend-down screen
+uses a subtle icon card instead of a warning emoji.
+
+## UX States
+
+| State | Trigger | Banner copy | Disabled placeholder |
+|-------|---------|-------------|---------------------|
+| Backend down | health endpoint fails | "Backend is offline — start the server to use chat." | "Start the backend to use chat" |
+| LLM not configured | backend up, LLM not set | "AI model not configured. Configure AI model" | "Configure an AI model to use chat" |
+| No answer source | backend + LLM ready, KB empty and web search off | "Chat needs documents or web search enabled to answer." | "Add documents or enable web search to use chat" |
+
+## Testing
+
+Backend:
+- `tests/test_api.py::TestAPI::test_config_status_returns_chat_readiness_fields`
+  verifies the new status fields.
+
+Frontend:
+- `frontend/src/components/chat/ChatReadinessBanner.test.tsx` structural smoke
+  test.
+- Existing `vitest` suite covers the streaming / query services.
+
+Run the relevant suites:
+
+```powershell
+# Backend
+cd "d:/Cora ai"
+pytest tests/test_api.py tests/test_citation_manager.py
+ruff check src/api/settings_routes.py src/agents/kb_route_handler.py src/agents/orchestrator.py src/agents/streaming_orchestrator.py
+
+# Frontend
+cd "d:/Cora ai/frontend"
+npm run test -- --run
+npm run lint
+npm run build
+```
+
+## Files Changed
+
+- `src/api/settings_routes.py`
+- `src/agents/kb_route_handler.py`
+- `src/agents/orchestrator.py`
+- `src/agents/streaming_orchestrator.py`
+- `src/query_processing/base_rag_client.py`
+- `src/utils/cache.py`
+- `frontend/src/hooks/useChatReadiness.ts`
+- `frontend/src/components/chat/ChatReadinessBanner.tsx`
+- `frontend/src/components/ui/SearchBar.tsx`
+- `frontend/src/pages/Index.tsx`
+- `frontend/src/pages/OnboardingPage.tsx`
+- `frontend/src/components/onboarding/WelcomeStep.tsx`
+- `frontend/src/services/llmSettingsApi.ts`
+- `frontend/src/services/coraApi.ts` (health check export)
+- `frontend/src/services/cora/types.ts`
+- `frontend/src/contexts/chat/useBotResponse.ts`
+- `frontend/src/store/settingsDialogStore.ts`
+- `frontend/src/components/layout/UserMenu.tsx`
+- `frontend/src/components/settings/SettingsDialog.tsx`
+- `tests/test_api.py`
+- `frontend/src/components/chat/ChatReadinessBanner.test.tsx`
+
+## Removal of Hardcoded Starter Prompt Answers
+
+The three frontend starter prompts (VM0048, VCM pricing, COP 30) were previously
+short-circuited by the orchestrator to static answers in
+`src/utils/starter_prompts.py`. For the local self-hosted version this was
+misleading when those documents were not in the KB.
+
+- Removed the starter-prompt short-circuit from `src/agents/orchestrator.py` and
+  `src/agents/streaming_orchestrator.py`.
+- Moved the general query-cache helpers (`QUERY_HANDLER_TYPE`,
+  `get_query_cache_key`) from `src/utils/starter_prompts.py` into
+  `src/utils/cache.py`.
+- Updated `src/query_processing/base_rag_client.py` to import the cache helpers
+  from `src/utils/cache.py`.
+- The starter prompt files (`src/utils/starter_prompts.py` and
+  `scripts/ops/fetch_starter_answers.py`) have been deleted as dead code.
+
+## LLM Provider Fallback
+
+When the primary LLM provider hits a quota/rate-limit error (e.g. Gemini `429
+RESOURCE_EXHAUSTED`), the backend can transparently fall back to the other
+configured provider (e.g. OpenAI) so the chat keeps working.
+
+### How it works
+
+- `src/query_processing/fallback_llm_client.py` introduces `FallbackLLMClient`,
+  a wrapper that implements the `LLMClient` protocol and inherits from
+  `BaseRAGClient` so the streaming RAG wrapper can reuse its helpers.
+- `FallbackLLMClient` catches 429 / `RESOURCE_EXHAUSTED` / `rate_limit` /
+  `quota` / `circuit is open` errors from the primary provider and retries the
+  same call against the fallback provider.
+- `src/query_processing/llm_factory.py` builds a `FallbackLLMClient` when the
+  opposite provider's API key is also configured in the environment (e.g. primary
+  Gemini with `OPENAI_API_KEY` set, or primary OpenAI with `GEMINI_API_KEY` set).
+
+### UI provider switching
+
+Users can switch the primary provider at any time via **Settings → AI Model**
+in the chat UI. The dialog supports Gemini and OpenAI-compatible presets
+(OpenAI, Ollama, OpenRouter, etc.). Automatic fallback uses the other provider's
+environment key.
