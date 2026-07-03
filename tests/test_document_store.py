@@ -19,9 +19,9 @@ def document_store_env(tmp_path, monkeypatch):
 
     import src.config as config
 
-    config._settings_instance = None
+    config.reset_settings_singleton()
     yield data_dir
-    config._settings_instance = None
+    config.reset_settings_singleton()
 
 
 @pytest.mark.asyncio
@@ -416,14 +416,14 @@ def test_conversion_prompt_is_configurable_via_env(document_store_env, monkeypat
 
     custom_prompt = "Extract all VCM registry tables and methodology numbers. Return Markdown only."
     monkeypatch.setenv("DOCUMENT_LLM_CONVERSION_PROMPT", custom_prompt)
-    config._settings_instance = None
+    config.reset_settings_singleton()
 
     from src.document_store.converter import get_conversion_capabilities
 
     caps = get_conversion_capabilities()
     assert caps["llm_api"]["conversion_prompt"] == custom_prompt
 
-    config._settings_instance = None
+    config.reset_settings_singleton()
 
 
 # --- R2: Docling standard (classical) conversion tests ---

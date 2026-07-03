@@ -51,12 +51,14 @@ async def initialize_components():
     settings = get_settings()
     
     # Check security configuration
+    # SECRET_KEY may have been auto-generated and persisted by _apply_db_overlay
+    # during get_settings(). If it's still missing, the DB wasn't available.
     if not settings.SECRET_KEY:
         logger.warning(
             "--- SECURITY WARNING --- "
-            "SECRET_KEY is not configured in environment. "
+            "SECRET_KEY is not configured and could not be auto-generated. "
             "Conversation history will be DISCARDED for all requests because it cannot be securely verified. "
-            "Please configure SECRET_KEY for production deployments."
+            "Set SECRET_KEY in .env or ensure the SQLite database is writable."
         )
     
     try:

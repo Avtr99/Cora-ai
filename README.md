@@ -196,7 +196,8 @@ Edit `.env` and set at least:
 GEMINI_API_KEY=your_gemini_api_key
 VOYAGE_API_KEY=your_voyage_api_key      # default embedding + rerank provider
 TAVILY_API_KEY=your_tavily_api_key      # default web search provider
-SECRET_KEY=generate-a-strong-random-key # signs conversation history
+# SECRET_KEY is auto-generated on first run and persisted to SQLite.
+# Set it here only if you want to use your own key.
 ```
 
 ### 2. Start the stack
@@ -392,7 +393,7 @@ every option. The most important ones:
 | `EMBEDDING_PROVIDER` | `voyage` (default), `cohere`, `ollama`, or `openai`. |
 | `RERANK_PROVIDER` | `voyage` (default), `cohere`, or `none`. |
 | `SEARCH_PROVIDER` | `tavily` (default) or `none`. |
-| `SECRET_KEY` | Signs conversation history. Without it, history is discarded per request. |
+| `SECRET_KEY` | Signs conversation history and anonymizes memory user IDs. **Auto-generated on first run** and persisted to SQLite — no setup needed. Set it in `.env` only if you want your own key. |
 
 ### KB relevance thresholds (tunable, with per-collection overrides)
 
@@ -402,76 +403,6 @@ every option. The most important ones:
 | `KB_MIN_TOP_RELEVANCE_SCORE` | 0.4 | Pre-generation gate; below this → web fallback. |
 | `QUERY_DOC_OVERLAP_THRESHOLD` | 0.0 (off) | Zero-cost lexical overlap guard. |
 | `COLLECTION_RELEVANCE_OVERRIDES` | — | JSON map of per-collection threshold overrides. |
-
----
-
-## Development & testing
-
-### Backend
-
-```bash
-pytest                      # all tests
-pytest -m unit              # unit tests only
-pytest -m integration       # integration tests only
-pytest --cov=src tests/     # with coverage
-ruff check src/             # lint
-ruff check --fix src/       # auto-fix
-```
-
-### Frontend
-
-```bash
-cd frontend
-npm run test      # vitest
-npm run lint
-npm run build
-```
-
-### Evaluation (dev deps required)
-
-```bash
-python scripts/evaluation/evaluate_rag.py --limit 20
-python scripts/evaluation/run_full_evaluation.py
-```
-
-### Pre-commit hooks
-
-```bash
-pip install pre-commit
-pre-commit install
-```
-
-Runs `gitleaks` (secret scanning) and `ruff` (Python linting) before each commit.
-
----
-
-## Project structure
-
-```
-.
-├── src/                  # Python backend
-│   ├── api/              # FastAPI app, routes, lifespan, middleware, streaming, auth
-│   ├── agents/           # RAG orchestrator, router, route handlers, validator
-│   ├── retrieval/        # Dense retriever (pluggable embeddings + Qdrant), fusion
-│   ├── query_processing/ # LLM factory, Gemini + OpenAI-compatible clients, prompts
-│   ├── embeddings/       # Pluggable embedding provider factory
-│   ├── citations/        # Citation extraction + HTML sanitization (nh3)
-│   ├── memory/           # Conversation memory (Qdrant vectors, HMAC-hashed user IDs)
-│   ├── document_loader/  # Metadata extractor (ingestion only)
-│   ├── document_store/   # Upload, conversion (Docling / llm_api), indexing
-│   ├── evaluation/       # RAGAS evaluation harness (dev only)
-│   ├── registry_config/  # VCM registry patterns, keyword maps for routing
-│   ├── db/               # SQLite database connection + persistent cache
-│   ├── utils/            # Cache, PII redactor, security helpers
-│   └── config.py         # Singleton Settings (pydantic-settings)
-├── frontend/             # Vite + React + TypeScript SPA
-├── scripts/              # Evaluation, diagnostics, SQL migrations, Docker model prefetch
-├── migrations/           # SQLite schema migrations
-├── tests/                # pytest suite (unit + integration markers)
-├── docker-compose.yml    # app + qdrant
-├── Dockerfile            # multi-stage (frontend build → backend image)
-└── .env.example          # every configuration option, documented
-```
 
 ---
 

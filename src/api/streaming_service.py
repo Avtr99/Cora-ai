@@ -40,6 +40,7 @@ async def _drain_orchestrator_stream(
     stream_gen: AsyncGenerator[Dict[str, Any], None],
     output_sanitizer: OutputSanitizer,
     final_result_holder: List[Optional[Dict[str, Any]]],
+    emit_tokens: bool = True,
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """Consume orchestrator stream events and yield SSE-formatted dict events.
 
@@ -53,21 +54,27 @@ async def _drain_orchestrator_stream(
         output_sanitizer: Output sanitizer used to redact token chunks.
         final_result_holder: Single-element list used as a mutable out-param
             for the final result dict.
+        emit_tokens: When False, skip ``token`` and ``replace`` events (the
+            orchestrator still consumes its internal stream to produce the
+            ``final`` result, but no token events are forwarded to the client).
 
     Yields:
         SSE-formatted event dicts (``status``/``replace``/``token``).
     """
     async for event in stream_gen:
-        if event.get("type") == "status":
+        etype = event.get("type")
+        if etype == "status":
             yield {"event": "status", "status": event.get("status", "processing")}
-        elif event.get("type") == "replace":
-            yield {"event": "replace"}
-        elif event.get("type") == "token":
-            chunk = str(event.get("chunk", "") or "")
-            sanitized_chunk, _ = output_sanitizer.sanitize(chunk)
-            if sanitized_chunk:
-                yield {"event": "token", "chunk": sanitized_chunk}
-        elif event.get("type") == "final":
+        elif etype == "replace":
+            if emit_tokens:
+                yield {"event": "replace"}
+        elif etype == "token":
+            if emit_tokens:
+                chunk = str(event.get("chunk", "") or "")
+                sanitized_chunk, _ = output_sanitizer.sanitize(chunk)
+                if sanitized_chunk:
+                    yield {"event": "token", "chunk": sanitized_chunk}
+        elif etype == "final":
             final_result_holder[0] = event.get("result", {}) or {}
 
 
@@ -79,6 +86,7 @@ async def process_query_core_stream(
     include_metadata: bool,
     include_duration_ms: bool,
     include_chat_history_in_orchestrator: bool,
+    emit_tokens: bool = True,
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """Shared streaming query pipeline used by ``/query/stream``.
 
@@ -94,6 +102,13 @@ async def process_query_core_stream(
     The ``replace`` event is emitted when the KB answer is supplemented with a
     web answer: the client must discard previously rendered token text and
     render the subsequent token(s) fresh.
+
+    When ``emit_tokens`` is False, ``token`` and ``replace`` events are
+    suppressed — the orchestrator still runs its full pipeline (including
+    streaming LLM generation internally) but only ``status``/``result``/
+    ``done``/``error`` events are forwarded. This is used by clients that
+    only need status progress + the final answer (e.g. the web UI, which
+    renders the complete answer on ``result`` rather than streaming tokens).
     """
 
     input_sanitizer = get_input_sanitizer()
@@ -185,18 +200,18 @@ async def process_query_core_stream(
     output_sanitizer = get_output_sanitizer()
     final_result: Optional[Dict[str, Any]] = None
 
-    stream_gen = rag_orchestrator.process_stream(**orchestrator_kwargs)
+    stream_gen = rag_orchestrator.process_stream(emit_tokens=emit_tokens, **orchestrator_kwargs)
     final_result_holder: List[Optional[Dict[str, Any]]] = [None]
     try:
         if timeout_seconds > 0:
             async with asyncio.timeout(timeout_seconds):
                 async for sse_event in _drain_orchestrator_stream(
-                    stream_gen, output_sanitizer, final_result_holder
+                    stream_gen, output_sanitizer, final_result_holder, emit_tokens=emit_tokens
                 ):
                     yield sse_event
         else:
             async for sse_event in _drain_orchestrator_stream(
-                stream_gen, output_sanitizer, final_result_holder
+                stream_gen, output_sanitizer, final_result_holder, emit_tokens=emit_tokens
             ):
                 yield sse_event
         final_result = final_result_holder[0]

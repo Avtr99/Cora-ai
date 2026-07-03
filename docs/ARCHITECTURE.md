@@ -103,7 +103,7 @@ FastAPI middleware stack:
   │
   ▼
 query_routes.process_query_core
-  ├─ Verify SECRET_KEY (history HMAC) — if missing, history is discarded with a warning
+  ├─ Verify SECRET_KEY (history HMAC) — auto-generated on first run if not set in .env
   ├─ Assemble chat history from memory store
   ├─ StreamingRAGOrchestrator.run()
   │     ├─ QueryRewriter      (local acronym expand OR Gemini Lite)
@@ -208,7 +208,7 @@ All external dependencies are swappable via env vars. The default stack uses hos
 | `TAVILY_API_KEY` | Only if `SEARCH_PROVIDER=tavily` | Default stack |
 | `COHERE_API_KEY` | Only if using Cohere for embed/rerank | Optional |
 | `OPENAI_API_KEY` | Only if `EMBEDDING_PROVIDER=openai` | Optional |
-| `SECRET_KEY` | **Strongly recommended** | Signs conversation-history HMAC. Without it, history is discarded per-request (with a warning). |
+| `SECRET_KEY` | **Auto-generated** | Signs conversation-history HMAC and anonymizes memory user IDs. Auto-generated on first run and persisted to SQLite. Set in `.env` only for multi-instance deployments that need to share signed history. |
 | `JWT_SECRET_KEY` | Only if auth endpoints are used | Optional |
 
 The app **starts successfully with no keys configured** — `/health` works, providers fail lazily on first use. This is by design, so health probes don't depend on external services.
@@ -272,13 +272,13 @@ POST /v1/documents (conversion_mode: standard | llm_api)
 |---|---|
 | **PII redaction** | Forced on in production (`PII_REDACTION_ENABLED=True` is hardcoded when `APP_ENV=production`). Applied before memory storage. |
 | **User ID anonymization** | Memory store hashes user IDs via HMAC with `MEMORY_SECRET_KEY` (falls back to `SECRET_KEY`). |
-| **History integrity** | Conversation history is HMAC-signed with `SECRET_KEY`. Without the key, history is discarded per-request rather than trusted. |
+| **History integrity** | Conversation history is HMAC-signed with `SECRET_KEY` (auto-generated on first run if not set in `.env`). |
 | **Request size** | Hard limit `MAX_REQUEST_BODY_SIZE_BYTES=5 MB`. |
 | **Rate limiting** | **None.** Users bring their own API keys; rate limiting the operator is an anti-feature in a local-first tool. |
 | **Path traversal** | Document access is constrained to `ALLOWED_DOCUMENT_DIRS`. |
 | **Container user** | The `app` container runs as non-root UID 1000. |
 
-> **Local-only caveat:** `CORS_ORIGINS` defaults to a localhost list. If you expose the server beyond localhost, tighten this list and set a strong `SECRET_KEY`.
+> **Local-only caveat:** `CORS_ORIGINS` defaults to a localhost list. If you expose the server beyond localhost, tighten this list. `SECRET_KEY` is auto-generated per instance — for multi-instance deployments, set a shared key in `.env`.
 
 ---
 
@@ -323,7 +323,8 @@ All runtime configuration lives in `src/config.py` as a pydantic-settings `Setti
 ```powershell
 # 1. Configure environment
 copy .env.example .env
-#    Fill in: GEMINI_API_KEY (required), VOYAGE_API_KEY, TAVILY_API_KEY, SECRET_KEY
+#    Fill in: GEMINI_API_KEY (required), VOYAGE_API_KEY, TAVILY_API_KEY
+#    (SECRET_KEY is auto-generated on first run — no need to set it)
 
 # 2. Start the stack
 docker-compose up -d --build

@@ -21,13 +21,13 @@ export const ChatMessageItem = React.memo(({
   isHighlighted,
   measure,
 }: ChatMessageItemProps) => {
-  const isStreaming = message.status === 'streaming' || message.status === 'pending';
-
+  // Always measure on mount — TanStack Virtual's measureElement sets up its
+  // own ResizeObserver, so it tracks content height changes automatically.
   const setRef = useCallback((node: HTMLDivElement | null) => {
-    if (node && !isStreaming) {
+    if (node) {
       measure(node);
     }
-  }, [measure, isStreaming]);
+  }, [measure]);
 
   return (
     <div

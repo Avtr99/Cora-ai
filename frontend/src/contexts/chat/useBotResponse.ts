@@ -3,7 +3,6 @@ import { ChatHistoryMessage, CoraResponse, queryCoraStream } from '@/services/co
 import { Chat, Message } from '@/store/chatStore.types';
 import { generateId, detectTopics } from '@/store/chatStore.utils';
 import { friendlyStatusText } from './chatStatusHelpers';
-import { emit as emitStreamingText, clear as clearStreamingChannel } from './streamingTextChannel';
 import { RECOMMENDATIONS } from '@/components/chat/recommendations';
 import type { Recommendation, RecommendationType } from '@/components/chat/RecommendationCard';
 
@@ -149,9 +148,12 @@ export function useBotResponse({
 
       const requestConversationId = chat.backendConversationId ?? chat.id;
       let streamedResponse: CoraResponse | null = null;
-      let streamedText = '';
-      let streamingStarted = false;
 
+      // Status-based progress: show pipeline stage updates (searching,
+      // retrieving, generating, verifying) in the pending bubble. The
+      // complete answer is rendered only when `result` arrives — never
+      // intermediate tokens that the orchestrator might discard (KB → web
+      // fallback, relevance-check replacement, etc.).
       const response = await queryCoraStream(
         lastUserMessage.content,
         requestConversationId,
@@ -174,32 +176,8 @@ export function useBotResponse({
               updateChat(chatId, { messages: updatedMessages });
             }
           },
-          onToken: (chunk) => {
-            streamedText += chunk;
-            if (!streamingStarted) {
-              streamingStarted = true;
-              const currentChat = getCurrentChat(chatId);
-              if (currentChat) {
-                const updatedMessages = currentChat.messages.map(m =>
-                  m.id === placeholderId
-                    ? { ...m, status: 'streaming' as const }
-                    : m
-                );
-                updateChat(chatId, { messages: updatedMessages });
-              }
-            }
-            emitStreamingText(placeholderId, streamedText);
-          },
-          onReplace: () => {
-            streamedText = '';
-            emitStreamingText(placeholderId, '');
-          },
           onResult: (result: CoraResponse) => {
             streamedResponse = result;
-            // Stop token delivery before the store flips to 'complete'.
-            // The single, complete store update (with all fields) is performed
-            // by the post-await block below to avoid a redundant render + map.
-            clearStreamingChannel(placeholderId);
           },
           onError: (errorId, message) => {
             console.error('[ChatContext] SSE error:', errorId, message);
@@ -349,7 +327,6 @@ export function useBotResponse({
       );
       updateChat(chatId, { messages: updatedMessages });
     } finally {
-      clearStreamingChannel(placeholderId);
       activeRequestControllers.current.delete(chatId);
       pendingBotMessageIds.current.delete(chatId);
       setTypingChatIds(prev => {

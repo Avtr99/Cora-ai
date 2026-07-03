@@ -14,9 +14,7 @@ const DEFAULT_MESSAGE_ESTIMATE_SIZE = 200;
  *
  * Features:
  * - Virtualized rendering for performance with many messages
- * - Auto-scroll to latest user message with smart locking
- * - MutationObserver-based scroll correction during streaming
- * - User interaction cancels auto-scroll
+ * - Stick-to-bottom auto-scroll on new messages (cancelled on manual scroll)
  * - Empty state when no active chat
  *
  * @example
@@ -53,115 +51,48 @@ export const ChatInterface: React.FC = () => {
     return -1;
   }, [messages]);
 
-  // Handle deterministic auto-scrolling to the user's latest question
-  const isAutoScrollingRef = useRef(false);
+  // Simple stick-to-bottom: scroll to bottom when a new message is added
+  // or when the last message transitions out of 'pending' (the placeholder
+  // is replaced by the full answer, which is much taller). Status updates
+  // only change the pending bubble's text, not its height class, so we
+  // don't need to scroll on every content update.
+  const stickToBottomRef = useRef(true);
   const previousMessageCountRef = useRef(messages.length);
+  const previousLastMessageStatusRef = useRef<string | undefined>(undefined);
 
-  // 1. Detect when a new user message is added to trigger auto-scroll mode
-  useEffect(() => {
-    if (messages.length > previousMessageCountRef.current && lastUserMessageIndex !== -1) {
-      isAutoScrollingRef.current = true;
-    }
-    previousMessageCountRef.current = messages.length;
-  }, [messages.length, lastUserMessageIndex]);
-
-  // 2. Track the message position as it streams using MutationObserver
-  const isStreamingRef = useRef(false);
-  useEffect(() => {
-    const lastMessage = messages[messages.length - 1];
-    isStreamingRef.current = !!(lastMessage && lastMessage.sender === 'bot' && (lastMessage.status === 'pending' || lastMessage.status === 'streaming'));
-  }, [messages]);
+  const lastMessageStatus = messages.length > 0
+    ? messages[messages.length - 1].status
+    : undefined;
 
   useEffect(() => {
-    if (!isAutoScrollingRef.current || lastUserMessageIndex === -1) return;
-
     const container = parentScrollRef.current;
     if (!container) return;
-
-    // To prevent the scroll position from jumping around due to React/Virtualizer 
-    // asynchronous updates during rapid text streaming, we use a MutationObserver.
-    // It watches for any DOM additions/sizing changes and instantly corrects the scroll position.
-
-    let rafScheduled = false;
-
-    const lockScrollPosition = () => {
-      if (!isAutoScrollingRef.current) {
-        rafScheduled = false;
-        return;
-      }
-
-      const userMessageElement = container.querySelector(`[data-index="${lastUserMessageIndex}"]`);
-      if (!userMessageElement) {
-        // Fallback: tell virtualizer to find it if unmounted
-        virtualizer.scrollToIndex(lastUserMessageIndex, { align: 'start', behavior: 'auto' });
-        rafScheduled = false;
-        return;
-      }
-
-      const containerRect = container.getBoundingClientRect();
-      const messageRect = userMessageElement.getBoundingClientRect();
-
-      const offsetFromTop = messageRect.top - containerRect.top;
-      const targetOffset = 16; // Maintain the visual pt-4 padding gap
-
-      const maxPossibleScrollTop = container.scrollHeight - container.clientHeight;
-      const intendedScrollTop = container.scrollTop + (offsetFromTop - targetOffset);
-
-      if (Math.abs(offsetFromTop - targetOffset) > 1 && intendedScrollTop <= maxPossibleScrollTop) {
-        container.scrollTop = intendedScrollTop;
-      } else if (intendedScrollTop > maxPossibleScrollTop && container.scrollTop !== maxPossibleScrollTop) {
-        container.scrollTop = maxPossibleScrollTop;
-      }
-      rafScheduled = false;
-    };
-
-    // Run once immediately
-    lockScrollPosition();
-
-    // Set up observer to run synchronously whenever the DOM changes (text streams in)
-    const observer = new MutationObserver(() => {
-      if (!rafScheduled) {
-        rafScheduled = true;
-        requestAnimationFrame(lockScrollPosition);
-      }
-    });
-
-    // Observe the container for any child list additions or character data changes
-    observer.observe(container, {
-      childList: true,
-      subtree: true,
-      characterData: true
-    });
-
-    let settleRAF: number | null = null;
-    if (!isStreamingRef.current) {
-      // Streaming finished; wait for the next two frames so the virtualizer can re-measure
-      // and paint the final state before we unlock auto-scroll.
-      settleRAF = requestAnimationFrame(() => {
-        settleRAF = requestAnimationFrame(() => {
-          isAutoScrollingRef.current = false;
-          observer.disconnect();
-        });
-      });
+    const countChanged = messages.length > previousMessageCountRef.current;
+    const lastMessageCompleted = (
+      previousLastMessageStatusRef.current === 'pending' &&
+      lastMessageStatus !== 'pending'
+    );
+    if (countChanged || lastMessageCompleted) {
+      stickToBottomRef.current = true;
     }
+    previousMessageCountRef.current = messages.length;
+    previousLastMessageStatusRef.current = lastMessageStatus;
+    if (stickToBottomRef.current) {
+      container.scrollTop = container.scrollHeight;
+    }
+  }, [messages.length, lastMessageStatus, parentScrollRef]);
 
-    return () => {
-      if (settleRAF !== null) {
-        cancelAnimationFrame(settleRAF);
-      }
-      observer.disconnect();
-    };
-  }, [messages.length, lastUserMessageIndex, virtualizer, parentScrollRef]);
-
-  // 3. Cancel auto-scroll if the user manually interacts with the chat
+  // Cancel stick-to-bottom when the user manually scrolls up
   useEffect(() => {
     if (!scrollContainer) return;
 
     const handleUserInteraction = () => {
-      isAutoScrollingRef.current = false;
+      const container = parentScrollRef.current;
+      if (!container) return;
+      const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+      stickToBottomRef.current = distanceFromBottom < 80;
     };
 
-    // Listen to wheel and touch move to detect intent to manually scroll
     scrollContainer.addEventListener('wheel', handleUserInteraction, { passive: true });
     scrollContainer.addEventListener('touchmove', handleUserInteraction, { passive: true });
 
@@ -169,7 +100,7 @@ export const ChatInterface: React.FC = () => {
       scrollContainer.removeEventListener('wheel', handleUserInteraction);
       scrollContainer.removeEventListener('touchmove', handleUserInteraction);
     };
-  }, [scrollContainer]);
+  }, [scrollContainer, parentScrollRef]);
 
   // Empty state
   if (!activeChat || activeChat.messages.length === 0) {
@@ -203,7 +134,6 @@ export const ChatInterface: React.FC = () => {
           height: `${virtualizer.getTotalSize()}px`,
           width: '100%',
           position: 'relative',
-          contain: 'layout paint',
         }}
       >
         {virtualItems.map((virtualRow) => {

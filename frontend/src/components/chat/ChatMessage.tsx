@@ -10,7 +10,6 @@ import { useChatContext } from '@/contexts/useChatContext';
 import { useUserContext } from '@/contexts/useUserContext';
 import { ChatMarkdownContent } from './ChatMarkdownContent';
 import { parseCitationSources } from './chatMessageCitations.utils';
-import { subscribe as subscribeStreamingText } from '@/contexts/chat/streamingTextChannel';
 import { MessageFeedback } from './MessageFeedback';
 import { QuizWidget } from './QuizWidget';
 import { SuggestedPrompts } from './SuggestedPrompts';
@@ -101,23 +100,9 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAgentReas
   };
 
   const isPending = !isUser && message.status === 'pending';
-  const isStreaming = !isUser && message.status === 'streaming';
-
-  // Subscribe to streaming text channel for live token updates.
-  // This bypasses the Zustand store so token chunks update local state
-  // without triggering global re-renders or virtualizer re-measurements.
-  const [streamingText, setStreamingText] = useState('');
-  useEffect(() => {
-    if (!isStreaming) return;
-    setStreamingText('');
-    const unsub = subscribeStreamingText(message.id, (text) => {
-      setStreamingText(text);
-    });
-    return unsub;
-  }, [isStreaming, message.id]);
 
   const sourceLinks = useMemo(() => {
-    if (isUser || isErrorMessage || isCancelledMessage || isPending || isStreaming) {
+    if (isUser || isErrorMessage || isCancelledMessage || isPending) {
       return [];
     }
     // Try citations first (has structured details with URLs, source types, etc.)
@@ -134,8 +119,8 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAgentReas
       return parseCitationSources({ sources: message.sources });
     }
     return [];
-  }, [isUser, isErrorMessage, isCancelledMessage, isPending, isStreaming, message.citations, message.sources]);
-  const shouldShowRecommendations = !isUser && !isErrorMessage && !isCancelledMessage && !isPending && !isStreaming && message.triggeredRecommendationIds && message.triggeredRecommendationIds.length > 0;
+  }, [isUser, isErrorMessage, isCancelledMessage, isPending, message.citations, message.sources]);
+  const shouldShowRecommendations = !isUser && !isErrorMessage && !isCancelledMessage && !isPending && message.triggeredRecommendationIds && message.triggeredRecommendationIds.length > 0;
 
   const recommendationsToShow = useMemo(() => {
     if (!shouldShowRecommendations || !message.triggeredRecommendationIds) return [];
@@ -187,12 +172,6 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAgentReas
                     {message.content || 'Analyzing request...'}
                   </span>
                 </div>
-              ) : isStreaming ? (
-                <div className="py-1">
-                  <p className="font-inter font-normal text-sm leading-relaxed text-text-primary whitespace-pre-wrap break-words">
-                    {streamingText || message.content}
-                  </p>
-                </div>
               ) : (
                 <ChatMarkdownContent
                   content={message.content}
@@ -205,7 +184,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAgentReas
             </div>
 
             {/* Action bar: feedback (left) + copy (right) */}
-            {!isErrorMessage && !isCancelledMessage && !isPending && !isStreaming && (
+            {!isErrorMessage && !isCancelledMessage && !isPending && (
               <div className="flex items-start justify-between mt-1">
                 <MessageFeedback
                   messageId={message.id}
@@ -264,12 +243,12 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAgentReas
             {sourceLinks.length > 0 && <CitationBadges sources={sourceLinks} messageId={message.id} />}
 
             {/* Render the QuizWidget if the backend provided a quiz for this bot message */}
-            {!isUser && !isErrorMessage && !isCancelledMessage && !isPending && !isStreaming && message.quiz && (
+            {!isUser && !isErrorMessage && !isCancelledMessage && !isPending && message.quiz && (
               <QuizWidget quiz={message.quiz} />
             )}
 
             {/* Render suggested follow-up prompts from the backend */}
-            {!isUser && !isErrorMessage && !isCancelledMessage && !isPending && !isStreaming && message.suggestedPrompts && (
+            {!isUser && !isErrorMessage && !isCancelledMessage && !isPending && message.suggestedPrompts && (
               <SuggestedPrompts prompts={message.suggestedPrompts} messageId={message.id} />
             )}
           </div>

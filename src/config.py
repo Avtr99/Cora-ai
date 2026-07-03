@@ -1,13 +1,16 @@
-"""Application settings with environment-based configuration."""
+"""Application settings schema with environment-based configuration.
 
-import json
+Runtime management (singleton, DB overlay, per-collection thresholds) lives in
+``config_store.py``; this module defines only the ``Settings`` schema and the
+filter-field validation helper.
+"""
+
 import logging
 import re
-from typing import Optional, List, Dict, Any
-from threading import Lock
+from typing import Optional, List
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import field_validator
 
 logger = logging.getLogger(__name__)
 
@@ -83,16 +86,7 @@ class Settings(BaseSettings):
     # Qdrant Settings (local Docker Qdrant via docker-compose; no API key needed)
     QDRANT_URL: Optional[str] = None  # Required for vector store, validated on use
     QDRANT_COLLECTION_NAME: str = "cora_dense_only"
-    QDRANT_MEMORY_COLLECTION: str = "cora_memories"
-    QDRANT_REGISTRY_COLLECTION: str = "vcm_doc_registry"
-    QDRANT_MAX_CONCURRENCY: int = 5
-    QDRANT_BATCH_SIZE: int = 64
     QDRANT_TIMEOUT: int = 120
-
-    # Embedding batch size - decoupled from Qdrant upsert batch size for efficiency
-    # Voyage AI handles larger batches efficiently (fewer API requests, less overhead)
-    # Embeddings are fetched in EMBEDDING_BATCH_SIZE chunks, then sliced into QDRANT_BATCH_SIZE for upsert
-    EMBEDDING_BATCH_SIZE: int = 96  # Larger batches for Voyage API efficiency (max 128)
 
     # Qdrant Payload Filter Settings
     # Comma-separated list of metadata fields allowed for filtering queries
@@ -107,13 +101,15 @@ class Settings(BaseSettings):
         "chunk_index,source_chunk_index,block_index,json_index"
     )
     
-    # Auto-index CSV columns: When true, all CSV column names are automatically
-    # added to allowed filter fields during document ingestion
-    QDRANT_AUTO_INDEX_CSV_COLUMNS: bool = True
-    
+    # Note: VCM domain is wide with diverse data sources, so comprehensive field list is maintained
+    QDRANT_ALLOWED_FILTER_FIELDS: str = (
+        "source,file_type,doc_type,category,registry,standard,publisher,policy_framework,"
+        "document_id,version_number,title,methodology_codes,"
+        "country,status,program_name,date,methodology_name,reference_id,"
+        "chunk_index,source_chunk_index,block_index,json_index"
+    )
+
     # Retrieval Settings
-    SIMILARITY_THRESHOLD: float = 0.75
-    MAX_RESULTS_PER_QUERY: int = 5
     MAX_CHUNKS_PER_SOURCE: int = 5  # Post-rerank source diversity cap; 0 disables
     
     # Multi-round retrieval settings (expansion-pool design)
@@ -189,16 +185,12 @@ class Settings(BaseSettings):
     MAX_DOCUMENTS_FOR_ANSWER: int = 10  # Documents passed to answer generator (increased for better coverage)
 
     # Prompt Repetition Settings (RAG accuracy vs cost)
-    ENABLE_SUMMARIZER_PROMPT_REPETITION: bool = True
     ENABLE_VALIDATOR_PROMPT_REPETITION: bool = True
     # If context is longer than this many characters, repeat instructions/question only
     PROMPT_REPETITION_CONTEXT_THRESHOLD: Optional[int] = 12000
-    
+
     # Citation Settings
     CITATION_MIN_RELEVANCE_SCORE: float = 0.3  # Minimum relevance score to include citation
-    
-    # Cache Settings
-    MAINTENANCE_INTERVAL: int = 3600  # Run maintenance every hour
 
     # Agent In-Memory Cache TTLs (short-lived, catches rapid-fire duplicates on warm instances)
     ROUTE_CACHE_TTL: int = 600  # 10 minutes
@@ -207,22 +199,10 @@ class Settings(BaseSettings):
     # SQLite Persistent Cache (survives application restarts)
     CACHE_ENABLED: bool = True  # Feature flag for SQLite cache
     CACHE_TTL_SECONDS: int = 86400  # 24 hours
-    
-    # Document Processing Settings
-    CHUNK_SIZE: int = 1000
-    CHUNK_OVERLAP: int = 200
-    
-    # Chunking Settings
-    CHUNK_SIZE_TOKENS: int = 200
-    CHUNK_OVERLAP_TOKENS: int = 0
-    MAX_SECTION_LENGTH: int = 4000  # Kept for compatibility with document processing
-    
+
     # API Settings
-    MAX_RETRIES: int = 3
-    RETRY_DELAY: int = 1
     TIMEOUT: int = 30
-    API_BASE_URL: str = "http://localhost:8000"  # Base URL for API endpoints
-    
+
     # Uvicorn server settings (used when running via python -m src.api.main)
     UVICORN_HOST: str = "0.0.0.0"
     PORT: int = 8000
@@ -234,9 +214,6 @@ class Settings(BaseSettings):
     ASYNC_QUERY_WORKERS: int = 1  # Number of queue workers for /query/async
     ASYNC_QUERY_QUEUE_MAX_SIZE: int = 100  # Max queued jobs before rejecting new jobs
     ASYNC_QUERY_JOB_TTL_SECONDS: int = 3600  # Retain completed/failed jobs for polling (seconds)
-    
-    # Semantic Query Cache Settings
-    SEMANTIC_CACHE_SIMILARITY_THRESHOLD: float = 0.95  # Threshold for semantic match
     
     # Security Settings (Phase 3)
     API_ACCESS_KEY: Optional[str] = None  # Optional API key for protected endpoints
@@ -259,24 +236,14 @@ class Settings(BaseSettings):
     # Logging Settings (Phase 3)
     LOG_LEVEL: str = "INFO"
     LOG_JSON_FORMAT: bool = False  # Set True for production log aggregators
-    LOG_FILE_PATH: Optional[str] = None  # Optional file path for logs
-    
+
     # Authentication Controls
     ENABLE_INSECURE_TOKEN_ENDPOINT: bool = False  # Dev-only token issuance
-    
-    # Circuit Breaker Settings (Phase 3)
-    CIRCUIT_FAILURE_THRESHOLD: int = 5  # Failures before opening circuit
-    CIRCUIT_TIMEOUT_SECONDS: float = 30.0  # Time before half-open attempt
-    CIRCUIT_SUCCESS_THRESHOLD: int = 3  # Successes in half-open to close
-    
+
     # Conversational Handler Settings
     CONVERSATIONAL_INTENT_CACHE_SIZE: int = 512  # LRU cache size for intent classification
     CONVERSATIONAL_INTENT_MAX_TOKENS: int = 5  # Max tokens for intent classification
     CONVERSATIONAL_MAX_OUTPUT_TOKENS: int = 150  # Max tokens for conversational responses
-    
-    # Semantic Chunking Settings (from .env)
-    SEMANTIC_CHUNK_MIN_TOKENS: int = 100
-    SEMANTIC_CHUNK_MAX_TOKENS: int = 300
 
     SEARCH_PROVIDER: str = "tavily"
     TAVILY_API_KEY: Optional[str] = None
@@ -289,7 +256,6 @@ class Settings(BaseSettings):
     DOCUMENT_STORE_ROOT: str = "./data/documents"
     DOCUMENT_UPLOAD_MAX_BYTES: int = 50 * 1024 * 1024
     DOCUMENT_ALLOWED_EXTENSIONS: str = ".pdf,.md,.txt,.csv,.json,.jsonl"
-    DOCUMENT_DEFAULT_CONVERSION_MODE: str = "standard"
     # PDF render DPI: used by `llm_api` mode to render pages to images for the
     # LLM. `standard` mode (PyMuPDF) extracts text directly and ignores this.
     # 200 is a good accuracy/speed trade-off.
@@ -353,38 +319,10 @@ class Settings(BaseSettings):
         dirs = [d.strip() for d in self.ALLOWED_DOCUMENT_DIRS.split(",") if d.strip()]
         return [str(Path(d).resolve()) for d in dirs]
     
-    @model_validator(mode='after')
-    def validate_pii_redaction_production(self):
-        """PII redaction is configurable in all environments.
-
-        For self-hosted local deployments, the user owns the data and may
-        legitimately want to disable redaction. No production enforcement.
-        """
-        return self
-
-    @field_validator("QDRANT_MAX_CONCURRENCY", "QDRANT_BATCH_SIZE", "EMBEDDING_BATCH_SIZE")
-    @classmethod
-    def validate_qdrant_positive_int(cls, v: int, info) -> int:
-        """Ensure Qdrant concurrency and batch size are positive integers."""
-        if v <= 0:
-            raise ValueError(f"{info.field_name} must be a positive integer")
-        if info.field_name == "EMBEDDING_BATCH_SIZE" and v > 128:
-            raise ValueError(f"{info.field_name} must not exceed 128 (Voyage AI max)")
-        return v
-
-    @field_validator("ASYNC_QUERY_WORKERS", "ASYNC_QUERY_QUEUE_MAX_SIZE", "ASYNC_QUERY_JOB_TTL_SECONDS")
-    @classmethod
-    def validate_async_query_positive_int(cls, v: int, info) -> int:
-        """Ensure async query queue settings are positive integers."""
-        if v <= 0:
-            raise ValueError(f"{info.field_name} must be a positive integer")
-        return v
-
     @field_validator(
-        "CONVERSATIONAL_INTENT_CACHE_SIZE",
-        "CONVERSATIONAL_INTENT_MAX_TOKENS",
-        "CONVERSATIONAL_MAX_OUTPUT_TOKENS",
-        "SUBQUERY_CANDIDATES",
+        "ASYNC_QUERY_WORKERS", "ASYNC_QUERY_QUEUE_MAX_SIZE", "ASYNC_QUERY_JOB_TTL_SECONDS",
+        "CONVERSATIONAL_INTENT_CACHE_SIZE", "CONVERSATIONAL_INTENT_MAX_TOKENS",
+        "CONVERSATIONAL_MAX_OUTPUT_TOKENS", "SUBQUERY_CANDIDATES",
     )
     @classmethod
     def validate_positive_int(cls, v: int, info) -> int:
@@ -434,191 +372,17 @@ class Settings(BaseSettings):
         extra="ignore"
     )
 
-# Singleton instance storage
-_settings_instance: Optional[Settings] = None
-_settings_lock = Lock()
 
-
-# Keys stored in the app_settings table for embedding/search/reranker config.
-# These overlay the .env values so users can change them from the UI.
-DB_SETTING_KEYS = {
-    "embedding_provider": "EMBEDDING_PROVIDER",
-    "embedding_model": "EMBEDDING_MODEL",
-    "embedding_dim": "EMBEDDING_DIM",
-    "ollama_base_url": "OLLAMA_BASE_URL",
-    "voyage_api_key": "VOYAGE_API_KEY",
-    "cohere_api_key": "COHERE_API_KEY",
-    "openai_api_key": "OPENAI_API_KEY",
-    "rerank_provider": "RERANK_PROVIDER",
-    "rerank_model": "RERANK_MODEL",
-    "search_provider": "SEARCH_PROVIDER",
-    "tavily_api_key": "TAVILY_API_KEY",
-}
-
-
-def _apply_db_overlay(settings: Settings) -> Settings:
-    """Overlay DB-stored values on top of the env-loaded Settings.
-
-    Reads from the ``app_settings`` SQLite table and overrides the matching
-    Settings attributes.  This lets users change embedding/search/reranker
-    config from the UI without editing .env.
-
-    Silently skips if the DB or table is unavailable (e.g. on first run
-    before migrations have applied).
-    """
-    try:
-        from .db.database import get_connection
-        conn = get_connection()
-        try:
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT key, value FROM app_settings WHERE key IN (%s)"
-                % ",".join("?" * len(DB_SETTING_KEYS)),
-                tuple(DB_SETTING_KEYS.keys()),
-            )
-            for row in cursor.fetchall():
-                db_key = row["key"]
-                value = row["value"]
-                attr_name = DB_SETTING_KEYS.get(db_key)
-                if not attr_name:
-                    continue
-                # Type-convert based on the target field
-                current = getattr(settings, attr_name, None)
-                if isinstance(current, int):
-                    try:
-                        value = int(value)
-                    except (ValueError, TypeError):
-                        continue
-                # Override the attribute on the pydantic model
-                object.__setattr__(settings, attr_name, value)
-        finally:
-            conn.close()
-    except Exception:
-        # DB not ready yet (first run, migrations not applied, etc.)
-        # — silently fall back to .env values
-        pass
-    return settings
-
-
-def reload_settings() -> Settings:
-    """Re-read DB overlay and update the singleton.
-
-    Call this after saving settings via the API so the new values take
-    effect without requiring a full server restart.
-    """
-    global _settings_instance
-    with _settings_lock:
-        if _settings_instance is not None:
-            _apply_db_overlay(_settings_instance)
-    return _settings_instance
-
-
-class _CollectionRelevanceOverrides(BaseModel):
-    """Validated per-collection relevance threshold overrides."""
-
-    kb_min_top_relevance_score: Optional[float] = Field(default=None, alias="KB_MIN_TOP_RELEVANCE_SCORE")
-    rerank_score_threshold: Optional[float] = Field(default=None, alias="RERANK_SCORE_THRESHOLD")
-    citation_min_relevance_score: Optional[float] = Field(default=None, alias="CITATION_MIN_RELEVANCE_SCORE")
-    similarity_threshold: Optional[float] = Field(default=None, alias="SIMILARITY_THRESHOLD")
-
-    model_config = {"populate_by_name": True}
-
-
-# Cache for parsed COLLECTION_RELEVANCE_OVERRIDES, keyed by the raw JSON
-# string. The settings singleton is stable for the process lifetime, so this
-# avoids re-parsing the same JSON on every retrieval hot-path call to
-# ``get_collection_threshold``. Invalidated automatically if the raw string
-# changes (e.g. after ``reload_settings``).
-_collection_overrides_cache: Dict[str, Dict[str, Any]] = {}
-
-
-def _parse_collection_relevance_overrides(settings: Settings) -> Dict[str, Dict[str, Any]]:
-    """Parse and validate the COLLECTION_RELEVANCE_OVERRIDES JSON string.
-
-    Results are memoized in a module-level cache keyed by the raw JSON string
-    so the retrieval hot path does not re-parse on every call. A ``None`` raw
-    value is also cached (returns ``{}``) to avoid repeated attribute lookups.
-    Invalid override entries are dropped individually so one bad collection does
-    not break the others.
-    """
-    raw = getattr(settings, "COLLECTION_RELEVANCE_OVERRIDES", None) or ""
-    cached = _collection_overrides_cache.get(raw)
-    if cached is not None:
-        return cached
-    if not raw:
-        result: Dict[str, Dict[str, Any]] = {}
-    else:
-        try:
-            parsed = json.loads(raw)
-            if not isinstance(parsed, dict):
-                logger.warning("COLLECTION_RELEVANCE_OVERRIDES must be a JSON object")
-                result = {}
-            else:
-                result = {}
-                for collection_name, overrides in parsed.items():
-                    if not isinstance(overrides, dict):
-                        logger.warning(
-                            "Ignoring invalid COLLECTION_RELEVANCE_OVERRIDES entry for '%s': expected object",
-                            collection_name,
-                        )
-                        continue
-                    try:
-                        validated = _CollectionRelevanceOverrides(**overrides)
-                        result[collection_name] = validated.model_dump(
-                            by_alias=True, exclude_none=True
-                        )
-                    except Exception as e:
-                        logger.warning(
-                            "Invalid COLLECTION_RELEVANCE_OVERRIDES for '%s': %s",
-                            collection_name,
-                            e,
-                        )
-        except Exception as e:
-            logger.warning("Failed to parse COLLECTION_RELEVANCE_OVERRIDES: %s", e)
-            result = {}
-    _collection_overrides_cache[raw] = result
-    return result
-
-
-def get_collection_threshold(settings: Settings, threshold_name: str, collection_name: Optional[str] = None) -> Any:
-    """Return a relevance threshold, optionally overridden per collection.
-
-    Args:
-        settings: Settings singleton.
-        threshold_name: Name of the threshold attribute on Settings (e.g.
-            "KB_MIN_TOP_RELEVANCE_SCORE").
-        collection_name: Optional collection name to look up in
-            COLLECTION_RELEVANCE_OVERRIDES. Defaults to QDRANT_COLLECTION_NAME.
-
-    Returns:
-        The threshold value, using the per-collection override if present,
-        otherwise the global setting.
-    """
-    if collection_name is None:
-        collection_name = getattr(settings, "QDRANT_COLLECTION_NAME", None)
-    overrides = _parse_collection_relevance_overrides(settings)
-    collection_overrides = overrides.get(collection_name) if collection_name else None
-    if isinstance(collection_overrides, dict) and threshold_name in collection_overrides:
-        return collection_overrides[threshold_name]
-    return getattr(settings, threshold_name, None)
-
-
-def get_settings() -> Settings:
-    """Get or create the Settings singleton (thread-safe).
-
-    After loading from .env, overlays any DB-stored values from the
-    ``app_settings`` table so UI-configured settings take precedence.
-    """
-    global _settings_instance
-
-    # Fast path: already initialized
-    if _settings_instance is not None:
-        return _settings_instance
-
-    # Double-checked locking for thread-safe initialization
-    with _settings_lock:
-        if _settings_instance is None:
-            _settings_instance = Settings()
-            _apply_db_overlay(_settings_instance)
-
-    return _settings_instance
+# ---------------------------------------------------------------------------
+# Runtime management (singleton, DB overlay, per-collection thresholds) lives
+# in config_store.py to keep this file focused on the settings schema. Re-export
+# the public API so existing `from ..config import get_settings` imports work
+# without changes.
+# ---------------------------------------------------------------------------
+from .config_store import (  # noqa: E402
+    get_settings,
+    reload_settings,
+    reset_settings_singleton,
+    get_collection_threshold,
+    DB_SETTING_KEYS,
+)

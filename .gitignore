@@ -159,3 +159,4 @@ frontend/public/data/Document sources.csv
 document-update-baseline.json
 document-update-report.json
 bundle-report.json
+tests/test_secret_key_auto.py

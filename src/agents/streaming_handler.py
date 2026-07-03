@@ -79,6 +79,7 @@ class KBStreamingHandler:
         web_route_callback: Optional[Any] = None,
         finalize_citations_callback: Optional[Any] = None,
         sub_queries: Optional[List[str]] = None,
+        emit_tokens: bool = True,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """Stream-process a KB query.
 
@@ -86,8 +87,20 @@ class KBStreamingHandler:
         final ``{"type": "final", "result": {...}}`` event. If the answer is
         insufficient or no KB documents are found, the handler may fall back to
         web search and emit the final answer as a single token.
+
+        When ``emit_tokens`` is False, token events are suppressed — the
+        handler still runs the full pipeline (retrieval, generation, relevance
+        checks, fallbacks) and yields ``status`` + ``final`` events, but no
+        ``token`` events. This skips the non-answer buffer gate entirely (no
+        need to hold tokens for inspection when they won't be emitted).
         """
         step_start = time.time()
+
+        async def _emit_tokens(text: str) -> AsyncGenerator[Dict[str, Any], None]:
+            """Yield token events for a pre-computed answer, unless suppressed."""
+            if emit_tokens:
+                async for ev in emit_text_as_token_events(text):
+                    yield ev
 
         try:
             if sub_queries and hasattr(self.retriever, "retrieve_with_fusion"):
@@ -149,7 +162,7 @@ class KBStreamingHandler:
             if cached_result is not None:
                 cached_answer = str(cached_result.get("answer", "") or "")
                 yield {"type": "status", "status": "generating"}
-                async for ev in emit_text_as_token_events(cached_answer):
+                async for ev in _emit_tokens(cached_answer):
                     yield ev
                 yield {"type": "final", "result": cached_result}
                 return
@@ -175,7 +188,7 @@ class KBStreamingHandler:
                 timeout_budget_ms=remaining,
             )
             yield {"type": "status", "status": "generating"}
-            async for ev in emit_text_as_token_events(web_result.get("answer", "")):
+            async for ev in _emit_tokens(web_result.get("answer", "")):
                 yield ev
             yield {"type": "final", "result": web_result}
             return
@@ -232,7 +245,7 @@ class KBStreamingHandler:
                     duration_ms=round(gen_duration, 2),
                     details={"source": "web_supplement", "summary": web_result.get("answer", "")[:150]}
                 ))
-                async for ev in emit_text_as_token_events(web_result.get("answer", "")):
+                async for ev in _emit_tokens(web_result.get("answer", "")):
                     yield ev
                 yield {"type": "final", "result": web_result}
                 return
@@ -257,7 +270,7 @@ class KBStreamingHandler:
                         original_query=original_query,
                         timeout_budget_ms=remaining,
                     )
-                    async for ev in emit_text_as_token_events(web_result.get("answer", "")):
+                    async for ev in _emit_tokens(web_result.get("answer", "")):
                         yield ev
                     yield {"type": "final", "result": web_result}
                     return
@@ -271,15 +284,16 @@ class KBStreamingHandler:
                 details={"source": "knowledge_base", "summary": answer_summary}
             ))
 
-            async for ev in emit_text_as_token_events(answer_text):
+            async for ev in _emit_tokens(answer_text):
                 yield ev
             yield {"type": "final", "result": result}
             return
 
-        # Buffer-gate the live token stream: hold the first chunk of generated
-        # text until we can tell whether it's a non-answer fallback. If it is,
-        # we suppress it entirely and supplement with web (no flash). If it's a
-        # real answer, we flush the buffer and stream the rest live.
+        # Consume the LLM stream to obtain the final result. When emit_tokens
+        # is True, buffer-gate the first ~80 chars to detect non-answer
+        # fallbacks before forwarding tokens to the client (prevents flashing
+        # "information not found" text). When emit_tokens is False, drain
+        # silently — no token events are forwarded regardless.
         result = None
         buffered = ""
         gate_open = False
@@ -287,6 +301,9 @@ class KBStreamingHandler:
             async for event in stream_method(original_query, vector_results):
                 etype = event.get("type")
                 if etype == "token":
+                    if not emit_tokens:
+                        # Silently drain; only the final result matters.
+                        continue
                     if gate_open:
                         yield event
                         continue
@@ -343,12 +360,12 @@ class KBStreamingHandler:
                 supplement_reason="KB returned non-answer fallback",
                 timeout_budget_ms=remaining,
             )
-            async for ev in emit_text_as_token_events(web_result.get("answer", "")):
+            async for ev in _emit_tokens(web_result.get("answer", "")):
                 yield ev
             yield {"type": "final", "result": web_result}
             return
 
-        if buffered and not gate_open:
+        if emit_tokens and buffered and not gate_open:
             yield {"type": "token", "chunk": buffered}
 
         # Finalize and emit citations

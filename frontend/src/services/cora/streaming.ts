@@ -124,7 +124,7 @@ export async function queryCoraStream(
   try {
     timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
 
-    const response = await fetch(API_STREAM_ENDPOINT, {
+    const response = await fetch(`${API_STREAM_ENDPOINT}?tokens=false`, {
       method: 'POST',
       headers,
       body: JSON.stringify(requestBody),

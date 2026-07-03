@@ -238,8 +238,15 @@ async def get_query_async_status(job_id: str):
     return job
 
 @app.post("/query/stream")
-async def process_query_stream(query: Query, request: Request):
-    """Stream query processing via SSE with token events and a final payload event."""
+async def process_query_stream(query: Query, request: Request, tokens: bool = True):
+    """Stream query processing via SSE with token events and a final payload event.
+
+    Query params:
+        tokens: When False, suppress token/replace events — only status,
+            result, done, and error events are emitted. Used by clients
+            that render the complete answer on result rather than
+            streaming tokens (e.g. the web UI).
+    """
 
     async def event_generator():
         stream = process_query_core_stream(
@@ -249,6 +256,7 @@ async def process_query_stream(query: Query, request: Request):
             include_metadata=True,
             include_duration_ms=True,
             include_chat_history_in_orchestrator=True,
+            emit_tokens=tokens,
         )
         try:
             async for event in stream:
@@ -276,9 +284,9 @@ async def v1_process_query(query: Query, request: Request):
     return await process_query(query, request)
 
 @v1_router.post("/query/stream")
-async def v1_process_query_stream(query: Query, request: Request):
+async def v1_process_query_stream(query: Query, request: Request, tokens: bool = True):
     """Stream query processing updates (SSE) for API v1."""
-    return await process_query_stream(query, request)
+    return await process_query_stream(query, request, tokens=tokens)
 
 @v1_router.post("/query/async", response_model=AsyncQueryAcceptedResponse, status_code=202)
 async def v1_enqueue_query_async(query: Query):
@@ -403,9 +411,9 @@ async def api_cora_query(query: Query, request: Request):
     return await process_query(query, request)
 
 @app.post("/api/cora-query-stream")
-async def api_cora_query_stream(query: Query, request: Request):
+async def api_cora_query_stream(query: Query, request: Request, tokens: bool = True):
     """Streaming query alias for the SPA (maps to /v1/query/stream)."""
-    return await process_query_stream(query, request)
+    return await process_query_stream(query, request, tokens=tokens)
 
 # Mount SPA (Single Page Application)
 # 1. API router is already included under /v1

@@ -183,12 +183,13 @@ class StreamingRAGOrchestrator(RAGOrchestrator):
         query: str,
         metadata_filters: Optional[Dict[str, Any]] = None,
         chat_history: Optional[List[Dict[str, str]]] = None,
+        emit_tokens: bool = True,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """Stream-process a query through the RAG pipeline.
 
         Yields:
             - ``{"type": "status", "status": "..."}`` events
-            - ``{"type": "token", "chunk": "..."}`` events
+            - ``{"type": "token", "chunk": "..."}`` events (skipped when emit_tokens=False)
             - ``{"type": "final", "result": {...}}`` event
         """
         start_time = time.time()
@@ -201,6 +202,12 @@ class StreamingRAGOrchestrator(RAGOrchestrator):
         yield {"type": "status", "status": "accepted"}
         yield {"type": "status", "status": "processing"}
 
+        async def _emit_answer_tokens(text: str) -> AsyncGenerator[Dict[str, Any], None]:
+            """Yield token events for a pre-computed answer, unless suppressed."""
+            if emit_tokens:
+                async for ev in emit_text_as_token_events(text):
+                    yield ev
+
         try:
             # OPTIMIZATION: Conversational Gate — cheap heuristic first.
             # Bypass the entire RAG pipeline for clear greetings using only the
@@ -212,7 +219,7 @@ class StreamingRAGOrchestrator(RAGOrchestrator):
             if conv_result is not None:
                 logger.debug("Conversational query detected in stream, bypassing RAG pipeline")
                 yield {"type": "status", "status": "generating"}
-                async for ev in emit_text_as_token_events(conv_result.get("answer", "")):
+                async for ev in _emit_answer_tokens(conv_result.get("answer", "")):
                     yield ev
                 yield {"type": "final", "result": conv_result}
                 return
@@ -227,7 +234,7 @@ class StreamingRAGOrchestrator(RAGOrchestrator):
                 cached_answer = str(cached_result.get("answer", "") or "")
                 logger.debug("Serving from early query cache check in stream")
                 yield {"type": "status", "status": "generating"}
-                async for ev in emit_text_as_token_events(cached_answer):
+                async for ev in _emit_answer_tokens(cached_answer):
                     yield ev
                 yield {"type": "final", "result": cached_result}
                 return
@@ -241,7 +248,7 @@ class StreamingRAGOrchestrator(RAGOrchestrator):
             if conv_result is not None:
                 logger.debug("Conversational query detected in stream after cache miss, bypassing RAG pipeline")
                 yield {"type": "status", "status": "generating"}
-                async for ev in emit_text_as_token_events(conv_result.get("answer", "")):
+                async for ev in _emit_answer_tokens(conv_result.get("answer", "")):
                     yield ev
                 yield {"type": "final", "result": conv_result}
                 return
@@ -261,7 +268,7 @@ class StreamingRAGOrchestrator(RAGOrchestrator):
                 # Timeout result returned directly by ``_prepare_routing``.
                 result = routing
                 yield {"type": "status", "status": "generating"}
-                async for ev in emit_text_as_token_events(result.get("answer", "")):
+                async for ev in _emit_answer_tokens(result.get("answer", "")):
                     yield ev
                 result["reasoning_steps"] = format_reasoning_steps(steps)
                 yield {"type": "final", "result": result}
@@ -301,6 +308,7 @@ class StreamingRAGOrchestrator(RAGOrchestrator):
                     web_route_callback=self.route_processor.process_web_route,
                     finalize_citations_callback=self.route_processor._finalize_citations,
                     sub_queries=sub_queries,
+                    emit_tokens=emit_tokens,
                 ):
                     if event.get("type") == "final":
                         final_result = event.get("result", {}) or {}
@@ -319,7 +327,7 @@ class StreamingRAGOrchestrator(RAGOrchestrator):
                     timeout_budget_ms=remaining_budget_ms,
                 )
                 yield {"type": "status", "status": "generating"}
-                async for ev in emit_text_as_token_events(result.get("answer", "")):
+                async for ev in _emit_answer_tokens(result.get("answer", "")):
                     yield ev
                 final_result = result
 
@@ -336,7 +344,7 @@ class StreamingRAGOrchestrator(RAGOrchestrator):
                     timeout_budget_ms=remaining_budget_ms,
                 )
                 yield {"type": "status", "status": "generating"}
-                async for ev in emit_text_as_token_events(result.get("answer", "")):
+                async for ev in _emit_answer_tokens(result.get("answer", "")):
                     yield ev
                 final_result = result
 
