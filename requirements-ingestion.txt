@@ -22,7 +22,7 @@ docling[rapidocr]>=2.106.0,<2.108.0
 # (granite_vision.py, table_structure_model_v2.py) even when VLM features are
 # off. Install CPU-only wheels to avoid the 451MB CUDA build. --no-deps keeps
 # the install minimal (torch only needs filelock, sympy, networkx, jinja2).
-torch>=2.11.0,<3.0
+torch>=2.12.1,<3.0
 torchvision>=0.26.0,<1.0
 
 # PyMuPDF: page rendering for llm_api input (rasterizes PDF pages to PNG images).
