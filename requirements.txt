@@ -37,7 +37,7 @@ pydantic>=2.13.4,<3.0
 pydantic-settings>=2.14.2,<3.0
 numpy>=2.4.0,<3.0
 pandas>=3.0.3,<4.0
-PyYAML==6.0.2
+PyYAML==6.0.3
 
 # Document Processing (ingestion)
 markdown>=3.10.2,<4.0
