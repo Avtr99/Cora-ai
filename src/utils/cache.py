@@ -1,11 +1,11 @@
 """
 Unified caching module for the RAG system.
 
-Single-tier design: all query result caching is backed by SQLite
-(see src/db/sqlite_cache.py and the backend_cache table). This replaces
-the previous two-tier (in-memory L1 + SQLite L2) approach — for a
-self-hosted local app, SQLite is fast enough and we don't need the
-complexity of a separate in-memory layer.
+Query result caching is backed by SQLite (see src/db/sqlite_cache.py and
+the backend_cache table). Agent-level in-memory caches (TTLCache/LRUCache
+in routing, rewrite, and conversational handlers) provide short-lived
+dedup for rapid-fire requests within a session — they are independent
+dedup layers, not a separate cache tier.
 
 Embedding persistence also lives in SQLite (see embedding_cache table
 in migrations/001_initial.sql).
@@ -25,7 +25,7 @@ def generate_cache_key(prefix: str, text: str) -> str:
     return f"{prefix}:{hashlib.sha256(text.encode()).hexdigest()}"
 
 
-# Handler type used for SQLite L2 cache entries for query answers.
+# Handler type used for SQLite cache entries for query answers.
 QUERY_HANDLER_TYPE = "query"
 
 
@@ -38,23 +38,21 @@ def get_query_cache_key(query: str) -> str:
 class QueryCache:
     """SQLite-backed query result cache.
 
-    Provides the same API as the previous in-memory version but delegates
-    all storage to SQLite (SQLiteCache). This persists across restarts and
-    eliminates the need for a separate in-memory tier.
+    Delegates all storage to SQLite (SQLiteCache). Persists across restarts.
     """
 
     def __init__(self, max_size: int = None, ttl: int = None):
         # max_size is accepted for backwards compat but ignored — SQLite
         # handles its own storage. TTL is read from settings by SQLiteCache.
         self._ttl = ttl
-        self._l2 = None  # Lazily initialized to avoid import-time DB access
+        self._sqlite = None  # Lazily initialized to avoid import-time DB access
 
-    def _get_l2(self):
+    async def _get_sqlite(self):
         """Lazily get the SQLite cache instance."""
-        if self._l2 is None:
+        if self._sqlite is None:
             from ..db.sqlite_cache import get_sqlite_cache
-            self._l2 = get_sqlite_cache()
-        return self._l2
+            self._sqlite = await get_sqlite_cache()
+        return self._sqlite
 
     def _build_query_cache_key(self, query: str, context_fingerprint: Optional[str] = None) -> str:
         """Build a stable query-cache key with optional retrieval-context fingerprint."""
@@ -76,7 +74,8 @@ class QueryCache:
         """Get cached result for query."""
         key = self._build_query_cache_key(query, context_fingerprint)
         try:
-            result = await self._get_l2().get(key, "query")
+            sqlite = await self._get_sqlite()
+            result = await sqlite.get(key, "query")
             if result is not None:
                 return result
         except Exception as e:
@@ -95,7 +94,8 @@ class QueryCache:
         try:
             settings = get_settings()
             effective_ttl = ttl or self._ttl or getattr(settings, "CACHE_TTL_SECONDS", 86400)
-            await self._get_l2().set(key, "query", result, ttl_seconds=effective_ttl)
+            sqlite = await self._get_sqlite()
+            await sqlite.set(key, "query", result, ttl_seconds=effective_ttl)
         except Exception as e:
             logger.debug(f"SQLite cache set failed: {e}")
 
@@ -116,7 +116,8 @@ class QueryCache:
             # Overwrite with empty data and TTL of 1 second to effectively
             # invalidate. The next get_result will return None because the
             # entry will have expired.
-            await self._get_l2().set(key, "query", {}, ttl_seconds=1)
+            sqlite = await self._get_sqlite()
+            await sqlite.set(key, "query", {}, ttl_seconds=1)
             return True
         except Exception as e:
             logger.debug(f"SQLite cache invalidate failed: {e}")
@@ -133,7 +134,8 @@ class QueryCache:
     async def clear(self) -> None:
         """Clear all cached query results."""
         try:
-            await self._get_l2().clear(handler_type="query")
+            sqlite = await self._get_sqlite()
+            await sqlite.clear(handler_type="query")
         except Exception as e:
             logger.debug(f"SQLite cache clear failed: {e}")
 

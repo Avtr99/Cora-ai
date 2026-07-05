@@ -43,8 +43,6 @@ _STOP_WORDS = frozenset({
 
 _WINDOWS_PATH_RE = re.compile(r"[A-Za-z]:\\[^\n<>\"|?*]+")
 _UNIX_PATH_RE = re.compile(r"/(?:home|root|usr|var|etc|tmp|opt|srv|mnt|proc)/[^\n<>\"|?*]+")
-_SCRIPT_TAG_RE = re.compile(r"<script[^>]*>.*?</script>", re.IGNORECASE | re.DOTALL)
-_HTML_TAG_RE = re.compile(r"<[^>]+>")
 _ENV_PATH_RE = re.compile(r"\b[A-Z_]{3,}=(?:/[^\"]*\S|[A-Za-z]:\\[^\s]+)")
 
 _WORD_RE = re.compile(r"\b[a-zA-Z0-9][a-zA-Z0-9.-]*\b")

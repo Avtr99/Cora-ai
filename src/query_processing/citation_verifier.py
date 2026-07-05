@@ -302,3 +302,106 @@ def normalize_kb_citations(answer: str, sources: list[str]) -> str:
     answer = re.sub(r"  +", " ", answer).strip()
     answer = re.sub(r"\s+([.,;!?])", r"\1", answer)
     return answer
+
+
+# ─── Citation renumbering after filtering ──────────────────────────────
+
+# Matches all citation marker formats the LLM produces:
+#   [cite_kb: 1]  [cite_kb: 1, 2]  [Knowledge Base, cite: 1]  [Web, cite: 1, 2]
+_CITE_KB_RE = re.compile(
+    r"\[(?:cite_kb:\s*([\d,\s]+)|Knowledge\s+Base,\s*cite:\s*([\d,\s]+))\]",
+    re.IGNORECASE,
+)
+_CITE_WEB_RE = re.compile(
+    r"\[(?:cite_web:\s*([\d,\s]+)|Web,\s*cite:\s*([\d,\s]+))\]",
+    re.IGNORECASE,
+)
+
+
+def _unique_sources_by_type(citations: list, source_type: str) -> list[str]:
+    """Return unique source names for *source_type* in first-seen order."""
+    seen: set[str] = set()
+    names: list[str] = []
+    for c in citations:
+        if c.source_type != source_type:
+            continue
+        key = c.source_name.strip().lower()
+        if key and key not in seen:
+            seen.add(key)
+            names.append(c.source_name)
+    return names
+
+
+def _build_renumber_map(
+    original: list, filtered: list, source_type: str
+) -> dict[int, int]:
+    """Map old 1-indexed position → new 1-indexed position for *source_type*."""
+    old_names = _unique_sources_by_type(original, source_type)
+    new_names = _unique_sources_by_type(filtered, source_type)
+    new_index: dict[str, int] = {}
+    for i, name in enumerate(new_names, 1):
+        new_index[name.strip().lower()] = i
+
+    mapping: dict[int, int] = {}
+    for old_pos, name in enumerate(old_names, 1):
+        new_pos = new_index.get(name.strip().lower())
+        if new_pos is not None:
+            mapping[old_pos] = new_pos
+    return mapping
+
+
+def _replace_numbers(match: re.Match, mapping: dict[int, int]) -> str:
+    """Rewrite citation numbers in a matched marker using *mapping*.
+
+    Returns an empty string (removing the marker) when no numbers survive
+    the mapping so the frontend never sees a dangling reference.
+    """
+    raw = match.group(1) or match.group(2) or ""
+    nums: list[str] = []
+    for part in raw.split(","):
+        part = part.strip()
+        if part.isdigit():
+            old = int(part)
+            new = mapping.get(old)
+            if new is not None:
+                nums.append(str(new))
+    if not nums:
+        return ""
+    # Splice only the captured number group into the full marker text.
+    # Using str.replace would corrupt label text that happens to contain
+    # the same digits (e.g. "[VCS v4.1, cite: 1]" → "v4.2").
+    full = match.group(0)
+    group_idx = 1 if match.group(1) is not None else 2
+    start = match.start(group_idx) - match.start(0)
+    end = match.end(group_idx) - match.start(0)
+    return full[:start] + ", ".join(nums) + full[end:]
+
+
+def renumber_citation_markers(
+    answer: str,
+    original_citations: list,
+    filtered_citations: list,
+) -> str:
+    """Rewrite inline citation markers so their numbers match the filtered list.
+
+    After ``filter_citations_by_answer`` removes citations that aren't grounded
+    in the answer, the remaining citation list is shorter. But the ``[cite_kb: N]``
+    markers in the answer still reference the *original* source indices. This
+    function renumbers them so ``N`` refers to the position in the filtered list
+    (separated by KB/Web), which is what the frontend displays.
+
+    Markers referencing filtered-out sources are removed entirely.
+    """
+    if not answer:
+        return answer
+
+    kb_map = _build_renumber_map(original_citations, filtered_citations, "knowledge_base")
+    web_map = _build_renumber_map(original_citations, filtered_citations, "web")
+
+    answer = _CITE_KB_RE.sub(lambda m: _replace_numbers(m, kb_map), answer)
+    answer = _CITE_WEB_RE.sub(lambda m: _replace_numbers(m, web_map), answer)
+
+    # Clean up spacing left by removed markers.
+    answer = re.sub(r"  +", " ", answer).strip()
+    answer = re.sub(r"\s+([.,;!?])", r"\1", answer)
+    return answer

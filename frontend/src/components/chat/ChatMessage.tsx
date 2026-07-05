@@ -10,6 +10,7 @@ import { useChatContext } from '@/contexts/useChatContext';
 import { useUserContext } from '@/contexts/useUserContext';
 import { ChatMarkdownContent } from './ChatMarkdownContent';
 import { parseCitationSources } from './chatMessageCitations.utils';
+import type { CitationNumberMap } from './ChatMarkdownContent';
 import { MessageFeedback } from './MessageFeedback';
 import { QuizWidget } from './QuizWidget';
 import { SuggestedPrompts } from './SuggestedPrompts';
@@ -120,6 +121,25 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAgentReas
     }
     return [];
   }, [isUser, isErrorMessage, isCancelledMessage, isPending, message.citations, message.sources]);
+
+  // Build a single global numbering sequence for all sources. The backend emits
+  // per-type citations (KB 1..N, Web 1..M); we map those to the global index of
+  // the matching source in sourceLinks so the inline markers and the source list
+  // share one linear, unbroken sequence.
+  const citationNumberMap = useMemo<CitationNumberMap>(() => {
+    const kb: number[] = [];
+    const web: number[] = [];
+    sourceLinks.forEach((source, index) => {
+      const globalNumber = index + 1;
+      if (source.type === 'knowledge_base') {
+        kb.push(globalNumber);
+      } else {
+        web.push(globalNumber);
+      }
+    });
+    return { kb, web };
+  }, [sourceLinks]);
+
   const shouldShowRecommendations = !isUser && !isErrorMessage && !isCancelledMessage && !isPending && message.triggeredRecommendationIds && message.triggeredRecommendationIds.length > 0;
 
   const recommendationsToShow = useMemo(() => {
@@ -178,7 +198,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAgentReas
                   messageId={message.id}
                   mounted={mounted}
                   copyText={copyText}
-                  maxCitationNumber={sourceLinks.length}
+                  citationNumberMap={citationNumberMap}
                 />
               )}
             </div>

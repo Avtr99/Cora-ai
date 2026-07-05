@@ -415,7 +415,7 @@ def get_conversion_capabilities() -> dict[str, Any]:
             "provider": "docling",
             "cost_per_page": "Free",
             "privacy": "local",
-            "speed": "slow",
+            "speed": "fast",
             "experimental": False,
         },
         "llm_api": {

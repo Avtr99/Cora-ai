@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, asdict
 from datetime import datetime
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 
 # Reference Q&A dataset for evaluation
@@ -532,8 +532,7 @@ def test_rag_evaluation_ci_check():
     This test uses mocks by default. To run with real components,
     set RAG_EVAL_LIVE=1 environment variable.
     """
-    import os
-    
+
     async def mock_search_and_process(query: str, vector_results: Dict):
         """Generate contextual mock responses based on query keywords."""
         query_lower = query.lower()

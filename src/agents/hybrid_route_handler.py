@@ -29,7 +29,6 @@ from .route_processor_utils import (
     remaining_budget_ms,
     source_name_from_metadata,
 )
-
 if TYPE_CHECKING:
     from ..citations import CitationManager
 
@@ -253,14 +252,12 @@ class HybridRouteHandler:
             web_citations,
             max_total=5
         )
-        grounded_citations = self.citation_manager.filter_citations_by_answer(
-            merged_citations,
-            result.get("answer", ""),
-            query=original_query,
-            min_match_threshold=1,
-        )
-
-        result["citations"] = grounded_citations
+        # Defer filtering, suppression, and renumbering to the
+        # finalize_citations_callback (RouteProcessor._finalize_citations),
+        # which handles source-type alignment and marker renumbering in one
+        # pass.  Setting citations to the merged set gives the callback the
+        # full original list so renumber mapping is correct.
+        result["citations"] = merged_citations
         
         # Use coverage_score from result if available, otherwise compute from merged citations
         coverage_score = result.get("coverage_score")

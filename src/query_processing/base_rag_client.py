@@ -2,7 +2,7 @@
 
 Shared by GeminiClient and OpenAICompatibleClient. Contains:
 - Context preparation from vector results
-- Cache management (L1 in-memory + L2 SQLite)
+- Cache management (SQLite persistent cache)
 - Prompt injection detection
 - Coverage score calculation
 - The search_and_process pipeline (delegates LLM call to subclasses)
@@ -45,7 +45,7 @@ class BaseRAGClient:
     """
 
     def __init__(self):
-        self._l2_cache = None  # Lazily set from lifespan initialization
+        self._sqlite_cache = None  # Lazily set from lifespan initialization
 
     # ------------------------------------------------------------------
     # Properties — must be implemented by subclasses
@@ -115,6 +115,13 @@ class BaseRAGClient:
     # Shared RAG pipeline
     # ------------------------------------------------------------------
 
+    def get_cache_status(self) -> Dict[str, Any]:
+        """Report SQLite cache status for health checks."""
+        return {
+            "cache_enabled": self._sqlite_cache is not None and self._sqlite_cache.enabled,
+            "model": self.model_main,
+        }
+
     async def check_query_cache(self, query: str) -> Optional[Dict[str, Any]]:
         """Check SQLite cache for a previously cached answer (query-only, no context fingerprint)."""
         if not query or not query.strip():
@@ -140,14 +147,14 @@ class BaseRAGClient:
 
         return None
 
-    async def persist_to_l2(self, query: str, result: Dict[str, Any]) -> None:
-        """Persist a query result to L2 (SQLite) cache."""
-        if self._l2_cache is None or not self._l2_cache.enabled:
+    async def persist_to_cache(self, query: str, result: Dict[str, Any]) -> None:
+        """Persist a query result to the SQLite cache."""
+        if self._sqlite_cache is None or not self._sqlite_cache.enabled:
             return
 
         if not isinstance(result, dict) or "reasoning_steps" not in result:
             logger.warning(
-                "Skipping L2 cache write for query '%s': result is missing reasoning_steps",
+                "Skipping cache write for query '%s': result is missing reasoning_steps",
                 query[:50],
             )
             return
@@ -156,15 +163,15 @@ class BaseRAGClient:
             from ..utils.cache import get_query_cache_key, QUERY_HANDLER_TYPE
             settings = get_settings()
             hash_key = get_query_cache_key(query)
-            await self._l2_cache.set(
+            await self._sqlite_cache.set(
                 hash_key,
                 QUERY_HANDLER_TYPE,
                 result,
                 ttl_seconds=getattr(settings, "CACHE_TTL_SECONDS", 86400),
             )
-            logger.debug("Persisted query result to L2 cache: %s", query[:50])
+            logger.debug("Persisted query result to SQLite cache: %s", query[:50])
         except Exception as e:
-            logger.warning("Failed to persist query result to L2 cache: %s", e)
+            logger.warning("Failed to persist query result to SQLite cache: %s", e)
 
     async def search_and_process(self, query: str, vector_results: Dict[str, Any]) -> Dict[str, Any]:
         """Full RAG pipeline: build prompt, generate answer, extract citations.

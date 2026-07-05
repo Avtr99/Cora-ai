@@ -17,6 +17,61 @@ export interface LLMSettings {
   organization: string | null;
 }
 
+// ---------------------------------------------------------------------------
+// Provider quick-switch (chat toggle)
+// ---------------------------------------------------------------------------
+
+export interface AvailableProvider {
+  slug: string;
+  label: string;
+  provider: string;
+  model: string;
+  has_api_key: boolean;
+}
+
+export interface AvailableProvidersResponse {
+  current: string | null;
+  available: AvailableProvider[];
+}
+
+export interface ProviderSwitchResult {
+  success: boolean;
+  label: string | null;
+  provider: string | null;
+  model_main: string | null;
+  client_type: string | null;
+  error: string | null;
+}
+
+/**
+ * List all LLM providers that have API keys configured and are available
+ * for quick-switching via the chat toggle.
+ */
+export async function getAvailableProviders(): Promise<AvailableProvidersResponse> {
+  const response = await fetch(`${SETTINGS_BASE}/llm/providers`);
+  if (!response.ok) {
+    throw new Error(`Failed to list providers: ${response.status}`);
+  }
+  return response.json();
+}
+
+/**
+ * Quick-switch the active LLM provider by profile slug. Instantly hot-swaps
+ * the backend client without requiring a restart.
+ */
+export async function switchLLMProvider(slug: string): Promise<ProviderSwitchResult> {
+  const response = await fetch(`${SETTINGS_BASE}/llm/switch`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ label: slug }),
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Failed to switch provider: ${response.status} ${text}`);
+  }
+  return response.json();
+}
+
 export interface LLMModel {
   name: string;
   size_bytes: number | null;

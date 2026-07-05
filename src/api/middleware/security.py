@@ -69,7 +69,15 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         return api_keys
     
     def _hash_key(self, key: str) -> str:
-        """Hash API key for secure comparison."""
+        """Hash API key for secure comparison.
+
+        SHA-256 is intentional here: API keys are high-entropy random tokens
+        (256 bits via ``secrets.token_hex(32)``), not user passwords, so a
+        fast hash is appropriate — there is no realistic brute-force surface.
+        A slow KDF (PBKDF2/scrypt) would add per-request latency for no
+        security benefit. Comparison uses ``secrets.compare_digest`` to
+        prevent timing attacks.
+        """
         return hashlib.sha256(key.encode()).hexdigest()
     
     def _is_path_protected(self, path: str) -> bool:

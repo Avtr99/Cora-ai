@@ -1,6 +1,7 @@
 import React from 'react';
 import { Database, Globe, ExternalLink } from 'lucide-react';
 import { sanitizeUrl } from '@/lib/security';
+import { decodeSourceLabel } from './chatMessageCitations.utils';
 
 export interface CitationSource {
   label: string;
@@ -21,23 +22,7 @@ interface CitationBadgesProps {
 function getSourceDisplayName(label: string): string {
   // Backend now handles: URL decoding, extension stripping (.jsonl, .md, .pdf)
   // We only do minimal path cleaning for display
-  let cleaned = label.replace(/^data[\\/]/, '').trim();
-
-  if (cleaned.includes('%') || cleaned.includes('+')) {
-    try {
-      let decoded = cleaned.replace(/\+/g, ' ');
-      let guard = 0;
-      while (decoded.includes('%') && guard < 5) {
-        const next = decodeURIComponent(decoded);
-        if (next === decoded) break;
-        decoded = next;
-        guard++;
-      }
-      cleaned = decoded;
-    } catch {
-      // Keep original cleaned label if decoding fails
-    }
-  }
+  let cleaned = decodeSourceLabel(label).replace(/^data[\\/]/, '').trim();
 
   // Preserve methodology IDs (VM0047, VCS1764, ACM0001, etc.) as uppercase
   cleaned = cleaned.replace(/(VM|VCS|ACM|AMS|CCQI)\d+/gi, (match) => match.toUpperCase());
@@ -133,46 +118,30 @@ const SourceIcon: React.FC<{ type: 'knowledge_base' | 'web'; label: string }> = 
 };
 
 /**
- * CitationBadges - Displays sources as numbered pill badges
- * Similar to the design in the reference image with numbered pills
- * containing icons and source names
+ * CitationBadges - Displays sources as a single linear, numbered list.
+ *
+ * Sources are shown in one continuous sequence (no separate KB/Web numbering),
+ * with the icon color indicating the source type. This keeps the citation
+ * numbers in the answer text and the source list consistent across hybrid,
+ * KB-only, and web-only responses.
  */
 export const CitationBadges: React.FC<CitationBadgesProps> = ({ sources, messageId }) => {
   if (!sources || sources.length === 0) return null;
 
-  // Group sources by type
-  const kbSources = sources.filter(s => s.type === 'knowledge_base');
-  const webSources = sources.filter(s => s.type === 'web');
-
   return (
-    <div id={`citation-badges-section-${messageId}`} className="mt-3 space-y-2 w-full">
-      {/* Knowledge Base Sources */}
-      {kbSources.length > 0 && (
-        <div className="flex flex-wrap md:flex-nowrap items-center gap-2">
-          <span className="font-inter font-normal text-xs text-text-secondary mr-1 whitespace-nowrap shrink-0">Knowledge Base:</span>
-          {kbSources.map((source, index) => (
-            <CitationBadge
-              key={`kb-${index}`}
-              number={index + 1}
-              source={source}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Web Sources */}
-      {webSources.length > 0 && (
-        <div className="flex flex-wrap md:flex-nowrap items-center gap-2">
-          <span className="font-inter font-normal text-xs text-text-secondary mr-1 whitespace-nowrap shrink-0">Web:</span>
-          {webSources.map((source, index) => (
-            <CitationBadge
-              key={`web-${index}`}
-              number={index + 1}
-              source={source}
-            />
-          ))}
-        </div>
-      )}
+    <div id={`citation-badges-section-${messageId}`} className="mt-3 w-full">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="font-inter font-normal text-xs text-text-secondary mr-1 whitespace-nowrap shrink-0">
+          Sources:
+        </span>
+        {sources.map((source, index) => (
+          <CitationBadge
+            key={`${source.type}-${index}`}
+            number={index + 1}
+            source={source}
+          />
+        ))}
+      </div>
     </div>
   );
 };
@@ -183,11 +152,15 @@ export const CitationBadges: React.FC<CitationBadgesProps> = ({ sources, message
 const CitationBadge: React.FC<{ number: number; source: CitationSource }> = ({ number, source }) => {
   const displayName = getSourceDisplayName(source.label);
   const safeUrl = source.url ? sanitizeUrl(source.url) : null;
+  const isKB = source.type === 'knowledge_base';
 
   const badgeContent = (
     <>
-      {/* Number circle */}
-      <span className="flex items-center justify-center w-4 h-4 rounded-full bg-surface-subtle text-2xs font-normal text-text-secondary">
+      {/* Number circle — color-coded by source type for quick scanning */}
+      <span className={`
+        flex items-center justify-center w-4 h-4 rounded-full text-2xs font-medium
+        ${isKB ? 'bg-brand-100 text-brand-700' : 'bg-surface-subtle text-text-secondary'}
+      `}>
         {number}
       </span>
       {/* Icon */}

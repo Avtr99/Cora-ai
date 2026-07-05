@@ -28,7 +28,14 @@ def generate_api_key() -> str:
 
 
 def main():
-    """Generate and display API key with setup instructions."""
+    """Generate and display API key with setup instructions.
+
+    Note: Printing the key to stdout is intentional — this is a CLI utility
+    whose sole purpose is to generate and show the key so the operator can
+    copy it into their .env file. The key is not logged to any persistent
+    log file; it goes only to the terminal the operator is running the
+    command in.
+    """
     api_key = generate_api_key()
 
     print("=" * 70)

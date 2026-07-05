@@ -1,9 +1,9 @@
 """
 Query Rewrite Handler
 
-Handles query rewriting with two-tier caching:
-- L1: In-memory TTLCache (fast, ephemeral, catches rapid-fire duplicates)
-- L2: SQLite (persistent, survives application restarts)
+Handles query rewriting with caching:
+- In-memory TTLCache (fast, ephemeral, catches rapid-fire duplicates)
+- SQLite cache (persistent, survives application restarts)
 """
 
 import datetime
@@ -28,10 +28,10 @@ logger = logging.getLogger(__name__)
 
 
 class RewriteHandler:
-    """Handles query rewriting with two-tier caching (L1 in-memory + L2 SQLite)."""
-    
+    """Handles query rewriting with in-memory + SQLite caching."""
+
     _HANDLER_TYPE = "rewrite"
-    
+
     def __init__(
         self,
         query_rewriter: Any,
@@ -39,24 +39,24 @@ class RewriteHandler:
         cache_ttl: int = 600,
         cache_maxsize: int = 500,
         sqlite_cache: Optional[SQLiteCache] = None,
-        l2_ttl_seconds: int = 86400,
+        sqlite_ttl_seconds: int = 86400,
     ):
         """
         Initialize the rewrite handler.
-        
+
         Args:
             query_rewriter: QueryRewriterAgent instance
             use_quick_rewrite: If True, prefer quick local expansion
-            cache_ttl: L1 cache TTL in seconds (default 10 min)
-            cache_maxsize: Maximum L1 cache size
-            sqlite_cache: Optional L2 persistent cache
-            l2_ttl_seconds: L2 cache TTL in seconds (default 24h)
+            cache_ttl: In-memory cache TTL in seconds (default 10 min)
+            cache_maxsize: Maximum in-memory cache size
+            sqlite_cache: Optional persistent SQLite cache
+            sqlite_ttl_seconds: SQLite cache TTL in seconds (default 24h)
         """
         self.query_rewriter = query_rewriter
         self.use_quick_rewrite = use_quick_rewrite
         self._cache = TTLCache(maxsize=cache_maxsize, ttl=cache_ttl)
-        self._l2_cache = sqlite_cache
-        self._l2_ttl = l2_ttl_seconds
+        self._sqlite_cache = sqlite_cache
+        self._sqlite_ttl = sqlite_ttl_seconds
     
     async def rewrite(
         self,
@@ -94,7 +94,7 @@ class RewriteHandler:
             full_rewrite_types=DEFAULT_FULL_REWRITE_QUERY_TYPES,
         )
 
-        # Check L1 cache first (cost optimization)
+        # Check in-memory cache first (cost optimization)
         rewrite_cache_key = cache_key(f"rewrite:{rewrite_mode}", query, chat_history)
         if rewrite_cache_key in self._cache:
             cached_result = self._handle_cache_hit(
@@ -103,13 +103,13 @@ class RewriteHandler:
             if cached_result is not None:
                 return cached_result
 
-        # Check L2 (SQLite) cache
-        if self._l2_cache and self._l2_cache.enabled:
-            l2_data = await self._l2_cache.get(rewrite_cache_key, self._HANDLER_TYPE)
-            if l2_data is not None:
-                # Populate L1 from L2 hit
-                self._cache[rewrite_cache_key] = l2_data
-                logger.debug("L2 cache hit for %s key: %s", self._HANDLER_TYPE, rewrite_cache_key[:16])
+        # Check SQLite cache
+        if self._sqlite_cache and self._sqlite_cache.enabled:
+            sqlite_data = await self._sqlite_cache.get(rewrite_cache_key, self._HANDLER_TYPE)
+            if sqlite_data is not None:
+                # Populate in-memory from SQLite hit
+                self._cache[rewrite_cache_key] = sqlite_data
+                logger.debug("SQLite cache hit for %s key: %s", self._HANDLER_TYPE, rewrite_cache_key[:16])
                 cached_result = self._handle_cache_hit(
                     rewrite_cache_key, query, rewrite_mode, query_type, step_start, steps
                 )
@@ -197,18 +197,18 @@ class RewriteHandler:
             }
         ))
         
-        # Cache result in L2 (persistent) then L1 (in-memory)
-        if self._l2_cache and self._l2_cache.enabled:
+        # Cache result in SQLite (persistent) then in-memory
+        if self._sqlite_cache and self._sqlite_cache.enabled:
             try:
-                await self._l2_cache.set(
-                    rewrite_cache_key, self._HANDLER_TYPE, result, ttl_seconds=self._l2_ttl
+                await self._sqlite_cache.set(
+                    rewrite_cache_key, self._HANDLER_TYPE, result, ttl_seconds=self._sqlite_ttl
                 )
-            except Exception as l2_exc:
+            except Exception as sqlite_exc:
                 logger.warning(
-                    "L2 cache write failed for %s key %s: %s. Continuing with L1 cache.",
+                    "SQLite cache write failed for %s key %s: %s. Continuing with in-memory cache.",
                     self._HANDLER_TYPE,
                     rewrite_cache_key[:16],
-                    l2_exc,
+                    sqlite_exc,
                 )
         self._cache[rewrite_cache_key] = result
         return rewritten, result
@@ -274,17 +274,17 @@ class RewriteHandler:
 
         # Cache result only for successful rewrites
         if not result.get("error"):
-            if self._l2_cache and self._l2_cache.enabled:
+            if self._sqlite_cache and self._sqlite_cache.enabled:
                 try:
-                    await self._l2_cache.set(
-                        rewrite_cache_key, self._HANDLER_TYPE, result, ttl_seconds=self._l2_ttl
+                    await self._sqlite_cache.set(
+                        rewrite_cache_key, self._HANDLER_TYPE, result, ttl_seconds=self._sqlite_ttl
                     )
-                except Exception as l2_exc:
+                except Exception as sqlite_exc:
                     logger.warning(
-                        "L2 cache write failed for %s key %s: %s. Continuing with L1 cache.",
+                        "SQLite cache write failed for %s key %s: %s. Continuing with in-memory cache.",
                         self._HANDLER_TYPE,
                         rewrite_cache_key[:16],
-                        l2_exc,
+                        sqlite_exc,
                     )
             self._cache[rewrite_cache_key] = result
         return rewritten, result

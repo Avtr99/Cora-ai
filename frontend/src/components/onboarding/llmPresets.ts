@@ -88,9 +88,27 @@ export function presetFromSettings(settings: LLMSettings | null): ProviderPreset
   if (!settings) return "gemini";
   if (settings.provider === "gemini") return "gemini";
   const base = settings.base_url ?? "";
-  if (base.includes("openai.com")) return "openai";
-  if (base.includes("localhost:11434") || base.includes("127.0.0.1:11434")) return "ollama";
-  if (base.includes("openrouter.ai")) return "openrouter";
+  // Parse the URL and check the hostname (and port for Ollama) rather than
+  // using substring matching, which can be fooled by hosts like
+  // "openai.com.evil.com" or "evil.com/openai.com".
+  let host = "";
+  let port = "";
+  try {
+    // Add a protocol if missing so URL() parses the host correctly.
+    const parsed = new URL(base.includes("://") ? base : `http://${base}`);
+    host = parsed.hostname.toLowerCase();
+    port = parsed.port;
+  } catch {
+    // Malformed URL — fall through to "custom" below.
+  }
+  if (host === "api.openai.com") return "openai";
+  if (
+    (host === "localhost" || host === "127.0.0.1") &&
+    port === "11434"
+  ) {
+    return "ollama";
+  }
+  if (host === "openrouter.ai") return "openrouter";
   if (settings.provider === "openai_compatible") return "custom";
   return "gemini";
 }

@@ -301,7 +301,7 @@ class GeminiClient(BaseRAGClient):
             with attempt:
                 return await self._generate_async(prompt)
 
-    # check_query_cache, persist_to_l2, and search_and_process are inherited
+    # check_query_cache, persist_to_cache, and search_and_process are inherited
     # from BaseRAGClient (provider-agnostic implementations).
 
     async def _generate_async(self, prompt: str):

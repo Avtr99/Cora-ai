@@ -64,6 +64,7 @@ class Settings(BaseSettings):
     VOYAGE_API_KEY: Optional[str] = None  # Required when EMBEDDING_PROVIDER=voyage
     COHERE_API_KEY: Optional[str] = None  # Required when EMBEDDING_PROVIDER=cohere or RERANK_PROVIDER=cohere
     OPENAI_API_KEY: Optional[str] = None  # For OpenAI API access
+    OPENROUTER_API_KEY: Optional[str] = None  # For OpenRouter (multi-provider gateway)
 
     # Embedding Provider Settings (pluggable — no vendor lock-in)
     # Supported: voyage (default), cohere, ollama (local)
@@ -111,6 +112,13 @@ class Settings(BaseSettings):
 
     # Retrieval Settings
     MAX_CHUNKS_PER_SOURCE: int = 5  # Post-rerank source diversity cap; 0 disables
+
+    # Chunking Settings (indexing-time, used by src/document_store/indexer.py)
+    # Tuned via chunk-size A/B test: 1500/300 won over 600/800/1000/1200/2000
+    # on faithfulness + completeness with zero hedging across 15 queries
+    # judged by OpenRouter Gemini.
+    CHUNK_SIZE: int = 1500
+    CHUNK_OVERLAP: int = 300
     
     # Multi-round retrieval settings (expansion-pool design)
     # Round 1 fetches candidates; if the pool is sparse, round 2 fetches MORE
@@ -384,5 +392,12 @@ from .config_store import (  # noqa: E402
     reload_settings,
     reset_settings_singleton,
     get_collection_threshold,
-    DB_SETTING_KEYS,
 )
+
+__all__ = [
+    "Settings",
+    "get_settings",
+    "reload_settings",
+    "reset_settings_singleton",
+    "get_collection_threshold",
+]

@@ -115,14 +115,15 @@ query_routes.process_query_core
   │     │     └─ Conversational: short-circuit, no RAG
   │     └─ Validator (optional, off by default — adds latency)
   ├─ CitationManager.extract()
-  ├─ L1 cache write (in-memory TTLCache, 24h)
-  ├─ L2 cache write (SQLite backend_cache, 24h)
+  ├─ SQLite cache write (backend_cache table, 24h TTL)
   └─ Return JSON { answer, citations, reasoning_steps, ... }
 ```
 
 ### 4.2 Streaming query — `POST /v1/query/stream`
 
 Same pipeline, but the orchestrator emits `AgentStep` events as Server-Sent Events. The frontend `ChatInterface` renders `reasoning_steps` progressively. The orchestrator's `RAG_TIMEOUT_MS` (45s) is enforced via `asyncio` cancellation.
+
+**Token suppression (`tokens` query param):** Clients can pass `?tokens=false` to suppress `token` and `replace` SSE events — only `status`, `result`, `done`, and `error` events are emitted. The orchestrator still runs the full pipeline (including streaming LLM generation internally) but doesn't forward token chunks. This is used by the web UI, which renders the complete answer on the `result` event rather than streaming tokens. Default is `tokens=true` (backward compatible — other API clients using token streaming are unaffected). When `tokens=false`, the KB handler also skips the non-answer buffer gate (no need to hold tokens for inspection when they won't be emitted), reducing latency by ~200-400ms.
 
 ### 4.3 Async query — `POST /v1/query/async` + `GET /v1/query/async/{job_id}`
 
@@ -140,7 +141,7 @@ The single local relational store. Schema is created by `migrations/001_initial.
 |---|---|---|---|
 | `schema_migrations` | Migration tracking | `run_migrations()` | `run_migrations()` |
 | `feedback` | User thumbs up/down on answers | `POST /v1/feedback` | Operator-only (manual SQLite query) |
-| `backend_cache` | L2 persistent query cache (24h TTL) | `process_query_core` on cache miss | `process_query_core` on every query |
+| `backend_cache` | Persistent query cache (24h TTL) | `process_query_core` on cache miss | `process_query_core` on every query |
 | `embedding_cache` | Durable embedding cache (avoids re-paying for embeddings on restart) | Ingestion + retriever | Retriever |
 
 > **Note on `feedback`:** This is a **write-only collection sink**. There is no read-back endpoint, no UI to view submissions, and no wiring into retrieval or answer generation. The operator reviews it by querying `cora.db` directly. If no one reviews it, the widget is dead weight.
@@ -172,14 +173,15 @@ Served by the document-store API (`/v1/documents/*` and `/api/documents/*` for t
 
 ## 6. Caching (Single-Tier SQLite, Local-First)
 
-All query result caching is backed by SQLite (`backend_cache` table). This replaces the previous two-tier (in-memory L1 + SQLite L2) approach — for a self-hosted local app, SQLite is fast enough and the complexity of a separate in-memory layer is not needed.
+Query result caching is backed by SQLite (`backend_cache` table). Agent-level in-memory caches (TTLCache/LRUCache in routing, rewrite, and conversational handlers) provide short-lived dedup for rapid-fire requests within a session — they are independent dedup layers, not a separate cache tier.
 
 | Store | Location | Scope | TTL |
 |---|---|---|---|
 | **Query cache** | SQLite `backend_cache` table | Query results (survives restart) | 24h |
 | **Embedding cache** | SQLite `embedding_cache` table | Embedding vectors (survives restart) | — |
-
-Agent-level in-memory caches (routing decisions, query rewrites, intent classification) provide short-lived dedup for rapid-fire requests within a session.
+| **Routing dedup** | In-memory `TTLCache` (`RoutingHandler`) | Dedups rapid-fire routing decisions | 10 min |
+| **Rewrite dedup** | In-memory `TTLCache` (`RewriteHandler`) | Dedups rapid-fire query rewrites | 10 min |
+| **Intent dedup** | In-memory `LRUCache` (`ConversationalHandler`) | Caches LLM intent classification | session |
 
 - **Embedding cache** is separate (`embedding_cache` table) and shared between ingestion and query-time retrieval.
 - There is **no Redis** and no plan to add one. The SQLite design covers the local single-host case.

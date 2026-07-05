@@ -7,7 +7,21 @@ interface UserProviderProps {
 }
 
 function generateUserId(): string {
-  return 'user_' + Math.random().toString(36).substring(2, 15);
+  // Use the Web Crypto API for a cryptographically secure random UUID when
+  // available. Fall back to getRandomValues for older browsers. Math.random()
+  // is intentionally avoided because the user ID is used as an identifier in
+  // feedback and memory API calls.
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return 'user_' + crypto.randomUUID();
+  }
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+    return 'user_' + hex;
+  }
+  // Last-resort fallback for extremely old environments without Web Crypto.
+  return 'user_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 10);
 }
 
 export function UserProvider({ children }: UserProviderProps): JSX.Element {

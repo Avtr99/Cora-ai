@@ -4,7 +4,6 @@ from typing import Optional, List
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from loguru import logger
-import httpx
 
 from ...config import get_settings
 from ...query_processing.llm_factory import (
@@ -12,6 +11,18 @@ from ...query_processing.llm_factory import (
     save_llm_settings,
     is_llm_configured,
 )
+from ...db.app_settings import save_app_setting
+from ...db.llm_profile_manager import (
+    _read_profile,
+    _read_all_profiles,
+    _save_profile,
+    _label_for_openai,
+    _slug,
+    _detect_env_providers,
+)
+from .llm_ollama import LLMModelsResponse, _validate_ollama_url, _list_ollama_models
+from .llm_test import LLMTestResponse, _test_gemini, _test_openai_compatible
+from ..lifespan import hot_swap_llm_client
 
 router = APIRouter()
 
@@ -46,17 +57,43 @@ class LLMSettingsUpdate(BaseModel):
     organization: Optional[str] = Field(None, description="OpenAI organization ID (optional)")
 
 
-class LLMModel(BaseModel):
-    """A single available model from a provider."""
-    name: str
-    size_bytes: Optional[int] = None
-    parameter_size: Optional[str] = None
-    family: Optional[str] = None
+class ProviderSwitchRequest(BaseModel):
+    """Request model for POST /v1/settings/llm/switch.
+
+    Used by the chat provider toggle to instantly switch between providers.
+    Takes a profile slug (e.g. "gemini", "openai", "openrouter") — not a
+    provider type. The profile must already exist (saved via PUT /llm or
+    detected from .env keys).
+    """
+    label: str = Field(
+        ...,
+        max_length=100,
+        description="Profile slug to switch to (e.g. 'gemini', 'openai', 'openrouter')",
+    )
 
 
-class LLMModelsResponse(BaseModel):
-    """Response model for GET /v1/settings/llm/models."""
-    models: List[LLMModel]
+class ProviderSwitchResponse(BaseModel):
+    """Response model for POST /v1/settings/llm/switch."""
+    success: bool
+    label: Optional[str] = None
+    provider: Optional[str] = None
+    model_main: Optional[str] = None
+    client_type: Optional[str] = None
+    error: Optional[str] = None
+
+
+class AvailableProvider(BaseModel):
+    slug: str
+    label: str
+    provider: str
+    model: str
+    has_api_key: bool
+
+
+class AvailableProvidersResponse(BaseModel):
+    """Response model for GET /v1/settings/llm/providers."""
+    current: Optional[str] = None
+    available: List[AvailableProvider] = []
 
 
 # ---------------------------------------------------------------------------
@@ -97,8 +134,8 @@ async def update_llm_config(update: LLMSettingsUpdate) -> LLMSettingsResponse:
     """Update LLM provider configuration.
 
     If `api_key` is None, the existing key is preserved (not overwritten).
-    After updating, the application must be restarted for the new client
-    to take effect (or the client re-initialized via lifespan).
+    The LLM client and RAG orchestrator are hot-swapped in-place after saving,
+    so changes take effect immediately without a server restart.
     """
     if update.provider not in ("gemini", "openai_compatible"):
         raise HTTPException(
@@ -125,6 +162,25 @@ async def update_llm_config(update: LLMSettingsUpdate) -> LLMSettingsResponse:
         logger.error(f"Failed to save LLM settings: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to save settings: {e}")
 
+    # Save as a profile so the chat toggle can switch back to this config.
+    # Derive a label from the provider + base_url.
+    if update.provider == "gemini":
+        label = "gemini"
+    else:
+        label = _slug(_label_for_openai(update.base_url or ""))
+    _save_profile(
+        label, update.provider, update.api_key, update.base_url,
+        update.model_main, update.model_lite, update.model_relevance, update.organization,
+    )
+
+    # Hot-swap the LLM client and orchestrator so changes take effect
+    # immediately without a server restart.
+    swap_result = await hot_swap_llm_client()
+    if not swap_result["success"]:
+        logger.warning(f"LLM settings saved but hot-swap failed: {swap_result.get('error')}")
+    else:
+        logger.info(f"LLM hot-swapped to {swap_result.get('client_type')} ({swap_result.get('model')})")
+
     # Return the updated settings
     settings = get_llm_settings()
     return LLMSettingsResponse(
@@ -137,6 +193,132 @@ async def update_llm_config(update: LLMSettingsUpdate) -> LLMSettingsResponse:
         model_relevance=settings["model_relevance"],
         organization=settings["organization"],
     )
+
+
+@router.post("/llm/switch", response_model=ProviderSwitchResponse)
+async def switch_llm_provider(req: ProviderSwitchRequest) -> ProviderSwitchResponse:
+    """Quick-switch the active LLM provider by profile label.
+
+    Switches to a provider profile whose API key is already configured (in
+    .env or saved via PUT /llm). The LLM client and orchestrator are hot-swapped
+    in-place — no restart needed.
+
+    The current config is saved as a profile before switching, so switching back
+    restores it exactly.
+
+    For initial provider setup (entering new API keys), use PUT /v1/settings/llm.
+    """
+    # ponytail: no lock — local-first single-user app, concurrent switches are
+    # not a real concern. If two switches race, the last one wins.
+    env_settings = get_settings()
+    current_settings = get_llm_settings()
+
+    # Save current config as a profile so switching back restores it
+    if current_settings["provider"]:
+        cur_label = "gemini" if current_settings["provider"] == "gemini" else \
+            _slug(_label_for_openai(current_settings["base_url"] or ""))
+        _save_profile(
+            cur_label, current_settings["provider"],
+            current_settings["api_key"], current_settings["base_url"],
+            current_settings["model_main"], current_settings["model_lite"],
+            current_settings["model_relevance"], current_settings["organization"],
+        )
+
+    # Find the target profile: saved DB profile first, then .env-detected
+    profile = _read_profile(req.label)
+    if not profile:
+        # Check .env-detected providers
+        for p in _detect_env_providers(env_settings):
+            if p["slug"] == req.label:
+                profile = p
+                break
+
+    if not profile:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No profile found for '{req.label}'. Configure it via Settings first."
+        )
+
+    provider = profile["provider"]
+    save_llm_settings(
+        provider=provider,
+        api_key=profile.get("api_key"),
+        base_url=profile.get("base_url"),
+        model_main=profile.get("model_main"),
+        model_lite=profile.get("model_lite"),
+        model_relevance=profile.get("model_relevance"),
+        organization=profile.get("organization"),
+    )
+    # save_llm_settings skips None values (preserve existing). Clear base_url
+    # when the target profile has none (e.g. Gemini).
+    if profile.get("base_url") is None:
+        save_app_setting("llm_base_url", None)
+
+    logger.info(f"Quick-switching LLM to profile '{req.label}' ({provider})")
+
+    swap_result = await hot_swap_llm_client()
+    if not swap_result["success"]:
+        return ProviderSwitchResponse(
+            success=False, label=req.label, provider=provider,
+            error=swap_result.get("error"),
+        )
+
+    settings = get_llm_settings()
+    return ProviderSwitchResponse(
+        success=True, label=req.label, provider=settings["provider"],
+        model_main=settings["model_main"],
+        client_type=swap_result.get("client_type"),
+    )
+
+
+@router.get("/llm/providers", response_model=AvailableProvidersResponse)
+async def list_available_providers() -> AvailableProvidersResponse:
+    """List all LLM providers available for quick-switching via the chat toggle.
+
+    Providers come from two sources:
+    1. .env-detected: GEMINI_API_KEY, OPENAI_API_KEY, OPENROUTER_API_KEY
+    2. DB-saved profiles: from previous PUT /v1/settings/llm calls
+
+    The current active provider is determined by matching the active DB config
+    against known profiles.
+    """
+    env_settings = get_settings()
+    current_settings = get_llm_settings()
+    saved_profiles = _read_all_profiles()
+
+    # Build a merged dict: slug → profile, from .env + DB profiles.
+    # DB profiles take precedence (they have the user's chosen model/key).
+    all_profiles = {}
+    for p in _detect_env_providers(env_settings):
+        all_profiles[p["slug"]] = p
+    for slug, p in saved_profiles.items():
+        all_profiles[slug] = {**p, "slug": slug}
+
+    # Determine current active profile slug by matching DB settings
+    cur_slug = None
+    if current_settings["provider"] == "gemini":
+        cur_slug = "gemini"
+    elif current_settings["base_url"]:
+        cur_slug = _slug(_label_for_openai(current_settings["base_url"]))
+
+    available = []
+    for slug, p in all_profiles.items():
+        if p.get("provider") == "gemini":
+            label = p.get("label") or "Gemini"
+        else:
+            label = p.get("label") or _label_for_openai(p.get("base_url") or "")
+        available.append(AvailableProvider(
+            slug=slug,
+            label=label,
+            provider=p.get("provider", "openai_compatible"),
+            model=p.get("model_main") or "unknown",
+            has_api_key=bool(p.get("api_key")),
+        ))
+
+    # Sort: current first, then alphabetical
+    available.sort(key=lambda a: (a.slug != cur_slug, a.slug))
+
+    return AvailableProvidersResponse(current=cur_slug, available=available)
 
 
 @router.get("/llm/models", response_model=LLMModelsResponse)
@@ -152,51 +334,22 @@ async def list_llm_models(base_url: str) -> LLMModelsResponse:
     if not base_url:
         raise HTTPException(status_code=400, detail="base_url query parameter is required")
 
-    # Detect Ollama by the default port or URL pattern
-    is_ollama = "localhost:11434" in base_url or "127.0.0.1:11434" in base_url
+    # Validate the URL is a local Ollama instance before making any request.
+    # This prevents SSRF — without validation an attacker could point the
+    # server at internal services (e.g. cloud metadata endpoints).
+    try:
+        validated_url = _validate_ollama_url(base_url)
+    except HTTPException:
+        # Not a valid local Ollama URL — fall through to the empty-list
+        # response for non-Ollama providers (user enters model name manually).
+        return LLMModelsResponse(models=[])
 
-    if is_ollama:
-        try:
-            return await _list_ollama_models(base_url)
-        except httpx.ConnectError:
-            raise HTTPException(
-                status_code=503,
-                detail=f"Could not connect to Ollama at {base_url}. Is `ollama serve` running?"
-            )
-        except Exception as e:
-            logger.error(f"Failed to list Ollama models: {e}")
-            raise HTTPException(status_code=502, detail=f"Failed to fetch models from Ollama: {e}")
+    try:
+        return await _list_ollama_models(validated_url)
+    except Exception as e:
+        logger.error(f"Failed to list Ollama models: {e}")
+        raise HTTPException(status_code=502, detail=f"Failed to fetch models from Ollama: {e}")
 
-    # For other OpenAI-compatible providers, return empty list (user enters name manually)
-    return LLMModelsResponse(models=[])
-
-
-async def _list_ollama_models(base_url: str) -> LLMModelsResponse:
-    """Fetch installed models from Ollama's /api/tags endpoint."""
-    # Ensure base_url doesn't have trailing slash
-    url = base_url.rstrip("/") + "/api/tags"
-
-    async with httpx.AsyncClient(timeout=5.0) as client:
-        response = await client.get(url)
-        response.raise_for_status()
-        data = response.json()
-
-    models = []
-    for m in data.get("models", []):
-        details = m.get("details", {}) or {}
-        models.append(LLMModel(
-            name=m.get("name", ""),
-            size_bytes=m.get("size"),
-            parameter_size=details.get("parameter_size"),
-            family=details.get("family"),
-        ))
-
-    return LLMModelsResponse(models=models)
-
-
-# ---------------------------------------------------------------------------
-# LLM connection test (validate before saving)
-# ---------------------------------------------------------------------------
 
 class LLMTestRequest(BaseModel):
     """Request body for POST /v1/settings/llm/test.
@@ -208,13 +361,6 @@ class LLMTestRequest(BaseModel):
     api_key: Optional[str] = Field(None, description="API key to test. If None, uses the existing saved key.")
     base_url: Optional[str] = Field(None, description="Base URL for OpenAI-compatible providers")
     model_main: Optional[str] = Field(None, description="Model name to test")
-
-
-class LLMTestResponse(BaseModel):
-    """Result of an LLM connection test."""
-    success: bool = Field(..., description="Whether the test succeeded")
-    message: str = Field(..., description="Human-readable result message")
-    detail: Optional[str] = Field(None, description="Technical error detail (on failure)")
 
 
 @router.post("/llm/test", response_model=LLMTestResponse)
@@ -263,92 +409,3 @@ async def test_llm_config(req: LLMTestRequest) -> LLMTestResponse:
                 message="Base URL is required for OpenAI-compatible providers.",
             )
         return await _test_openai_compatible(api_key, base_url, model)
-
-
-async def _test_gemini(api_key: str, model: str) -> LLMTestResponse:
-    """Test a Gemini API key + model by making a minimal generate_content call."""
-    try:
-        from google import genai
-        from google.genai import types as gtypes
-    except ImportError:
-        return LLMTestResponse(
-            success=False,
-            message="The 'google-genai' package is not installed on the backend.",
-            detail="ImportError: google.genai",
-        )
-
-    try:
-        client = genai.Client(api_key=api_key)
-        # Use a minimal prompt to keep cost negligible
-        response = await client.aio.models.generate_content(
-            model=model or "gemini-2.5-flash",
-            contents="Reply with exactly: OK",
-            config=gtypes.GenerateContentConfig(max_output_tokens=5),
-        )
-        # If we got here without raising, the key + model are valid
-        text = response.text if hasattr(response, "text") else ""
-        return LLMTestResponse(
-            success=True,
-            message=f"Connection successful. Model '{model or 'gemini-2.5-flash'}' responded.",
-            detail=text[:50] if text else None,
-        )
-    except Exception as e:
-        error_str = str(e)
-        # Classify common errors for user-friendly messages
-        if "API_KEY_INVALID" in error_str or "api_key" in error_str.lower() and "invalid" in error_str.lower():
-            return LLMTestResponse(success=False, message="Invalid API key. Check your Gemini API key.", detail=error_str[:300])
-        if "not_found" in error_str.lower() or "model" in error_str.lower() and "not" in error_str.lower():
-            return LLMTestResponse(success=False, message=f"Model '{model}' not found. Check the model name.", detail=error_str[:300])
-        if "permission" in error_str.lower() or "403" in error_str:
-            return LLMTestResponse(success=False, message="API key does not have permission to access this model.", detail=error_str[:300])
-        return LLMTestResponse(success=False, message="Connection failed. See detail for more info.", detail=error_str[:300])
-
-
-async def _test_openai_compatible(api_key: str, base_url: str, model: str) -> LLMTestResponse:
-    """Test an OpenAI-compatible provider by making a minimal chat completion call."""
-    try:
-        from openai import AsyncOpenAI
-    except ImportError:
-        return LLMTestResponse(
-            success=False,
-            message="The 'openai' package is not installed on the backend.",
-            detail="ImportError: openai",
-        )
-
-    # Ensure base_url ends with /v1 for OpenAI-compatible endpoints
-    if not base_url.rstrip("/").endswith("/v1"):
-        # Ollama uses /v1 too — only auto-append for non-Ollama
-        if "localhost:11434" not in base_url and "127.0.0.1:11434" not in base_url:
-            base_url = base_url.rstrip("/") + "/v1"
-
-    try:
-        client = AsyncOpenAI(api_key=api_key, base_url=base_url, timeout=15.0)
-        # Minimal chat completion — keeps cost negligible
-        response = await client.chat.completions.create(
-            model=model,
-            messages=[{"role": "user", "content": "Reply with exactly: OK"}],
-            max_tokens=5,
-        )
-        # If we got here, the key + model + URL are all valid
-        return LLMTestResponse(
-            success=True,
-            message=f"Connection successful. Model '{model}' responded.",
-            detail=response.choices[0].message.content[:50] if response.choices else None,
-        )
-    except Exception as e:
-        error_str = str(e)
-        error_type = type(e).__name__
-
-        # Classify common errors
-        if "authentication" in error_str.lower() or "api_key" in error_str.lower() or "401" in error_str:
-            return LLMTestResponse(success=False, message="Invalid API key. Check your API key for this provider.", detail=error_str[:300])
-        if "model" in error_str.lower() and ("not" in error_str.lower() or "does not exist" in error_str.lower()):
-            return LLMTestResponse(success=False, message=f"Model '{model}' not found. Check the model name.", detail=error_str[:300])
-        if "connection" in error_str.lower() or "refused" in error_str.lower() or "timeout" in error_str.lower():
-            return LLMTestResponse(success=False, message=f"Could not connect to {base_url}. Check the URL and that the service is running.", detail=error_str[:300])
-        if "404" in error_str:
-            return LLMTestResponse(success=False, message=f"Model '{model}' not found at {base_url}. Check the model name.", detail=error_str[:300])
-        if error_type == "APIConnectionError":
-            return LLMTestResponse(success=False, message=f"Could not connect to {base_url}. Is the service running?", detail=error_str[:300])
-
-        return LLMTestResponse(success=False, message="Connection failed. See detail for more info.", detail=error_str[:300])

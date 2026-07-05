@@ -8,6 +8,7 @@ import { sanitizeInput } from "@/lib/security";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useChatReadiness } from "@/hooks/useChatReadiness";
 import { TEXT } from "@/lib/colors";
+import { ProviderToggle } from "@/components/ui/ProviderToggle";
 
 // Static constants moved to module scope to avoid recreation on every render
 const LARGE_MAX_ROWS = 6;
@@ -236,10 +237,11 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onTypingStateChange, varia
         </div>
       </div>
 
-      <div className="mt-3 md:mt-4 w-full">
-        <p className="text-text-muted text-2xs md:text-xs font-normal text-center w-full">
+      <div className="mt-3 md:mt-4 w-full flex items-center justify-center gap-3">
+        <p className="text-text-muted text-2xs md:text-xs font-normal text-center">
           Cora is still in development and can make mistakes
         </p>
+        <ProviderToggle />
       </div>
     </div>
   );

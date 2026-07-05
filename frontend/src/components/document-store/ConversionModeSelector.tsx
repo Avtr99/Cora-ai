@@ -8,7 +8,7 @@ import {
 } from '@/services/documentStoreApi';
 
 const SPEED_LABELS: Record<string, string> = {
-  fast: 'Fast',
+  fast: 'Fast (~1-2s/page)',
   medium: 'Medium',
   slow: 'Slow (~2 min/page)',
   very_slow: 'Very slow (10+ min/page)',
