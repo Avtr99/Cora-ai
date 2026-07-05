@@ -80,7 +80,7 @@ pnpm-debug.log*
 *.db-journal
 *.db-wal
 *.db-shm
-data/
+/data/
 !data/.gitkeep
 
 # Ingestion checkpoints
