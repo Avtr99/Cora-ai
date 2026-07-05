@@ -10,7 +10,6 @@ Usage:
     python scripts/evaluation/run_full_evaluation.py --skip-generation  # Use existing dataset
 """
 
-import os
 import sys
 import asyncio
 import argparse
@@ -97,20 +96,20 @@ async def run_full_evaluation(
     # Save summary report
     report_path = Path(results_path).parent / "evaluation_report.txt"
     with open(report_path, "w") as f:
-        f.write(f"CORA RAG Evaluation Report\n")
+        f.write("CORA RAG Evaluation Report\n")
         f.write(f"Generated: {summary.timestamp}\n")
         f.write(f"Dataset: {summary.dataset_path}\n\n")
-        f.write(f"RAGAS Metrics:\n")
+        f.write("RAGAS Metrics:\n")
         f.write(f"  Faithfulness: {summary.avg_faithfulness:.3f}\n")
         f.write(f"  Answer Relevancy: {summary.avg_answer_relevancy:.3f}\n")
         f.write(f"  Context Recall: {summary.avg_context_recall:.3f}\n")
         f.write(f"  Context Precision: {summary.avg_context_precision:.3f}\n\n")
-        f.write(f"Timing:\n")
+        f.write("Timing:\n")
         f.write(f"  Avg Total: {summary.avg_total_ms:.0f}ms\n")
         f.write(f"  P95 Total: {summary.p95_total_ms:.0f}ms\n\n")
         f.write(f"Result: {'PASSED' if summary.passed else 'FAILED'}\n")
         if summary.threshold_failures:
-            f.write(f"Failures:\n")
+            f.write("Failures:\n")
             for failure in summary.threshold_failures:
                 f.write(f"  - {failure}\n")
     

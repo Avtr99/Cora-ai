@@ -26,5 +26,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Added README badges for license, CI, Scorecard, Python, Docker, and SDG alignment.
 - Fixed `.gitignore` so `frontend/src/data/` is tracked and the frontend/Docker build works in CI.
 - Removed `ruff-format` from pre-commit hooks; CI still runs `ruff` lint checks and `gitleaks` secret scanning.
+- Excluded `scripts/` from pre-commit ruff linting; these are dev-only scripts not required in CI.
 - Hardened CI workflow: pinned all GitHub Actions to SHA commits, set least-privilege permissions, added job timeouts, disabled persisted checkout credentials, and made Docker build depend on earlier validation jobs.
 - Changed test step from `pytest -m unit` to `pytest` since no tests currently use the `unit` marker.
