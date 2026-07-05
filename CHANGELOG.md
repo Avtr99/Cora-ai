@@ -29,3 +29,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Excluded `scripts/evaluation/` from pre-commit ruff linting; these are dev-only scripts not required in CI.
 - Hardened CI workflow: pinned all GitHub Actions to SHA commits, set least-privilege permissions, added job timeouts, disabled persisted checkout credentials, and made Docker build depend on earlier validation jobs.
 - Changed test step from `pytest -m unit` to `pytest` since no tests currently use the `unit` marker.
+
+### Security
+
+- Added `.github/dependabot.yml` with security-only update strategy (`open-pull-requests-limit: 0`) for pip, npm, github-actions, and docker ecosystems. Dependabot security updates stay active; routine version-bump PRs are disabled to reduce noise. Detected by Scorecard's Dependency-Update-Tool check.
+- Added `.github/CODEOWNERS` mapping all paths to `@Avtr99` with explicit security-sensitive path entries. Prerequisite for branch protection ruleset (Code-Review and Branch-Protection checks).
+- Pinned Dockerfile base images by SHA256 digest (`node:22-alpine`, `python:3.11-slim`) for supply-chain integrity. Digest updates handled automatically by Dependabot docker ecosystem.
+- Generated hash-pinned lockfiles via `uv pip compile --generate-hashes` targeting `x86_64-unknown-linux-gnu`/Python 3.11: `requirements-core.lock`, `requirements-ingestion.lock` (CPU torch via PyTorch index), `requirements-ci.lock` (core + ingestion + dev). Dockerfile and CI now install with `pip install --require-hashes` for verified reproducible builds.
+- Added OpenSSF Baseline Best Practices badge to README (project 13501 on bestpractices.dev). Detected by Scorecard's CII-Best-Practices check.
+- Removed redundant `push` trigger from CI workflow (kept `pull_request` only). CI no longer runs a duplicate check after merge to main. SAST (CodeQL) runs independently via GitHub built-in scanning and is unaffected.
+
+### Fixed
+
+- Fixed import ordering in `scripts/docker/download_docling_models.py` (moved `Path` usage after docling imports).
+- Resolved merge conflict in `.pre-commit-config.yaml` — kept `scripts/evaluation/` exclusion (production scripts under `scripts/docker/` are still linted).

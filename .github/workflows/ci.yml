@@ -1,8 +1,9 @@
 name: CI
 
+# Only run on pull requests — avoids redundant CI run after merge to main.
+# SAST (CodeQL) runs independently via GitHub's built-in scanning, so the
+# Scorecard SAST check is unaffected by removing the push trigger.
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
 
@@ -86,5 +87,6 @@ jobs:
         with:
           context: .
           push: false
+          platforms: linux/amd64
           cache-from: type=gha
           cache-to: type=gha,mode=max

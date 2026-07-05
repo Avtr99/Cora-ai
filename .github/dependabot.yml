@@ -1,6 +1,16 @@
-# Dependabot configuration — weekly updates to keep notifications low-noise.
+# Dependabot configuration — security updates only, no version-bump spam.
 # Scorecard's Dependency-Update-Tool check detects this file and scores 10.
-# To regenerate lockfiles after editing requirements-*.txt:
+#
+# Strategy: open-pull-requests-limit: 0 disables version-update PRs (the
+# "package X has a new minor version" noise). Dependabot SECURITY updates
+# (fixes for known vulnerabilities) are controlled separately in repo
+# Settings → Security → Dependabot, and stay active regardless of this file.
+# So you get PRs only when a dependency has a real CVE — not for routine bumps.
+#
+# To manually check for outdated deps: `uv pip list --outdated` or review
+# Dependabot alerts in the GitHub Security tab.
+#
+# To regenerate lockfiles after a manual version bump:
 #   uv pip compile --generate-hashes --python-platform x86_64-unknown-linux-gnu \
 #     --python-version 3.11 requirements-core.txt -o requirements-core.lock
 #   (add --index-strategy unsafe-best-match --extra-index-url https://download.pytorch.org/whl/cpu
@@ -9,58 +19,41 @@ version: 2
 
 updates:
   # Python runtime + ingestion deps.
-  # uv.lock is the source of truth; requirements-*.txt are the input manifests.
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
       interval: "weekly"
-      day: "monday"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0
     labels:
       - "dependencies"
       - "python"
-    commit-message:
-      prefix: "deps(pip)"
-      include: "scope"
 
   # Frontend (Vite/React) deps.
   - package-ecosystem: "npm"
     directory: "/frontend"
     schedule:
       interval: "weekly"
-      day: "monday"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0
     labels:
       - "dependencies"
       - "frontend"
-    commit-message:
-      prefix: "deps(npm)"
-      include: "scope"
 
   # GitHub Actions versions in workflows.
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
-      day: "monday"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0
     labels:
       - "dependencies"
       - "github-actions"
-    commit-message:
-      prefix: "deps(ci)"
-      include: "scope"
 
   # Docker base images (Dockerfile + docker-compose.yml).
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
       interval: "weekly"
-      day: "monday"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0
     labels:
       - "dependencies"
       - "docker"
-    commit-message:
-      prefix: "deps(docker)"
-      include: "scope"
