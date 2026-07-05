@@ -19,6 +19,7 @@ from .route_processor_utils import emit_text_as_token_events
 from .router import RouteDecision
 from ..query_processing.streaming_rag_wrapper import StreamingRAGWrapper
 from ..query_processing.filter_extractor import extract_filters
+from ..query_processing.citation_verifier import renumber_citation_markers
 from ..config import get_settings
 from .orchestrator_query_utils import (
     query_changed_substantially,
@@ -212,7 +213,7 @@ class StreamingRAGOrchestrator(RAGOrchestrator):
             # OPTIMIZATION: Conversational Gate — cheap heuristic first.
             # Bypass the entire RAG pipeline for clear greetings using only the
             # regex heuristic (no LLM call). Greetings are never cached, so a
-            # cache lookup for them is wasted work (esp. the L2 SQLite call).
+            # cache lookup for them is wasted work (esp. the SQLite call).
             conv_result = await self._try_conversational(
                 query, chat_history, steps, start_time, use_llm_classification=False
             )
@@ -225,7 +226,7 @@ class StreamingRAGOrchestrator(RAGOrchestrator):
                 return
 
             # OPTIMIZATION: Early Query Cache Check
-            # Check L1/L2 caches before any rewriting, routing, or retrieval.
+            # Check in-memory and SQLite caches before any rewriting, routing, or retrieval.
             # Runs after the cheap heuristic (so greetings skip the cache) and
             # before the LLM intent classification (so cache hits are served
             # with zero LLM cost).
@@ -374,14 +375,32 @@ class StreamingRAGOrchestrator(RAGOrchestrator):
 
             citations = final_result.get("citations", [])
             answer_text = final_result.get("answer", "")
-            filtered_citations = self.citation_manager.filter_citations_by_answer(
-                citations, answer_text, query=query
-            )
-            coverage_score = final_result.get("coverage_score", 1.0)
-            if self.citation_manager.should_suppress_citations(
-                query, answer_text, filtered_citations, coverage_score
-            ):
-                filtered_citations = []
+
+            if final_result.get("_citations_finalized"):
+                # Route processor already filtered, suppressed, aligned, and
+                # renumbered.  Skip redundant work and go straight to formatting.
+                filtered_citations = citations
+            else:
+                # No finalization callback ran — do it here.
+                filtered_citations = self.citation_manager.filter_citations_by_answer(
+                    citations, answer_text, query=query
+                )
+                coverage_score = final_result.get("coverage_score", 1.0)
+                if self.citation_manager.should_suppress_citations(
+                    query, answer_text, filtered_citations, coverage_score
+                ):
+                    filtered_citations = []
+
+                # Renumber inline citation markers so their numbers match the
+                # filtered citation list. Markers referencing filtered-out
+                # sources are removed. Also runs when filtered is empty
+                # (suppressed) to strip orphaned markers.
+                # Note: this only affects the final result event, not the
+                # already-streamed tokens.
+                if answer_text and (filtered_citations or citations):
+                    renumbered = renumber_citation_markers(answer_text, citations, filtered_citations)
+                    if renumbered != answer_text:
+                        final_result["answer"] = renumbered
 
             citation_info = self.citation_manager.format_citations_for_response(
                 filtered_citations,
@@ -404,10 +423,10 @@ class StreamingRAGOrchestrator(RAGOrchestrator):
             final_result["citations"] = citation_info
             final_result["reasoning_steps"] = format_reasoning_steps(steps)
 
-            # Persist to L2 after the complete reasoning chain is assembled so
-            # cache hits are identical to live responses. Fire-and-forget to avoid
-            # blocking the final event (result is already fully built).
-            self._spawn_l2_persist(query, final_result)
+            # Persist to SQLite cache after the complete reasoning chain is
+            # assembled so cache hits are identical to live responses.
+            # Fire-and-forget to avoid blocking the final event.
+            self._spawn_cache_persist(query, final_result)
 
             yield {"type": "final", "result": final_result}
 

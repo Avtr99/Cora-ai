@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import re
 
+# These regexes are duplicated from citations/config.py. We don't import from
+# there to avoid a circular import (citations/__init__.py → citation_manager →
+# this module). They are trivial patterns unlikely to change.
 _WORD_COUNT_RE = re.compile(r"\b\w+\b")
 _NON_ALNUM_SPACE_RE = re.compile(r"[^a-z0-9\s]")
 _MULTISPACE_RE = re.compile(r"\s+")

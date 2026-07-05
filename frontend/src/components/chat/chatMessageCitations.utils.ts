@@ -4,14 +4,15 @@ import type { CitationResponse } from '@/services/cora/types';
 
 const INLINE_CITATION_REGEX = /\[(?:(Knowledge Base|Web)(?:,\s*cite:\s*([\d,\s]+))?|cite_(kb|web):\s*([\d,\s]+)|((?:source_\d+(?:,\s*)?)+))\]/g;
 const ROUTING_SOURCE_TOKENS = new Set(['knowledge_base', 'web_search', 'hybrid', 'error_fallback']);
+export const CITATION_INTERNAL_URL = 'https://citation.internal/';
 
 /** Decode URL-encoded source names defensively (e.g. vm0047%20arr%20v1.0). */
-function decodeSourceLabel(label: string): string {
+export function decodeSourceLabel(label: string): string {
   if (!label || (!label.includes('%') && !label.includes('+'))) return label;
   try {
     let decoded = label.replace(/\+/g, ' ');
     let guard = 0;
-    while (decoded.includes('%') && guard < 5) {
+    while (decoded.includes('%') && guard < 8) {
       const next = decodeURIComponent(decoded);
       if (next === decoded) break;
       decoded = next;
@@ -51,11 +52,19 @@ export function preprocessContent(content: string): string {
 
     const cleanNums = nums ? nums.split(',').map(s => s.trim()).filter(Boolean).join(',') : '';
 
-    return `[${match}](https://citation.internal/${type}/${cleanNums})`;
+    // Numberless markers (e.g. bare "[Knowledge Base]" or "[Web]") carry no
+    // source reference. Remove them from the text instead of leaving a gap.
+    if (!cleanNums) {
+      return '';
+    }
+
+    return `[${type}](${CITATION_INTERNAL_URL}${type}/${cleanNums})`;
   });
 }
 
-export function parseCitationSources(citations: CitationResponse | Record<string, unknown> | unknown[]): CitationSource[] {
+export function parseCitationSources(citations: CitationResponse | Record<string, unknown> | unknown[] | null | undefined): CitationSource[] {
+  if (!citations) return [];
+
   const links: CitationSource[] = [];
   const seen = new Set<string>();
 
@@ -87,23 +96,8 @@ const FILE_EXT_BLACKLIST = new Set([
 
   const extractDomain = (str: string): string => {
     try {
-      // First, replace '+' with ' ' which is common in URL encoding
-      let decodedStr = str.replace(/\+/g, ' ');
-
-      // URL decode fully to handle %20, %2C, and potential double-encodings
-      try {
-        let preventInfiniteLoop = 0;
-        while (decodedStr.includes('%') && preventInfiniteLoop < 5) {
-          const decoded = decodeURIComponent(decodedStr);
-          if (decoded === decodedStr) break;
-          decodedStr = decoded;
-          preventInfiniteLoop++;
-        }
-      } catch {
-        // If decoding fails partway, continue with what we have
-      }
-      const cleanStr = decodedStr.replace(/^\(/, '').replace(/\)$/, '').trim();
-      const url = cleanStr.startsWith('http') ? new URL(cleanStr) : new URL(`https://${cleanStr}`);
+      const decodedStr = decodeSourceLabel(str).replace(/^\(/, '').replace(/\)$/, '').trim();
+      const url = decodedStr.startsWith('http') ? new URL(decodedStr) : new URL(`https://${decodedStr}`);
       return url.hostname.replace(/^www\./, '');
     } catch {
       return str;
@@ -206,7 +200,9 @@ const FILE_EXT_BLACKLIST = new Set([
         if (import.meta.env.DEV) {
           console.log('[parseCitationSources] Processing source:', sourceText, 'isWeb:', isWeb);
         }
-        const label = isWeb ? extractDomain(sourceText) : decodeSourceLabel(sourceText);
+        const label = isWeb
+          ? extractDomain(sourceText)
+          : decodeSourceLabel(sourceText).replace(/^data[\\/]/, '').trim();
 
         let url: string | undefined;
         if (isWeb) {
@@ -334,8 +330,10 @@ function processCitationPart(
       }
     }
   } else if (normalizedPart.includes('data\\') || normalizedPart.includes('data/')) {
-    // Backend now automatically URL-decodes and strips file extensions
-    const cleaned = normalizedPart.replace(/^data[\\/]/, '').trim();
+    // Backend now automatically URL-decodes and strips file extensions,
+    // but double/triple encoding or older payloads can still arrive with
+    // %20 / + in the label.
+    const cleaned = decodeSourceLabel(normalizedPart.replace(/^data[\\/]/, '').trim());
     const key = `kb:${cleaned.toLowerCase()}`;
     if (cleaned && !seen.has(key)) {
       seen.add(key);
@@ -355,11 +353,13 @@ function processCitationPart(
       }
     }
   } else if (normalizedPart.length > 0 && normalizedPart !== '[object Object]') {
-    // Backend now automatically URL-decodes source names
-    const key = `kb:${normalizedPart.toLowerCase()}`;
+    // Backend now automatically URL-decodes source names, but double/triple
+    // encoding or older payloads can still arrive with %20 / + in the label.
+    const decoded = decodeSourceLabel(normalizedPart);
+    const key = `kb:${decoded.toLowerCase()}`;
     if (!seen.has(key)) {
       seen.add(key);
-      links.push({ label: normalizedPart, type: 'knowledge_base' });
+      links.push({ label: decoded, type: 'knowledge_base' });
     }
   }
 }

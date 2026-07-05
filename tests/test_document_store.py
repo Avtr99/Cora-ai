@@ -1,5 +1,4 @@
 import os
-import sys
 from io import BytesIO
 from pathlib import Path
 from unittest import mock
@@ -115,11 +114,19 @@ async def test_delete_document_job_succeeds_when_already_deleted(document_store_
     update_document(record.id, status="deleted")
     job = create_job(record.id, "delete")
 
-    await delete_document_job(record.id, job.id)
+    # The fix ensures Qdrant cleanup runs even for already-soft-deleted docs
+    # (previously the job exited early, leaving orphaned chunks behind).
+    with mock.patch("src.document_store.jobs.delete_document_chunks") as mock_chunks, mock.patch(
+        "src.document_store.jobs.remove_document_files"
+    ):
+        mock_chunks.return_value = None
+        await delete_document_job(record.id, job.id)
 
     still_deleted = get_document_including_deleted(record.id)
     assert still_deleted is not None
     assert still_deleted.status == "deleted"
+    # Qdrant cleanup must run even when the doc was already soft-deleted.
+    mock_chunks.assert_called_once_with(record.id)
 
 
 @pytest.mark.asyncio
@@ -653,7 +660,7 @@ def test_conversion_capabilities_standard_reports_docling(document_store_env):
     assert std["provider"] == "docling"
     assert std["model"] == "docling-standard-classical"
     assert std["privacy"] == "local"
-    assert std["speed"] == "slow"
+    assert std["speed"] == "fast"
 
 
 # --- R2b: llm_api direct HTTP tests ---

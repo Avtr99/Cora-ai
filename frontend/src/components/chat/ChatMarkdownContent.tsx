@@ -6,7 +6,7 @@ import { Copy, ExternalLink } from 'lucide-react';
 import type { Components } from 'react-markdown';
 import { sanitizeInput, sanitizeUrl } from '@/lib/security';
 import { CitationGroup, InlineCitationPill } from './chatMessageCitations';
-import { preprocessContent } from './chatMessageCitations.utils';
+import { preprocessContent, CITATION_INTERNAL_URL } from './chatMessageCitations.utils';
 import { GlossaryHydrator } from './glossary/GlossaryHydrator';
 
 type MarkdownLinkProps = React.AnchorHTMLAttributes<HTMLAnchorElement> & {
@@ -82,12 +82,17 @@ const REMARK_PLUGINS = [remarkGfm];
 const REHYPE_PLUGINS = [rehypeSanitize];
 const DISALLOWED_ELEMENTS = ['script', 'style', 'iframe', 'object', 'embed', 'form', 'input', 'button'];
 
+export interface CitationNumberMap {
+  kb: number[];
+  web: number[];
+}
+
 interface ChatMarkdownContentProps {
   content: string;
   messageId: string;
   mounted: boolean;
   copyText: (text: string) => Promise<void>;
-  maxCitationNumber?: number; // Max valid citation number based on available sources
+  citationNumberMap?: CitationNumberMap;
 }
 
 export const ChatMarkdownContent: React.FC<ChatMarkdownContentProps> = ({
@@ -95,7 +100,7 @@ export const ChatMarkdownContent: React.FC<ChatMarkdownContentProps> = ({
   messageId,
   mounted,
   copyText,
-  maxCitationNumber,
+  citationNumberMap,
 }) => {
   // Only renderers that depend on props need to live inside the component
   const components = useMemo<Components>(() => ({
@@ -143,26 +148,41 @@ export const ChatMarkdownContent: React.FC<ChatMarkdownContentProps> = ({
       );
     },
     a: ({ href = '', children, ...anchorProps }: MarkdownLinkProps) => {
-      if (href && href.startsWith('https://citation.internal/')) {
+      if (href && href.startsWith(CITATION_INTERNAL_URL)) {
         try {
           const urlObj = new URL(href);
           const pathParts = urlObj.pathname.split('/').filter(Boolean);
           const type = pathParts[0];
           const numsStr = pathParts[1];
 
-          const sourceLabel = type === 'kb' ? 'Knowledge Base' : 'Web';
           const cleanNumsStr = numsStr ? decodeURIComponent(numsStr) : '';
-          const numbers = cleanNumsStr
-            ? cleanNumsStr.split(',').map((n: string) => parseInt(n, 10)).filter((n: number) => !isNaN(n) && n > 0 && (maxCitationNumber === undefined || n <= maxCitationNumber))
+          const localNumbers = cleanNumsStr
+            ? cleanNumsStr
+                .split(',')
+                .map((n: string) => parseInt(n, 10))
+                .filter((n: number) => !isNaN(n) && n > 0)
             : [];
 
-          if (numbers.length === 0) {
+          if (localNumbers.length === 0) {
+            return null;
+          }
+
+          // Map backend per-type numbers (KB 1..N, Web 1..M) to the single
+          // global sequence used by the source list.
+          const map = citationNumberMap;
+          const globalNumbers = localNumbers
+            .map((n: number) => {
+              const list = type === 'kb' ? map?.kb : map?.web;
+              return list && n >= 1 && n <= list.length ? list[n - 1] : undefined;
+            })
+            .filter((n: number | undefined): n is number => n !== undefined);
+
+          if (globalNumbers.length === 0) {
             return null;
           }
 
           const group: CitationGroup = {
-            sourceLabel,
-            numbers,
+            numbers: globalNumbers,
           };
 
           return <InlineCitationPill group={group} messageId={messageId} />;
@@ -202,7 +222,7 @@ export const ChatMarkdownContent: React.FC<ChatMarkdownContentProps> = ({
         </a>
       );
     },
-  } as Components), [copyText, messageId, maxCitationNumber]);
+  } as Components), [copyText, messageId, citationNumberMap]);
 
   return (
     <div className={`markdown-content font-inter font-normal text-sm leading-relaxed text-text-primary transition-opacity duration-300 ${mounted ? 'opacity-100' : 'opacity-0'}`}>

@@ -349,7 +349,13 @@ class KBStreamingHandler:
 
         # If the stream was a non-answer fallback and web is enabled, supplement
         # with web instead of returning the fallback.
-        if _is_explicit_non_answer(buffered) and web_enabled and web_supplement_callback:
+        #
+        # The gate-open check is critical: when the gate opens (line 316),
+        # ``buffered`` is cleared to "".  Without the ``not gate_open`` guard,
+        # ``is_non_answer("")`` returns True (empty = non-answer), falsely
+        # triggering web supplementation on every real answer that was already
+        # streamed to the client.
+        if not gate_open and _is_explicit_non_answer(buffered) and web_enabled and web_supplement_callback:
             logger.info("Streaming KB returned non-answer fallback; supplementing with web search")
             remaining = remaining_budget_ms(timeout_budget_ms, step_start)
             web_result = await web_supplement_callback(

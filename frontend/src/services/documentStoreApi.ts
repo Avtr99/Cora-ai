@@ -45,7 +45,7 @@ export const CONVERSION_OPTIONS: Array<{
     value: 'standard',
     label: 'Standard',
     description: 'Free, runs on your CPU. Best for most VCM documents. Reads text, headings, and tables directly from the PDF. Handles scanned pages with built-in OCR. About 1 to 2 seconds per page. For documents with complex layouts, math formulas, charts, or images, consider LLM API mode for better accuracy.',
-    defaults: { cost: 'Free', speed: 'slow', privacy: 'local' },
+    defaults: { cost: 'Free', speed: 'fast', privacy: 'local' },
   },
   {
     value: 'llm_api',

@@ -22,6 +22,7 @@ from loguru import logger
 import asyncio
 import json
 import os
+from urllib.parse import unquote
 
 from .middleware import (
     RequestSizeLimitMiddleware,
@@ -445,17 +446,30 @@ async def serve_spa(full_path: str):
         raise HTTPException(status_code=404, detail="API route not found")
     if full_path.startswith("api/") or full_path == "api":
         raise HTTPException(status_code=404, detail="API route not found")
-        
-    # Serve static files from the public directory if they exist and aren't directories
+
+    # Reject path traversal attempts (e.g. "..", encoded variants) before
+    # joining with the public directory. Without this, a request like
+    # GET /../../etc/passwd could escape public_dir via os.path.join.
+    if ".." in unquote(full_path).split("/"):
+        raise HTTPException(status_code=404, detail="Not Found")
+
+    # Serve static files from the public directory if they exist and aren't directories.
+    # Resolve the real path and verify it stays within public_dir to prevent traversal.
     file_path = os.path.join(public_dir, full_path)
-    if os.path.exists(file_path) and os.path.isfile(file_path):
-        return FileResponse(file_path)
-        
+    real_public_dir = os.path.realpath(public_dir)
+    real_file_path = os.path.realpath(file_path)
+    if (
+        real_file_path.startswith(real_public_dir + os.sep)
+        and os.path.exists(real_file_path)
+        and os.path.isfile(real_file_path)
+    ):
+        return FileResponse(real_file_path)
+
     # Fallback to index.html for React routing
     index_path = os.path.join(public_dir, "index.html")
     if os.path.exists(index_path):
         return FileResponse(index_path)
-        
+
     return ORJSONResponse(content={"error": "Not Found"}, status_code=404)
 
 if __name__ == "__main__":

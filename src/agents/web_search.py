@@ -55,37 +55,58 @@ def parse_citations(text: str, valid_source_ids: List[str]) -> str:
       - legacy [source_X] / [source_X, source_Y] citations
       - raw [N] / [N, M] citations
       - bare [Web] markers (removed, as they are not rendered correctly)
+      - KB citations [cite_kb: N] normalized to [Knowledge Base, cite: N]
     """
-    if not text or not valid_source_ids:
+    if not text:
         return text
 
-    source_index = {sid: str(i + 1) for i, sid in enumerate(valid_source_ids)}
-    valid_set = set(valid_source_ids)
-    max_index = len(valid_source_ids)
-
-    def _normalize_numbers(parts: List[str]) -> List[str]:
+    def _normalize_kb_numbers(parts: List[str]) -> List[str]:
         out: List[str] = []
         for part in parts:
             part = part.strip()
-            if not part:
-                continue
-            if part in valid_set:
-                out.append(source_index[part])
-            elif part.isdigit() and 1 <= int(part) <= max_index:
+            if part.isdigit() and int(part) >= 1:
                 out.append(part)
         return out
 
-    def _replace_citation(match: re.Match) -> str:
-        nums = _normalize_numbers(match.group(1).split(","))
-        return f"[Web, cite: {', '.join(nums)}]" if nums else ""
+    def _replace_kb_citation(match: re.Match) -> str:
+        nums = _normalize_kb_numbers(match.group(1).split(","))
+        return f"[Knowledge Base, cite: {', '.join(nums)}]" if nums else ""
 
     text = re.sub(
-        r"\[((?:source_\d+(?:,\s*)?)+)\]",
-        _replace_citation,
+        r"\[cite_kb:\s*(\d+(?:,\s*\d+)*)\]",
+        _replace_kb_citation,
         text,
         flags=re.IGNORECASE,
     )
-    text = re.sub(r"\[((?:\d+(?:,\s*)?)+)\]", _replace_citation, text)
+
+    if valid_source_ids:
+        source_index = {sid: str(i + 1) for i, sid in enumerate(valid_source_ids)}
+        valid_set = set(valid_source_ids)
+        max_index = len(valid_source_ids)
+
+        def _normalize_numbers(parts: List[str]) -> List[str]:
+            out: List[str] = []
+            for part in parts:
+                part = part.strip()
+                if not part:
+                    continue
+                if part in valid_set:
+                    out.append(source_index[part])
+                elif part.isdigit() and 1 <= int(part) <= max_index:
+                    out.append(part)
+            return out
+
+        def _replace_citation(match: re.Match) -> str:
+            nums = _normalize_numbers(match.group(1).split(","))
+            return f"[Web, cite: {', '.join(nums)}]" if nums else ""
+
+        text = re.sub(
+            r"\[(source_\d+(?:,\s*source_\d+)*)\]",
+            _replace_citation,
+            text,
+            flags=re.IGNORECASE,
+        )
+        text = re.sub(r"\[(\d+(?:,\s*\d+)*)\]", _replace_citation, text)
 
     # Drop bare [Web] / [Web, ...] markers that carry no valid citation numbers.
     text = re.sub(r"\[Web(?:,\s*[^0-9\]]*)?\]", "", text, flags=re.IGNORECASE)
@@ -254,7 +275,10 @@ You are an expert VCM assistant with access to web search results.
 <instructions>
 1. Synthesis: Answer directly and authoritatively. Seamlessly merge the <reference_data> information with your web search results.
 2. No Preambles: NEVER use introductory phrases.
-3. Silent Sourcing: Cite your web sources using the [Web, cite: N] format where N is the source number from the search results (e.g., [Web, cite: 1]). Do NOT invent new sources.
+3. Silent Sourcing:
+   - Cite web sources using the [Web, cite: N] format where N is the source number from the search results (e.g., [Web, cite: 1]).
+   - Cite knowledge base sources using the [cite_kb: N] format where N is the source index from the <reference_data> <source index="N"> tags.
+   - Do NOT invent new sources and do NOT combine KB and web citations into a single bracket.
 4. Formatting & Word Limits:
    - Simple questions: Maximum 150 words.
    - Detailed questions: MAXIMUM 600 words using markdown.

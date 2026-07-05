@@ -215,18 +215,25 @@ async def reindex_document_job(document_id: str, job_id: str) -> None:
 
 async def delete_document_job(document_id: str, job_id: str) -> None:
     update_job(job_id, "processing", "Deleting document")
-    record = _refresh_record(document_id, job_id)
+    # Use get_document_including_deleted so we can still clean up Qdrant chunks
+    # for a document that was already soft-deleted by a prior (possibly failed)
+    # delete attempt. _refresh_record would return None for soft-deleted docs
+    # (get_document filters status != 'deleted'), causing us to exit before
+    # vector store cleanup — leaving orphaned chunks in Qdrant.
+    record = get_document_including_deleted(document_id)
     if record is None:
+        update_job(job_id, "failed", error="Document not found")
         return
-    if record.status == "deleted":
-        update_job(job_id, "completed", message="Document already deleted")
-        return
+    already_deleted = record.status == "deleted"
+    if not already_deleted:
+        try:
+            update_document(document_id, status="deleting", error=None)
+        except Exception as exc:
+            logger.warning("Could not mark document %s as deleting: %s", document_id, exc)
 
-    try:
-        update_document(document_id, status="deleting", error=None)
-    except Exception as exc:
-        logger.warning("Could not mark document %s as deleting: %s", document_id, exc)
-
+    # Always run Qdrant cleanup — it's idempotent (deleting non-existent
+    # points is a no-op) and is the only way to purge orphaned chunks left
+    # behind by a previous failed delete.
     qdrant_error = None
     try:
         await delete_document_chunks(document_id)
@@ -241,9 +248,12 @@ async def delete_document_job(document_id: str, job_id: str) -> None:
 
     try:
         update_document(document_id, status="deleted", error=None)
-        message = "Document deleted"
+        if already_deleted:
+            message = "Document already deleted"
+        else:
+            message = "Document deleted"
         if qdrant_error:
-            message = f"Document deleted locally; vector store cleanup failed: {qdrant_error}"
+            message = f"{message}; vector store cleanup failed: {qdrant_error}"
         update_job(job_id, "completed", message=message)
     except Exception as exc:
         logger.exception("Could not mark document %s as deleted", document_id)

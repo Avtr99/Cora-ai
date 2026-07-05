@@ -47,7 +47,7 @@ class AnswerGeneratorProtocol(Protocol):
         ...
 
     async def check_query_cache(self, query: str) -> Optional[Dict[str, Any]]:
-        """Check L1/L2 caches for a query-only cached answer."""
+        """Check in-memory and SQLite caches for a query-only cached answer."""
         ...
 
 

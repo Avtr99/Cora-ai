@@ -11,7 +11,6 @@ from qdrant_client import QdrantClient, models
 
 from ..config import get_settings
 from ..embeddings import create_embeddings
-from ..utils.cache import query_cache
 from ..db.sqlite_cache import get_sqlite_cache
 from .models import DocumentRecord
 from .storage import read_markdown, update_document
@@ -22,9 +21,10 @@ def chunk_markdown(record: DocumentRecord) -> list[Document]:
     from langchain_text_splitters import RecursiveCharacterTextSplitter
 
     text = read_markdown(record)
+    settings = get_settings()
     splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1000,
-        chunk_overlap=200,
+        chunk_size=settings.CHUNK_SIZE,
+        chunk_overlap=settings.CHUNK_OVERLAP,
         separators=["\n\n", "\n", ". ", " ", ""],
     )
     # Read the title and VCM metadata from the record (single source of truth,
@@ -81,8 +81,13 @@ async def delete_document_chunks(document_id: str) -> None:
 
 
 async def invalidate_document_caches() -> None:
-    await query_cache.clear()
-    cache = get_sqlite_cache()
+    """Clear all cached query results, routing decisions, and rewrites.
+
+    A single ``clear()`` with no handler_type removes every row from
+    backend_cache (query, route, rewrite, etc.) — no need to clear
+    individual handler types separately.
+    """
+    cache = await get_sqlite_cache()
     await cache.clear()
 
 

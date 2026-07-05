@@ -20,6 +20,7 @@ from .route_processor_utils import get_relevance_checker
 from .kb_route_handler import KBRouteHandler
 from .web_route_handler import WebRouteHandler
 from .hybrid_route_handler import HybridRouteHandler
+from ..query_processing.citation_verifier import renumber_citation_markers
 
 if TYPE_CHECKING:
     from .reasoning_formatter import AgentStep
@@ -105,7 +106,7 @@ class RouteProcessor:
         if filtered:
             answer_lower = answer.lower()
             has_web_markers = "[web, cite:" in answer_lower or "[source_" in answer_lower
-            has_kb_markers = "[cite_kb:" in answer_lower
+            has_kb_markers = "[cite_kb:" in answer_lower or "[knowledge base," in answer_lower
 
             if has_web_markers and not has_kb_markers:
                 filtered = [c for c in filtered if c.source_type == "web"]
@@ -117,7 +118,16 @@ class RouteProcessor:
         ):
             filtered = []
 
+        # Renumber inline citation markers so their numbers match the filtered
+        # citation list. Markers referencing filtered-out sources are removed.
+        # Also runs when filtered is empty (suppressed) to strip orphaned markers.
+        if answer and (filtered or citations):
+            renumbered = renumber_citation_markers(answer, citations, filtered)
+            if renumbered != answer:
+                result["answer"] = renumbered
+
         result["citations"] = filtered
+        result["_citations_finalized"] = True
         if filtered:
             sources = []
             for c in filtered:

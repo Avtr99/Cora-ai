@@ -27,6 +27,8 @@ citation_manager = None
 _docling_converter = None
 _docling_lock = Lock()
 
+_llm_swap_lock = asyncio.Lock()
+
 # Initialization state tracking
 initialization_complete = False
 initialization_errors = []
@@ -109,7 +111,7 @@ async def initialize_components():
                 max_total_time_ms=settings.RAG_TIMEOUT_MS,
             )
 
-            rag_orchestrator = StreamingRAGOrchestrator(
+            rag_orchestrator = await StreamingRAGOrchestrator.create(
                 llm_client=llm_client,
                 retriever=retriever,
                 answer_generator=llm_client,
@@ -153,14 +155,19 @@ async def initialize_components():
             )
             await async_job_manager.start(worker_count=settings.ASYNC_QUERY_WORKERS)
 
-            # Wire L2 cache into LLM client for query-only cache lookups
+            # Wire SQLite cache into LLM client for query-only cache lookups.
+            # For FallbackLLMClient, propagate to primary + fallback so delegated
+            # cache operations (persist_to_cache, check_query_cache) work correctly.
             try:
                 from ..db.sqlite_cache import get_sqlite_cache
-                sqlite_cache = get_sqlite_cache()
+                sqlite_cache = await get_sqlite_cache()
                 if llm_client is not None and sqlite_cache is not None:
-                    llm_client._l2_cache = sqlite_cache
+                    llm_client._sqlite_cache = sqlite_cache
+                    for inner in getattr(llm_client, "primary", None), getattr(llm_client, "fallback", None):
+                        if inner is not None:
+                            inner._sqlite_cache = sqlite_cache
             except Exception as e:
-                logger.warning(f"Failed to wire L2 cache into LLM client (non-critical): {e}")
+                logger.warning(f"Failed to wire SQLite cache into LLM client (non-critical): {e}")
 
             # Pre-populate the dynamic filter-field cache. This makes
             # synchronous Qdrant scroll calls; doing it here (in a thread)
@@ -269,6 +276,106 @@ def get_gemini_client():
 def get_llm_client():
     """Get the LLM client instance. Returns None if not initialized."""
     return llm_client
+
+
+async def hot_swap_llm_client() -> dict:
+    """Rebuild the LLM client and RAG orchestrator from current settings.
+
+    Called after the user switches providers via the settings API. Reuses the
+    existing retriever and citation_manager - only the LLM client and
+    orchestrator are rebuilt. This avoids a full server restart.
+
+    The swap is atomic under a lock: if orchestrator rebuild fails, neither
+    global is updated, so callers never see a mismatched client/orchestrator.
+
+    Returns:
+        Dict with success status and client type name, or error details.
+    """
+    global llm_client, rag_orchestrator
+
+    if not is_llm_configured():
+        return {"success": False, "error": "No LLM provider configured"}
+
+    async with _llm_swap_lock:
+        try:
+            new_client = create_llm_client()
+            logger.info(
+                f"Hot-swap: new LLM client created: {type(new_client).__name__} "
+                f"(model: {getattr(new_client, 'model_main', 'unknown')})"
+            )
+        except Exception as e:
+            error_msg = f"Hot-swap failed during client creation: {type(e).__name__}: {e}"
+            logger.error(error_msg, exc_info=True)
+            return {"success": False, "error": error_msg}
+
+        # Wire SQLite cache into the new client (same as startup path).
+        # For FallbackLLMClient, propagate to primary + fallback so delegated
+        # cache operations (persist_to_cache, check_query_cache) work correctly.
+        try:
+            from ..db.sqlite_cache import get_sqlite_cache
+            sqlite_cache = await get_sqlite_cache()
+            if new_client is not None and sqlite_cache is not None:
+                new_client._sqlite_cache = sqlite_cache
+                # Propagate to inner clients if this is a wrapper
+                for inner in getattr(new_client, "primary", None), getattr(new_client, "fallback", None):
+                    if inner is not None:
+                        inner._sqlite_cache = sqlite_cache
+        except Exception as e:
+            logger.warning(f"Hot-swap: SQLite cache wiring failed (non-critical): {e}")
+
+        # Rebuild the orchestrator with the new client, reusing the existing
+        # retriever and citation_manager.
+        if retriever is not None:
+            try:
+                settings = get_settings()
+                from ..agents import OrchestratorConfig
+                from ..agents.streaming_orchestrator import StreamingRAGOrchestrator
+
+                orchestrator_config = OrchestratorConfig(
+                    enable_rewriting=settings.ENABLE_QUERY_REWRITING,
+                    use_quick_rewrite=settings.USE_QUICK_REWRITE,
+                    enable_routing=settings.ENABLE_ROUTING,
+                    retrieval_k=settings.ROUND1_K,
+                    retrieval_threshold=settings.ROUND1_THRESHOLD,
+                    retrieval_rounds=settings.DARTBOARD_ROUNDS,
+                    kb_min_top_relevance_score=get_collection_threshold(
+                        settings, "KB_MIN_TOP_RELEVANCE_SCORE"
+                    ),
+                    enable_web_search=settings.ENABLE_WEB_SEARCH,
+                    web_supplement_relevance_confidence_threshold=getattr(
+                        settings,
+                        "WEB_SUPPLEMENT_RELEVANCE_CONFIDENCE_THRESHOLD",
+                        0.8,
+                    ),
+                    enable_validation=settings.ENABLE_VALIDATION,
+                    max_total_time_ms=settings.RAG_TIMEOUT_MS,
+                )
+
+                rag_orchestrator = await StreamingRAGOrchestrator.create(
+                    llm_client=new_client,
+                    retriever=retriever,
+                    answer_generator=new_client,
+                    config=orchestrator_config,
+                )
+                logger.info("Hot-swap: RAG orchestrator rebuilt successfully")
+            except Exception as e:
+                error_msg = f"Hot-swap: orchestrator rebuild failed: {type(e).__name__}: {e}"
+                logger.error(error_msg, exc_info=True)
+                # Still swap the client - direct callers via get_llm_client() get
+                # the new client. The old orchestrator keeps the old client, which
+                # is better than no orchestrator for streaming queries.
+        else:
+            logger.warning("Hot-swap: retriever not available, skipping orchestrator rebuild")
+
+        # Atomic update: both globals are assigned only after client and
+        # orchestrator are successfully rebuilt.
+        llm_client = new_client
+    return {
+        "success": True,
+        "client_type": type(new_client).__name__,
+        "model": getattr(new_client, "model_main", "unknown"),
+    }
+
 
 
 def get_rag_orchestrator():

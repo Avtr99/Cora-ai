@@ -1,9 +1,9 @@
 """
 Query Routing Handler
 
-Handles query routing with two-tier caching:
-- L1: In-memory TTLCache (fast, ephemeral, catches rapid-fire duplicates)
-- L2: SQLite (persistent, survives application restarts)
+Handles query routing with caching:
+- In-memory TTLCache (fast, ephemeral, catches rapid-fire duplicates)
+- SQLite cache (persistent, survives application restarts)
 """
 
 import asyncio
@@ -32,8 +32,8 @@ class RouterProtocol(Protocol):
 
 
 class RoutingHandler:
-    """Handles query routing with two-tier caching (L1 in-memory + L2 SQLite)."""
-    
+    """Handles query routing with in-memory + SQLite caching."""
+
     def __init__(
         self,
         router: RouterProtocol,
@@ -41,25 +41,25 @@ class RoutingHandler:
         cache_ttl: int = 600,
         cache_maxsize: int = 500,
         sqlite_cache: Optional[SQLiteCache] = None,
-        l2_ttl_seconds: int = 86400,
+        sqlite_ttl_seconds: int = 86400,
     ):
         """
         Initialize the routing handler.
-        
+
         Args:
             router: Router implementing route() method
             default_route: Default route when routing is disabled
-            cache_ttl: L1 cache TTL in seconds (default 10 min)
-            cache_maxsize: Maximum L1 cache size
-            sqlite_cache: Optional L2 persistent cache
-            l2_ttl_seconds: L2 cache TTL in seconds (default 24h)
+            cache_ttl: In-memory cache TTL in seconds (default 10 min)
+            cache_maxsize: Maximum in-memory cache size
+            sqlite_cache: Optional persistent SQLite cache
+            sqlite_ttl_seconds: SQLite cache TTL in seconds (default 24h)
         """
         self.router = router
         self.default_route = default_route
         self._cache = TTLCache(maxsize=cache_maxsize, ttl=cache_ttl)
         self._inflight: Dict[str, asyncio.Future[Dict[str, Any]]] = {}
-        self._l2_cache = sqlite_cache
-        self._l2_ttl = l2_ttl_seconds
+        self._sqlite_cache = sqlite_cache
+        self._sqlite_ttl = sqlite_ttl_seconds
         self._handler_type = "route"
     
     async def _run_with_dedup(
@@ -89,33 +89,33 @@ class RoutingHandler:
         Raises:
             Exception: Re-raises any exception from compute_fn
         """
-        # Check L1 cache first
+        # Check in-memory cache first
         if cache_key in self._cache:
             result = self._cache[cache_key]
             if on_cache_hit:
                 on_cache_hit(result)
             return result
 
-        # Check L2 (SQLite) cache
-        if self._l2_cache and self._l2_cache.enabled:
-            l2_data = await self._l2_cache.get(cache_key, self._handler_type)
-            if l2_data is not None:
+        # Check SQLite cache
+        if self._sqlite_cache and self._sqlite_cache.enabled:
+            sqlite_data = await self._sqlite_cache.get(cache_key, self._handler_type)
+            if sqlite_data is not None:
                 # Deserialize RouteDecision enum from string
-                result = self._deserialize_route_result(l2_data, cache_key)
+                result = self._deserialize_route_result(sqlite_data, cache_key)
                 if result is None:
                     # Deserialization failed (e.g., unknown route value), treat as miss
                     logger.warning(
-                        "L2 cache deserialization failed for %s key: %s",
+                        "SQLite cache deserialization failed for %s key: %s",
                         self._handler_type,
                         cache_key[:16]
                     )
-                    # Continue processing as cache miss (don't write to L1, don't return)
+                    # Continue processing as cache miss (don't write to in-memory, don't return)
                 else:
-                    # Populate L1 from L2 hit
+                    # Populate in-memory from SQLite hit
                     self._cache[cache_key] = result
                     if on_cache_hit:
                         on_cache_hit(result)
-                    logger.debug("L2 cache hit for %s key: %s", self._handler_type, cache_key[:16])
+                    logger.debug("SQLite cache hit for %s key: %s", self._handler_type, cache_key[:16])
                     return result
 
         # Check for in-flight request (deduplication)
@@ -139,24 +139,24 @@ class RoutingHandler:
         try:
             result = await compute_fn()
 
-            # Save to L2 (persistent) first - best effort, don't block on failure
-            if self._l2_cache and self._l2_cache.enabled:
+            # Save to SQLite (persistent) first - best effort, don't block on failure
+            if self._sqlite_cache and self._sqlite_cache.enabled:
                 try:
-                    await self._l2_cache.set(
+                    await self._sqlite_cache.set(
                         cache_key,
                         self._handler_type,
                         self._serialize_route_result(result),
-                        ttl_seconds=self._l2_ttl,
+                        ttl_seconds=self._sqlite_ttl,
                     )
-                except Exception as l2_exc:
+                except Exception as sqlite_exc:
                     logger.warning(
-                        "L2 cache write failed for %s key %s: %s. Continuing with L1 cache.",
+                        "SQLite cache write failed for %s key %s: %s. Continuing with in-memory cache.",
                         self._handler_type,
                         cache_key[:16],
-                        l2_exc
+                        sqlite_exc
                     )
 
-            # Save to L1 (in-memory)
+            # Save to in-memory cache
             self._cache[cache_key] = result
 
             # Resolve future for waiting coroutines
@@ -194,7 +194,7 @@ class RoutingHandler:
                 # Log only non-sensitive identifiers; data may contain PII
                 allowed_keys = sorted([k for k in data.keys() if k != "cached_data"])
                 logger.warning(
-                    "Unknown route value from L2 cache: %s for cache_key=%s (allowed_keys=%s)",
+                    "Unknown route value from SQLite cache: %s for cache_key=%s (allowed_keys=%s)",
                     route_value,
                     cache_key,
                     allowed_keys

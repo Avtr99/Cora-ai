@@ -188,3 +188,88 @@ Users can switch the primary provider at any time via **Settings → AI Model**
 in the chat UI. The dialog supports Gemini and OpenAI-compatible presets
 (OpenAI, Ollama, OpenRouter, etc.). Automatic fallback uses the other provider's
 environment key.
+
+## Unified Citation Rendering
+
+### Problem
+
+- Inline citation markers were rendered as large, colored pill boxes that interrupted the answer text.
+- The source list used two separate numbering systems: "Knowledge Base: 1, 2, 3" (purple) and "Web: 1, 2, 3" (gray), so the numbers in the answer text did not match a single source list.
+- Some source labels arrived URL-encoded (e.g. `vm0047%20arr%20v1.0`) and were displayed literally, making them unreadable.
+
+### Solution
+
+1. **Single global numbering sequence**
+   - `ChatMessage.tsx` builds a `CitationNumberMap` from `sourceLinks`. Each source gets a global number based on its position in the combined list.
+   - `ChatMarkdownContent.tsx` maps backend per-type numbers (`[cite_kb: N]`, `[Web, cite: N]`) to those global numbers, so inline markers and the source list share one linear sequence.
+
+2. **Less obtrusive inline markers**
+   - `InlineCitationPill` in `chatMessageCitations.tsx` now renders small superscript numbers (`1, 2`) instead of pill boxes. They are clickable and scroll to the source list.
+
+3. **Unified source list**
+   - `CitationBadges.tsx` renders a single "Sources" section with all sources numbered continuously. Source type is still indicated by the icon and the number-circle color (KB = brand purple, Web = muted gray).
+
+4. **URL-encoded label decoding**
+   - `decodeSourceLabel` is now shared between `chatMessageCitations.utils.ts` and `CitationBadges.tsx`.
+   - It handles `%20`, `+`, and double/triple encoding up to 8 passes.
+   - `processCitationPart` in `chatMessageCitations.utils.ts` now also decodes fallback source strings.
+
+### Files Changed
+
+- `frontend/src/components/chat/ChatMessage.tsx`
+- `frontend/src/components/chat/ChatMarkdownContent.tsx`
+- `frontend/src/components/chat/chatMessageCitations.tsx`
+- `frontend/src/components/chat/CitationBadges.tsx`
+- `frontend/src/components/chat/chatMessageCitations.utils.ts`
+- `frontend/src/components/chat/chatMessageCitations.utils.test.ts`
+
+### Backend citation marker renumbering
+
+After `filter_citations_by_answer` removes citations that aren't grounded in
+the answer, the inline `[cite_kb: N]` / `[Web, cite: N]` markers in the answer
+text still reference the original source indices. `renumber_citation_markers`
+in `src/query_processing/citation_verifier.py` rewrites them so `N` refers to
+the position in the filtered citation list — which is what the frontend
+displays. Markers referencing filtered-out sources are removed entirely.
+
+This is called in three places:
+- `src/agents/route_processors.py:_finalize_citations` (KB, Web routes)
+- `src/agents/orchestrator.py` (sync orchestrator)
+- `src/agents/streaming_orchestrator.py` (streaming orchestrator, final result event only)
+- `src/agents/hybrid_route_handler.py` (hybrid route, after `grounded_citations`)
+
+### Frontend cleanup
+
+- `extractDomain` in `chatMessageCitations.utils.ts` now reuses the shared
+  `decodeSourceLabel` instead of duplicating the URL-decoding loop.
+- The `data\` path fallback in `processCitationPart` and the `sources` array
+  path both decode URL-encoded labels and strip the `data\` prefix.
+- `preprocessContent` produces clean markdown links (`[kb](url)`) instead of
+  double-bracketed text. Numberless markers (`[Knowledge Base]`, `[Web]`) are
+  removed instead of leaving gaps in the text.
+- `CITATION_INTERNAL_URL` constant is shared between `chatMessageCitations.utils.ts`
+  and `ChatMarkdownContent.tsx`.
+
+### Files Changed (backend)
+
+- `src/query_processing/citation_verifier.py` (added `renumber_citation_markers`)
+- `src/agents/route_processors.py` (call renumber after filter)
+- `src/agents/orchestrator.py` (call renumber after filter)
+- `src/agents/streaming_orchestrator.py` (call renumber after filter)
+- `src/agents/hybrid_route_handler.py` (call renumber after filter)
+- `tests/test_citation_renumber.py` (12 new tests)
+
+### Testing
+
+```powershell
+# Frontend
+cd "d:/Cora ai/frontend"
+npm run test -- --run
+npm run lint
+npm run build
+
+# Backend
+cd "d:/Cora ai"
+pytest tests/test_citation_renumber.py tests/test_citation_manager.py
+ruff check src/query_processing/citation_verifier.py src/agents/
+```

@@ -14,7 +14,11 @@ services:
       - QDRANT_URL=http://qdrant:6333
       - CORS_ORIGINS=http://localhost:8000,http://localhost:8080
     volumes:
-      - cora_data:/app/data
+      # Bind mount (not a named volume) so user data is directly accessible
+      # in ./data/ for easy inspection, backup, and migration. This also
+      # prevents `docker-compose down -v` from accidentally destroying
+      # indexed documents — a footgun with named volumes.
+      - ./data:/app/data
     depends_on:
       qdrant:
         condition: service_healthy
@@ -34,5 +38,4 @@ services:
     restart: unless-stopped
 
 volumes:
-  cora_data:
   qdrant_data:

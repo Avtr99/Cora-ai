@@ -44,10 +44,9 @@ class FallbackLLMClient(BaseRAGClient):
         super().__init__()
         self.primary = primary
         self.fallback = fallback
-        # Re-use the primary's L2 cache handle so the orchestrator's persistence
-        # path works without re-initializing a second cache.
-        if hasattr(primary, "_l2_cache"):
-            self._l2_cache = primary._l2_cache
+        # Note: _sqlite_cache is wired by lifespan on the inner clients (primary
+        # and fallback) directly. The wrapper never reads its own _sqlite_cache
+        # — persist_to_cache and check_query_cache both delegate to primary.
 
     @property
     def model_main(self) -> str:
@@ -165,10 +164,10 @@ class FallbackLLMClient(BaseRAGClient):
             return await self.primary.check_query_cache(query)
         return None
 
-    async def persist_to_l2(self, query: str, result: Dict[str, Any]) -> None:
-        """Delegate L2 cache persistence to the primary provider."""
-        if hasattr(self.primary, "persist_to_l2"):
-            await self.primary.persist_to_l2(query, result)
+    async def persist_to_cache(self, query: str, result: Dict[str, Any]) -> None:
+        """Delegate cache persistence to the primary provider."""
+        if hasattr(self.primary, "persist_to_cache"):
+            await self.primary.persist_to_cache(query, result)
 
     def get_cache_status(self) -> Dict[str, Any]:
         """Delegate cache status to the primary provider if available."""

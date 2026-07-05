@@ -7,9 +7,10 @@ from ..db.database import get_connection
 logger = logging.getLogger(__name__)
 
 class SQLiteCache:
-    """Persistent L2 cache backed by local SQLite.
+    """Persistent cache backed by local SQLite.
 
-    Replaces the previous Supabase cache to keep the stack fully self-hosted.
+    Stores query results, routing decisions, and rewrite results in the
+    backend_cache table. Survives application restarts.
     """
 
     def __init__(self, default_ttl_seconds: int = 86400):
@@ -110,9 +111,24 @@ class SQLiteCache:
         return await asyncio.to_thread(self._ping)
 
 
-def get_sqlite_cache() -> SQLiteCache:
-    from ..config import get_settings
-    settings = get_settings()
-    # Read cache ttl from settings or default to 86400
-    ttl = int(getattr(settings, "CACHE_TTL_SECONDS", 86400))
-    return SQLiteCache(default_ttl_seconds=ttl)
+_sqlite_cache_singleton: Optional[SQLiteCache] = None
+_sqlite_cache_lock = asyncio.Lock()
+
+
+async def get_sqlite_cache() -> SQLiteCache:
+    """Get the shared SQLiteCache singleton.
+
+    All callers (query cache, orchestrator, lifespan, indexer, health check)
+    share the same instance so read and write paths are consistent.
+    """
+    global _sqlite_cache_singleton
+    if _sqlite_cache_singleton is not None:
+        return _sqlite_cache_singleton
+    async with _sqlite_cache_lock:
+        if _sqlite_cache_singleton is not None:
+            return _sqlite_cache_singleton
+        from ..config import get_settings
+        settings = get_settings()
+        ttl = int(getattr(settings, "CACHE_TTL_SECONDS", 86400))
+        _sqlite_cache_singleton = SQLiteCache(default_ttl_seconds=ttl)
+    return _sqlite_cache_singleton

@@ -106,7 +106,7 @@ async def check_gemini_health() -> ComponentHealth:
         circuit_state = gemini_circuit.state.value
         latency = (time.perf_counter() - start) * 1000
         
-        # Get context cache status from singleton client
+        # Get SQLite cache status from the active LLM client
         cache_status = {}
         try:
             from .lifespan import get_gemini_client
@@ -126,7 +126,7 @@ async def check_gemini_health() -> ComponentHealth:
                 message="Circuit breaker open",
                 details={
                     "circuit_state": circuit_state,
-                    "context_cache": cache_status
+                    "sqlite_cache": cache_status
                 }
             )
         
@@ -137,7 +137,7 @@ async def check_gemini_health() -> ComponentHealth:
             details={
                 "circuit_state": circuit_state,
                 "model": cache_status.get("model", "unknown"),
-                "context_cache_enabled": cache_status.get("cache_enabled", False),
+                "sqlite_cache_enabled": cache_status.get("cache_enabled", False),
             }
         )
     except Exception as e:
@@ -236,9 +236,10 @@ async def check_sqlite_cache_health() -> ComponentHealth:
     from ..db.sqlite_cache import get_sqlite_cache
     from ..utils.patterns import check_component_health
 
+    cache = await get_sqlite_cache()
     return await check_component_health(
         name="sqlite_cache",
-        check_fn=get_sqlite_cache().ping,
+        check_fn=cache.ping,
         details_fn=lambda result: {"table": "backend_cache", "reachable": bool(result)},
     )
 

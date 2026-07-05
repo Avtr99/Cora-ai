@@ -44,6 +44,7 @@ from ..citations import CitationManager
 from ..query_processing.filter_extractor import extract_filters
 from ..query_processing.fallback_answers import is_cacheable_answer
 from ..query_processing.llm_provider import LLMClient
+from ..query_processing.citation_verifier import renumber_citation_markers
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +65,38 @@ class RAGOrchestrator:
     caching.
     """
 
+    @classmethod
+    async def create(
+        cls,
+        llm_client: LLMClient,
+        retriever: Any,
+        answer_generator: AnswerGeneratorProtocol,
+        config: Optional[OrchestratorConfig] = None,
+        model_name: Optional[str] = None,
+        validator: Optional[RelevanceCheckerProtocol] = None,
+    ):
+        """Async factory: builds the orchestrator and fetches the SQLite cache.
+
+        ``__init__`` is synchronous, so any async singleton initialization
+        (like ``get_sqlite_cache()``) happens here. This keeps the constructor
+        simple and avoids awaiting inside ``__init__``.
+        """
+        from ..config import get_settings
+        settings = get_settings()
+        sqlite_cache = None
+        if getattr(settings, "CACHE_ENABLED", True):
+            from ..db.sqlite_cache import get_sqlite_cache
+            sqlite_cache = await get_sqlite_cache()
+        return cls(
+            llm_client,
+            retriever,
+            answer_generator,
+            config=config,
+            model_name=model_name,
+            validator=validator,
+            sqlite_cache=sqlite_cache,
+        )
+
     def __init__(
         self,
         llm_client: LLMClient,
@@ -72,6 +105,7 @@ class RAGOrchestrator:
         config: Optional[OrchestratorConfig] = None,
         model_name: Optional[str] = None,
         validator: Optional[RelevanceCheckerProtocol] = None,
+        sqlite_cache: Optional[Any] = None,
     ):
         """
         Initialize the orchestrator with all required components.
@@ -90,7 +124,7 @@ class RAGOrchestrator:
         self.retriever = retriever
         self.answer_generator = answer_generator
 
-        # Track fire-and-forget background tasks (L2 cache writes) to prevent
+        # Track fire-and-forget background tasks (cache writes) to prevent
         # garbage collection before completion. See asyncio.create_task docs.
         self._background_tasks: set = set()
 
@@ -119,24 +153,20 @@ class RAGOrchestrator:
             )
         )
 
-        # Initialize L2 persistent cache (SQLite)
-        from ..db.sqlite_cache import get_sqlite_cache
-        l2_cache = get_sqlite_cache() if getattr(settings, "CACHE_ENABLED", True) else None
-
-        # Initialize handlers with two-tier caching (L1 in-memory + L2 SQLite)
+        # Initialize handlers with in-memory + SQLite caching
         self.rewrite_handler = RewriteHandler(
             query_rewriter=query_rewriter,
             use_quick_rewrite=self.config.use_quick_rewrite,
             cache_ttl=settings.REWRITE_CACHE_TTL,
-            sqlite_cache=l2_cache,
-            l2_ttl_seconds=getattr(settings, "CACHE_TTL_SECONDS", 86400),
+            sqlite_cache=sqlite_cache,
+            sqlite_ttl_seconds=getattr(settings, "CACHE_TTL_SECONDS", 86400),
         )
         self.routing_handler = RoutingHandler(
             router=router,
             default_route=self.config.default_route,
             cache_ttl=settings.ROUTE_CACHE_TTL,
-            sqlite_cache=l2_cache,
-            l2_ttl_seconds=getattr(settings, "CACHE_TTL_SECONDS", 86400),
+            sqlite_cache=sqlite_cache,
+            sqlite_ttl_seconds=getattr(settings, "CACHE_TTL_SECONDS", 86400),
         )
 
         # Initialize route processor
@@ -210,12 +240,12 @@ class RAGOrchestrator:
             cached_result["reasoning_steps"] = format_reasoning_steps(steps)
         return cached_result
 
-    async def _persist_result_to_l2(
+    async def _persist_result_to_cache(
         self,
         query: str,
         result: Dict[str, Any],
     ) -> None:
-        """Persist the final result to L2 (SQLite) cache.
+        """Persist the final result to the SQLite cache.
 
         Called by the orchestrator after the complete reasoning chain, metadata,
         and citations have been assembled. This ensures cached entries are
@@ -226,7 +256,7 @@ class RAGOrchestrator:
         The query-only cache key means the same question will serve the same
         answer for the configured TTL, surviving application restarts.
 
-        This method is called as a fire-and-forget task via _spawn_l2_persist()
+        This method is called as a fire-and-forget task via _spawn_cache_persist()
         to avoid blocking the response. The result dict is already fully built
         before this method is called, so cache write failures are non-critical.
 
@@ -234,28 +264,30 @@ class RAGOrchestrator:
             query: Original user query (un-rewritten).
             result: Final result dict with ``reasoning_steps`` already set.
         """
-        persist_to_l2 = getattr(self.answer_generator, "persist_to_l2", None)
-        if persist_to_l2 is None:
+        persist_to_cache = getattr(self.answer_generator, "persist_to_cache", None)
+        if persist_to_cache is None:
             return
         if not is_cacheable_answer(result.get("answer", ""), result.get("sources")):
             return
         try:
-            await persist_to_l2(query, result)
+            await persist_to_cache(query, result)
         except Exception as e:
-            logger.debug("Failed to persist result to L2 cache: %s", e)
+            logger.debug("Failed to persist result to SQLite cache: %s", e)
 
-    def _spawn_l2_persist(self, query: str, result: Dict[str, Any]) -> None:
-        """Schedule L2 cache persistence as a fire-and-forget background task.
+    def _spawn_cache_persist(self, query: str, result: Dict[str, Any]) -> None:
+        """Schedule cache persistence as a fire-and-forget background task.
 
         The task is stored in ``self._background_tasks`` to prevent garbage
         collection before completion (per asyncio.create_task docs). The task
         removes itself from the set on completion to avoid unbounded growth.
 
-        A shallow snapshot of ``result`` is captured now so later mutations by
-        the caller cannot race with the background serialization.
+        A shallow snapshot of ``result`` is captured now.  Nested dicts
+        (``metadata``, ``citations``) are shared references, but they are
+        set earlier in ``process()`` and never mutated after this point,
+        so the snapshot is safe for serialization.
         """
         result_snapshot = dict(result)
-        task = asyncio.create_task(self._persist_result_to_l2(query, result_snapshot))
+        task = asyncio.create_task(self._persist_result_to_cache(query, result_snapshot))
         self._background_tasks.add(task)
         task.add_done_callback(self._background_tasks.discard)
 
@@ -343,8 +375,8 @@ class RAGOrchestrator:
             # Bypass the entire RAG pipeline for clear greetings/conversational
             # queries using only the regex heuristic (no LLM call). Greetings are
             # never cached (conversational responses don't go through
-            # persist_to_l2), so checking the cache for them is wasted work —
-            # especially the L2 SQLite network call.
+            # persist_to_cache), so checking the cache for them is wasted work —
+            # especially the SQLite call.
             conv_result = await self._try_conversational(
                 query, chat_history, steps, start_time, use_llm_classification=False
             )
@@ -353,11 +385,11 @@ class RAGOrchestrator:
                 return conv_result
 
             # OPTIMIZATION: Early Query Cache Check
-            # Check L1 (in-memory) and L2 (SQLite) caches before any
-            # rewriting, routing, or retrieval. This serves previously answered
-            # queries instantly. Runs after the cheap conversational heuristic
-            # so greetings skip the cache, and before the LLM intent
-            # classification so cache hits avoid any LLM cost.
+            # Check in-memory and SQLite caches before any rewriting, routing,
+            # or retrieval. This serves previously answered queries instantly.
+            # Runs after the cheap conversational heuristic so greetings skip
+            # the cache, and before the LLM intent classification so cache hits
+            # avoid any LLM cost.
             cached_result = await self._try_early_cache_hit(query, steps, start_time)
             if cached_result is not None:
                 return cached_result
@@ -536,20 +568,34 @@ class RAGOrchestrator:
             
             # Extract and format citations
             citations = result.get("citations", [])
-            
-            # Filter citations to only those actually used in the answer
             answer_text = result.get("answer", "")
-            filtered_citations = self.citation_manager.filter_citations_by_answer(
-                citations, answer_text, query=query
-            )
-            
-            # Suppress citations for conversational queries or when not relevant
-            coverage_score = result.get("coverage_score", 1.0)
-            if self.citation_manager.should_suppress_citations(
-                query, answer_text, filtered_citations, coverage_score
-            ):
-                filtered_citations = []
-            
+
+            if result.get("_citations_finalized"):
+                # Route processor already filtered, suppressed, aligned, and
+                # renumbered.  Skip the redundant work and go straight to
+                # response formatting.
+                filtered_citations = citations
+            else:
+                # No finalization callback ran — do it here.
+                filtered_citations = self.citation_manager.filter_citations_by_answer(
+                    citations, answer_text, query=query
+                )
+
+                coverage_score = result.get("coverage_score", 1.0)
+                if self.citation_manager.should_suppress_citations(
+                    query, answer_text, filtered_citations, coverage_score
+                ):
+                    filtered_citations = []
+
+                # Renumber inline citation markers so their numbers match the
+                # filtered citation list. Markers referencing filtered-out
+                # sources are removed. Also runs when filtered is empty
+                # (suppressed) to strip orphaned markers.
+                if answer_text and (filtered_citations or citations):
+                    renumbered = renumber_citation_markers(answer_text, citations, filtered_citations)
+                    if renumbered != answer_text:
+                        result["answer"] = renumbered
+
             citation_info = self.citation_manager.format_citations_for_response(
                 filtered_citations,
                 include_snippets=True
@@ -571,10 +617,10 @@ class RAGOrchestrator:
             result["citations"] = citation_info
             result["reasoning_steps"] = format_reasoning_steps(steps)
 
-            # Persist to L2 after the complete reasoning chain is assembled so
-            # cache hits are identical to live responses. Fire-and-forget to avoid
-            # blocking the response (result is already fully built).
-            self._spawn_l2_persist(query, result)
+            # Persist to SQLite cache after the complete reasoning chain is
+            # assembled so cache hits are identical to live responses.
+            # Fire-and-forget to avoid blocking the response.
+            self._spawn_cache_persist(query, result)
 
             logger.info(
                 "Query timing breakdown",

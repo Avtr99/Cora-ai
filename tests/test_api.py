@@ -215,6 +215,47 @@ class TestAPI:
             assert len(called_query.history) == 2
             assert include_history_flag is True
 
+    def test_stream_query_tokens_param_defaults_true(self, test_client):
+        """The tokens query param defaults to True (backward compatible)."""
+
+        async def mock_stream(*args, **kwargs):
+            yield {"event": "status", "status": "accepted"}
+            yield {"event": "done"}
+
+        with patch("src.api.main.process_query_core_stream", side_effect=mock_stream) as mock_fn:
+            response = test_client.post("/query/stream", json={"text": "hello"})
+            list(response.iter_lines())
+            assert mock_fn.call_count == 1
+            assert mock_fn.call_args.kwargs.get("emit_tokens") is True
+
+    def test_stream_query_tokens_false_suppresses_token_events(self, test_client):
+        """When tokens=false, emit_tokens=False is passed to the streaming pipeline."""
+
+        async def mock_stream(*args, **kwargs):
+            yield {"event": "status", "status": "accepted"}
+            yield {"event": "done"}
+
+        with patch("src.api.main.process_query_core_stream", side_effect=mock_stream) as mock_fn:
+            response = test_client.post("/query/stream?tokens=false", json={"text": "hello"})
+            list(response.iter_lines())
+            assert mock_fn.call_count == 1
+            assert mock_fn.call_args.kwargs.get("emit_tokens") is False
+
+    def test_stream_query_tokens_false_via_spa_alias(self, test_client):
+        """The SPA alias /api/cora-query-stream also respects tokens=false."""
+
+        async def mock_stream(*args, **kwargs):
+            yield {"event": "status", "status": "accepted"}
+            yield {"event": "done"}
+
+        with patch("src.api.main.process_query_core_stream", side_effect=mock_stream) as mock_fn:
+            response = test_client.post(
+                "/api/cora-query-stream?tokens=false", json={"text": "hello"}
+            )
+            list(response.iter_lines())
+            assert mock_fn.call_count == 1
+            assert mock_fn.call_args.kwargs.get("emit_tokens") is False
+
     def test_process_query_validation(self, test_client, mock_process_query_core):
         """Test query validation"""
         # Test with empty query - should return 422 for validation error
