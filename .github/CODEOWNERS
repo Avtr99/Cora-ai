@@ -1,0 +1,17 @@
+# CODEOWNERS — enables "Require review from Code Owners" in branch protection.
+# Every PR touching these paths will request a review from @Avtr99.
+# This is a prerequisite for the Scorecard Code-Review and Branch-Protection checks.
+
+# Default: all paths require review from the maintainer.
+*                           @Avtr99
+
+# Critical security-sensitive paths — explicit for clarity.
+/.github/                   @Avtr99
+/Dockerfile                 @Avtr99
+/docker-compose.yml         @Avtr99
+/requirements*.txt          @Avtr99
+/requirements-*.lock        @Avtr99
+/src/api/                   @Avtr99
+/src/utils/                 @Avtr99
+/src/config.py              @Avtr99
+/SECURITY.md                @Avtr99
