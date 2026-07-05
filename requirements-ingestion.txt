@@ -27,7 +27,7 @@ torchvision>=0.26.0,<1.0
 
 # PyMuPDF: page rendering for llm_api input (rasterizes PDF pages to PNG images).
 # The standard path no longer uses PyMuPDF — Docling handles text extraction.
-pymupdf>=1.24.0,<2.0
+pymupdf>=1.28.0,<2.0
 
 # Optional: FastEmbed local CPU embeddings
 # FastEmbed is NOT wired into the current provider factory (only voyage/cohere/ollama/openai
