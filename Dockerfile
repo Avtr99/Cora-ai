@@ -3,7 +3,7 @@
 # =============================================================================
 # Pinned by digest (multi-arch manifest list) for supply-chain integrity.
 # Update via Dependabot (docker ecosystem) — it will bump the tag + digest together.
-FROM node:22-alpine@sha256:16e22a550f3863206a3f701448c45f7912c6896a62de43add43bb9c86130c3e2 AS frontend-builder
+FROM node:26-alpine@sha256:725aeba2364a9b16beae49e180d83bd597dbd0b15c47f1f28875c290bfd255b9 AS frontend-builder
 
 WORKDIR /app/frontend
 
