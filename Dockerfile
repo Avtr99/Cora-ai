@@ -3,7 +3,8 @@
 # =============================================================================
 # Pinned to linux/amd64 and by digest for supply-chain integrity.
 # The Python lockfiles are generated for x86_64, so the build must be amd64.
-# Update via Dependabot (docker ecosystem) — it will bump the tag + digest together.
+# To update: bump the tag + digest manually (docker pull <image> && docker inspect --format='{{index .RepoDigests 0}}' <image>).
+# Dependabot security updates will still open a PR if a base image has a known vulnerability.
 FROM --platform=linux/amd64 node:22-alpine@sha256:16e22a550f3863206a3f701448c45f7912c6896a62de43add43bb9c86130c3e2 AS frontend-builder
 
 WORKDIR /app/frontend
@@ -21,7 +22,8 @@ RUN npm run build
 # =============================================================================
 # Pinned to linux/amd64 and by digest for supply-chain integrity.
 # The Python lockfiles are generated for x86_64, so the build must be amd64.
-# Update via Dependabot (docker ecosystem) — it will bump the tag + digest together.
+# To update: bump the tag + digest manually (docker pull <image> && docker inspect --format='{{index .RepoDigests 0}}' <image>).
+# Dependabot security updates will still open a PR if a base image has a known vulnerability.
 FROM --platform=linux/amd64 python:3.11-slim@sha256:b27df5841f3355e9473f9a516d38a6783b6c8dfeacaf2d14a240f443b368ddb6 AS backend
 
 ENV PYTHONUNBUFFERED=1 \
