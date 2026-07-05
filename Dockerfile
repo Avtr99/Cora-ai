@@ -20,7 +20,7 @@ RUN npm run build
 # =============================================================================
 # Pinned by digest (multi-arch manifest list) for supply-chain integrity.
 # Update via Dependabot (docker ecosystem) — it will bump the tag + digest together.
-FROM python:3.11-slim@sha256:b27df5841f3355e9473f9a516d38a6783b6c8dfeacaf2d14a240f443b368ddb6 AS backend
+FROM python:3.14-slim@sha256:b877e50bd90de10af8d82c57a022fc2e0dc731c5320d762a27986facfc3355c1 AS backend
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
