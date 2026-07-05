@@ -13,8 +13,11 @@
 # To regenerate lockfiles after a manual version bump:
 #   uv pip compile --generate-hashes --python-platform x86_64-unknown-linux-gnu \
 #     --python-version 3.11 requirements-core.txt -o requirements-core.lock
-#   (add --index-strategy unsafe-best-match --extra-index-url https://download.pytorch.org/whl/cpu
-#    for requirements-ingestion.lock; combine all three for requirements-ci.lock)
+#   For ingestion + CI lockfiles, add:
+#     --index-strategy unsafe-best-match --extra-index-url https://download.pytorch.org/whl/cpu
+#   so torch/torchvision pin to +cpu wheels (matching the Docker image).
+#   requirements-ingestion.lock: input = requirements-ingestion.txt
+#   requirements-ci.lock: input = requirements-core.txt + requirements-ingestion.txt + requirements-dev.txt
 version: 2
 
 updates:

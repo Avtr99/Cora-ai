@@ -1,9 +1,12 @@
 name: CI
 
-# Only run on pull requests — avoids redundant CI run after merge to main.
-# SAST (CodeQL) runs independently via GitHub's built-in scanning, so the
-# Scorecard SAST check is unaffected by removing the push trigger.
+# Run on PRs (full validation) and on push to main (defense-in-depth for
+# direct pushes / admin bypass / merge-queue). The push run is redundant
+# only when branch protection requires PRs — kept until that's enforced.
+# SAST (CodeQL) runs independently via GitHub's built-in scanning.
 on:
+  push:
+    branches: [main]
   pull_request:
     branches: [main]
 
@@ -31,7 +34,8 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install --require-hashes -r requirements-ci.lock
+          pip install --require-hashes -r requirements-ci.lock \
+            --extra-index-url https://download.pytorch.org/whl/cpu
 
       - name: Run pre-commit hooks
         uses: pre-commit/action@646c83fcd040023954eafda54b4db0192ce70507 # v3.0.0
