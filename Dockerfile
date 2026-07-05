@@ -1,7 +1,9 @@
 # =============================================================================
 # Stage 1: Build the Vite React Frontend
 # =============================================================================
-FROM node:22-alpine AS frontend-builder
+# Pinned by digest (multi-arch manifest list) for supply-chain integrity.
+# Update via Dependabot (docker ecosystem) — it will bump the tag + digest together.
+FROM node:22-alpine@sha256:16e22a550f3863206a3f701448c45f7912c6896a62de43add43bb9c86130c3e2 AS frontend-builder
 
 WORKDIR /app/frontend
 
@@ -16,7 +18,9 @@ RUN npm run build
 # =============================================================================
 # Stage 2: Python Backend (serves API + built SPA)
 # =============================================================================
-FROM python:3.11-slim AS backend
+# Pinned by digest (multi-arch manifest list) for supply-chain integrity.
+# Update via Dependabot (docker ecosystem) — it will bump the tag + digest together.
+FROM python:3.11-slim@sha256:b27df5841f3355e9473f9a516d38a6783b6c8dfeacaf2d14a240f443b368ddb6 AS backend
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -39,8 +43,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install Python dependencies first (better layer caching)
 # Core runtime is installed separately so it can be cached independently of
 # the heavy ingestion stack.
-COPY requirements-core.txt .
-RUN pip install --no-cache-dir -r requirements-core.txt
+# Lockfiles are generated with `uv pip compile --generate-hashes` and installed
+# with --require-hashes for supply-chain integrity (Scorecard Pinned-Dependencies).
+# To regenerate: uv pip compile --generate-hashes --python-platform x86_64-unknown-linux-gnu \
+#   --python-version 3.11 requirements-core.txt -o requirements-core.lock
+COPY requirements-core.lock .
+RUN pip install --no-cache-dir --require-hashes -r requirements-core.lock
 
 # The heavy ingestion stack: Docling (standard/classical PDF pipeline: layout +
 # RapidOCR + TableFormer).
@@ -51,10 +59,14 @@ RUN pip install --no-cache-dir -r requirements-core.txt
 # Docling 2.107+ imports torch/torchvision unconditionally (even with VLM
 # features off), so they must be installed. CPU-only torch is ~123MB vs ~451MB
 # for the CUDA build.
+# To regenerate: uv pip compile --generate-hashes --python-platform x86_64-unknown-linux-gnu \
+#   --python-version 3.11 --index-strategy unsafe-best-match \
+#   --extra-index-url https://download.pytorch.org/whl/cpu \
+#   requirements-ingestion.txt -o requirements-ingestion.lock
 ARG INSTALL_INGESTION=true
-COPY requirements-ingestion.txt .
+COPY requirements-ingestion.lock .
 RUN if [ "$INSTALL_INGESTION" != "false" ]; then \
-        pip install --no-cache-dir -r requirements-ingestion.txt \
+        pip install --no-cache-dir --require-hashes -r requirements-ingestion.lock \
             --extra-index-url https://download.pytorch.org/whl/cpu; \
     fi
 

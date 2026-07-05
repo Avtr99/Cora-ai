@@ -1,0 +1,66 @@
+# Dependabot configuration — weekly updates to keep notifications low-noise.
+# Scorecard's Dependency-Update-Tool check detects this file and scores 10.
+# To regenerate lockfiles after editing requirements-*.txt:
+#   uv pip compile --generate-hashes --python-platform x86_64-unknown-linux-gnu \
+#     --python-version 3.11 requirements-core.txt -o requirements-core.lock
+#   (add --index-strategy unsafe-best-match --extra-index-url https://download.pytorch.org/whl/cpu
+#    for requirements-ingestion.lock; combine all three for requirements-ci.lock)
+version: 2
+
+updates:
+  # Python runtime + ingestion deps.
+  # uv.lock is the source of truth; requirements-*.txt are the input manifests.
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "python"
+    commit-message:
+      prefix: "deps(pip)"
+      include: "scope"
+
+  # Frontend (Vite/React) deps.
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "frontend"
+    commit-message:
+      prefix: "deps(npm)"
+      include: "scope"
+
+  # GitHub Actions versions in workflows.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "deps(ci)"
+      include: "scope"
+
+  # Docker base images (Dockerfile + docker-compose.yml).
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "docker"
+    commit-message:
+      prefix: "deps(docker)"
+      include: "scope"

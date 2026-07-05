@@ -16,13 +16,13 @@ Usage:
 import sys
 from pathlib import Path
 
-output_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("/app/models/docling")
-output_dir.mkdir(parents=True, exist_ok=True)
-
 from docling.datamodel.pipeline_options import LayoutOptions
 from docling.models.stages.layout.layout_model import LayoutModel
 from docling.models.stages.ocr.rapid_ocr_model import RapidOcrModel
 from docling.models.stages.table_structure.table_structure_model import TableStructureModel
+
+output_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("/app/models/docling")
+output_dir.mkdir(parents=True, exist_ok=True)
 
 print(f"Downloading Docling models to {output_dir} ...")
 
