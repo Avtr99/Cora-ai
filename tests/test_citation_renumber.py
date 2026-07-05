@@ -7,7 +7,6 @@ answer text still reference the *original* source indices. The
 position in the filtered list — which is what the frontend displays.
 """
 
-import pytest
 
 from src.citations.citation_manager import Citation
 from src.query_processing.citation_verifier import renumber_citation_markers

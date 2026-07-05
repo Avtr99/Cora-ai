@@ -13,8 +13,10 @@ repos:
         name: "Scan for leaked secrets (API keys, tokens, credentials)"
 
   # Python linting — matches the CI ruff check
+  # Dev-only scripts under scripts/ are excluded; they are not required for CI.
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.11.13
     hooks:
       - id: ruff
         args: ["--fix"]
+        exclude: ^scripts/
