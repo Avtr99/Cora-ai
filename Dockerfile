@@ -1,9 +1,10 @@
 # =============================================================================
 # Stage 1: Build the Vite React Frontend
 # =============================================================================
-# Pinned by digest (multi-arch manifest list) for supply-chain integrity.
+# Pinned to linux/amd64 and by digest for supply-chain integrity.
+# The Python lockfiles are generated for x86_64, so the build must be amd64.
 # Update via Dependabot (docker ecosystem) — it will bump the tag + digest together.
-FROM node:22-alpine@sha256:16e22a550f3863206a3f701448c45f7912c6896a62de43add43bb9c86130c3e2 AS frontend-builder
+FROM --platform=linux/amd64 node:22-alpine@sha256:16e22a550f3863206a3f701448c45f7912c6896a62de43add43bb9c86130c3e2 AS frontend-builder
 
 WORKDIR /app/frontend
 
@@ -18,9 +19,10 @@ RUN npm run build
 # =============================================================================
 # Stage 2: Python Backend (serves API + built SPA)
 # =============================================================================
-# Pinned by digest (multi-arch manifest list) for supply-chain integrity.
+# Pinned to linux/amd64 and by digest for supply-chain integrity.
+# The Python lockfiles are generated for x86_64, so the build must be amd64.
 # Update via Dependabot (docker ecosystem) — it will bump the tag + digest together.
-FROM python:3.11-slim@sha256:b27df5841f3355e9473f9a516d38a6783b6c8dfeacaf2d14a240f443b368ddb6 AS backend
+FROM --platform=linux/amd64 python:3.11-slim@sha256:b27df5841f3355e9473f9a516d38a6783b6c8dfeacaf2d14a240f443b368ddb6 AS backend
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \

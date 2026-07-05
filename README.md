@@ -193,6 +193,8 @@ AI Studio or use openrouter or switch to a local Ollama LLM for a no-cost, no-ra
 
 The fastest way to run Cora locally.
 
+> **Note:** The Docker image is built for `linux/amd64` because the Python dependency lockfiles are hashed for the x86_64 platform. On Apple Silicon or other arm64 hosts, Docker will run the image under emulation unless you explicitly build for `linux/amd64`.
+
 ### 1. Clone and configure
 
 ```bash
