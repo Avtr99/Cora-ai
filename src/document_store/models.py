@@ -40,6 +40,7 @@ class DocumentRecord:
     # Read by the indexer (chunk metadata) and the RAG citation pipeline.
     title: str | None = None
     registry: str | None = None
+    category: str | None = None
     publisher: str | None = None
     document_id: str | None = None
     version_number: str | None = None
@@ -65,6 +66,7 @@ class DocumentRecord:
             "error": self.error,
             "title": self.title,
             "registry": self.registry,
+            "category": self.category,
             "publisher": self.publisher,
             "document_id": self.document_id,
             "version_number": self.version_number,

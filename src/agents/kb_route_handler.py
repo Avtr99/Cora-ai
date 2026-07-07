@@ -34,15 +34,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Named constants for truncation and display limits
-TRUNCATE_DEFAULT_LENGTH = 80
-ANSWER_SUMMARY_MAX_LENGTH = 150
-DEFAULT_MAX_HIGHLIGHTS = 2
-MAX_DOC_HIGHLIGHTS = 6
-MAX_KB_CITATIONS = 5
 
-
-def _truncate_to_word_boundary(text: str, max_len: int = TRUNCATE_DEFAULT_LENGTH) -> str:
+def _truncate_to_word_boundary(text: str, max_len: int = 80) -> str:
     """Truncate text to max_len while preserving word boundaries.
 
     Args:
@@ -191,7 +184,7 @@ class KBRouteHandler:
             )
 
         # Extract highlights for frontend
-        doc_highlights = self._extract_doc_highlights(vector_results, max_highlights=MAX_DOC_HIGHLIGHTS)
+        doc_highlights = self._extract_doc_highlights(vector_results, max_highlights=6)
         
         steps.append(AgentStep(
             name="Knowledge Base Retrieval",
@@ -278,7 +271,7 @@ class KBRouteHandler:
         
         # Extract answer summary for display with safe truncation
         answer_text = result.get("answer", "")
-        answer_summary = _truncate_to_word_boundary(answer_text, max_len=ANSWER_SUMMARY_MAX_LENGTH) if answer_text else ""
+        answer_summary = _truncate_to_word_boundary(answer_text, max_len=150) if answer_text else ""
         
         steps.append(AgentStep(
             name="Answer Generation",
@@ -293,7 +286,7 @@ class KBRouteHandler:
         # Extract citations
         kb_citations = self.citation_manager.extract_citations_from_vector_results(
             vector_results,
-            max_citations=MAX_KB_CITATIONS
+            max_citations=5
         )
         result["citations"] = kb_citations
         
@@ -370,7 +363,7 @@ class KBRouteHandler:
     def _extract_doc_highlights(
         self,
         vector_results: Dict[str, Any],
-        max_highlights: int = DEFAULT_MAX_HIGHLIGHTS,
+        max_highlights: int = 2,
     ) -> List[str]:
         """Extract short snippet highlights from top documents."""
         highlights = []

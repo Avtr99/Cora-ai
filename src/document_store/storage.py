@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS document_store_documents (
     error TEXT,
     title TEXT,
     registry TEXT,
+    category TEXT,
     publisher TEXT,
     document_id TEXT,
     version_number TEXT,
@@ -296,6 +297,7 @@ def _row_to_record(row) -> DocumentRecord:
         error=row["error"],
         title=row["title"] if "title" in keys else None,
         registry=row["registry"] if "registry" in keys else None,
+        category=row["category"] if "category" in keys else None,
         publisher=row["publisher"] if "publisher" in keys else None,
         document_id=row["document_id"] if "document_id" in keys else None,
         version_number=row["version_number"] if "version_number" in keys else None,
@@ -313,8 +315,8 @@ def insert_document(record: DocumentRecord) -> None:
                 id, original_filename, stored_filename, mime_type, extension, size_bytes,
                 sha256, status, conversion_mode, original_path, converted_path, chunk_count,
                 page_count, tags_json, warnings_json, error,
-                title, registry, publisher, document_id, version_number
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                title, registry, category, publisher, document_id, version_number
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 record.id,
@@ -335,6 +337,7 @@ def insert_document(record: DocumentRecord) -> None:
                 record.error,
                 record.title,
                 record.registry,
+                record.category,
                 record.publisher,
                 record.document_id,
                 record.version_number,
@@ -356,6 +359,7 @@ def update_document(
     error: str | None = None,
     title: str | None = None,
     registry: str | None = None,
+    category: str | None = None,
     publisher: str | None = None,
     document_id: str | None = None,
     version_number: str | None = None,
@@ -396,6 +400,9 @@ def update_document(
     if registry is not None:
         fields.append("registry = ?")
         values.append(registry)
+    if category is not None:
+        fields.append("category = ?")
+        values.append(category)
     if publisher is not None:
         fields.append("publisher = ?")
         values.append(publisher)

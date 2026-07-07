@@ -41,7 +41,8 @@ class CitationManager:
         self.min_relevance_score = self.config.min_relevance_score
         self.safe_metadata_fields = {
             "file_name", "parent_doc", "source", "page_number",
-            "section", "registry", "document_id", "version_number", "title",
+            "section", "registry", "category", "document_id", "version_number", "title",
+            "publisher", "registry_document_id", "methodology_codes",
         }
 
         self._kb_extensions = _ALL_KB_EXTENSIONS

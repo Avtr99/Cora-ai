@@ -85,8 +85,10 @@ class TestMetadataExtractor:
         """
         result = extractor.extract(content, "A6.4-SBM014-A06.pdf.md")
 
-        # Article 6.4 is now a policy framework, detected via VCM Policy pattern
-        assert result.get("registry") == "VCM Policy"
+        # Article 6.4 is a policy framework, detected via VCM Policy pattern.
+        # VCM Policy is a topic classifier, not a registry → stored as "category"
+        assert result.get("category") == "VCM Policy"
+        assert "registry" not in result or result.get("registry") is None
         assert result.get("document_id") == "A6.4-SBM014-A06"
 
     def test_extract_article_64_stan_meth(self, extractor):
@@ -98,8 +100,9 @@ class TestMetadataExtractor:
         """
         result = extractor.extract(content, "A6.4-STAN-METH-001.pdf.md")
 
-        # Article 6.4 is now a policy framework, detected via VCM Policy pattern
-        assert result.get("registry") == "VCM Policy"
+        # Article 6.4 is a policy framework → stored as "category", not "registry"
+        assert result.get("category") == "VCM Policy"
+        assert "registry" not in result or result.get("registry") is None
     
     # CDM tests
     def test_extract_cdm_acm_methodology(self, extractor):
@@ -133,8 +136,10 @@ class TestMetadataExtractor:
         Integrity Council for the Voluntary Carbon Market
         """
         result = extractor.extract(content, "CCP-Assessment.md")
-        
-        assert result.get("registry") == "ICVCM"
+
+        # ICVCM is a governance body, not a credit-issuing registry → "category"
+        assert result.get("category") == "ICVCM"
+        assert "registry" not in result or result.get("registry") is None
     
     # Version extraction tests
     def test_extract_version_various_formats(self, extractor):
@@ -181,9 +186,10 @@ class TestMetadataExtractor:
         result = extractor.extract(content, "generic.md")
         
         # Title extraction is handled by title_utils._ensure_title(); the
-        # metadata extractor only returns registry, publisher, document_id, and
-        # version fields.
+        # metadata extractor only returns registry, category, publisher,
+        # document_id, and version fields.
         assert "registry" not in result or result.get("registry") is None
+        assert "category" not in result or result.get("category") is None
         assert "document_id" not in result or result.get("document_id") is None
     
     def test_multiple_registries_mentioned(self, extractor):

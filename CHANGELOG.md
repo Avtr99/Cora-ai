@@ -16,6 +16,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Conversation memory with HMAC-hashed user IDs.
 - Citation extraction and HTML sanitization for provenance.
 - Docker Compose setup for local deployment.
+- Document `category` metadata for non-registry classifications (VCM Policy, ICVCM, Market Intelligence, etc.) alongside `registry` for credit-issuing registries.
+- Curated VCM citation metadata surfaced in API responses (`registry`, `category`, `document_id`, `version_number`, `publisher`).
+- Registry pattern configuration split into focused modules (`_registries`, `_governance`, `_categories`) with `is_registry` flag.
+- Image placeholder stripping (`<!-- image -->`) in standard Docling conversions to reduce garbage chunks.
 
 ### Infrastructure
 
@@ -44,3 +48,5 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Fixed CI/Docker torch binary mismatch: regenerated `requirements-ci.lock` with `--index-strategy unsafe-best-match --extra-index-url https://download.pytorch.org/whl/cpu` so CI pins `torch==2.12.1+cpu` / `torchvision==0.27.1+cpu`, matching the Docker image. CI install command updated to pass the PyTorch CPU index.
 - Fixed import ordering in `scripts/docker/download_docling_models.py` (moved `Path` usage after docling imports).
 - Resolved merge conflict in `.pre-commit-config.yaml` — kept `scripts/evaluation/` exclusion (production scripts under `scripts/docker/` are still linted).
+- Restored working tree to `origin/main` baseline while preserving new work: kept monolithic `src/config.py`, async SQLite cache singleton, and main's lifespan/orchestrator initialization; removed unused config-split mixins and dead `_MIN_CHUNK_CHARS` constant.
+- Expanded `.gitignore` with frontend test/coverage and cache patterns.
