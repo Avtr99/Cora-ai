@@ -45,6 +45,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Fixed metadata extraction registry/category tie-break to use `pattern.is_registry` instead of `id_patterns` presence, ensuring real registries win over non-registry patterns with ID patterns.
+- Fixed historical data inconsistency in `document_store_documents` table: added migration `006_document_category_backfill.sql` to move pre-split non-registry names (governance bodies, topic classifiers) from `registry` to `category`, and added indexes on both columns for performance on large document stores.
+- Fixed `MetadataExtractor.extract()` docstring to match actual return contract: corrected `version` → `version_number`, removed `title` (extracted separately in `title_utils`), and added `publisher`.
+- Fixed payload index field duplication in `indexer.py`: refactored `_ensure_collection()` to iterate over the existing `_PAYLOAD_INDEX_FIELDS` constant instead of hardcoding a duplicate tuple, eliminating drift risk.
+- Fixed overly generic content markers in registry/category patterns to reduce false positives:
+  - Removed standalone `"trees"` from `REDD+ / NBS` category (ART/TREES registry documents are covered by the dedicated `ART` pattern).
+  - Removed `"scope 1"`, `"scope 2"`, `"scope 3"` from `GHG Protocol` (these terms appear across SBTi, CDP, VCMI, and corporate disclosures).
+  - Removed `"environmental registry"` from `Verra` (not Verra-specific; OxCarbon also issues on the S&P Global Environmental Registry).
 - Fixed CI/Docker torch binary mismatch: regenerated `requirements-ci.lock` with `--index-strategy unsafe-best-match --extra-index-url https://download.pytorch.org/whl/cpu` so CI pins `torch==2.12.1+cpu` / `torchvision==0.27.1+cpu`, matching the Docker image. CI install command updated to pass the PyTorch CPU index.
 - Fixed import ordering in `scripts/docker/download_docling_models.py` (moved `Path` usage after docling imports).
 - Resolved merge conflict in `.pre-commit-config.yaml` — kept `scripts/evaluation/` exclusion (production scripts under `scripts/docker/` are still linted).

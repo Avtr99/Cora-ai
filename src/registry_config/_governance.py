@@ -74,7 +74,6 @@ GOVERNANCE_PATTERNS: List[RegistryPattern] = [
         content_markers=[
             "ghg protocol", "greenhouse gas protocol",
             "corporate accounting and reporting standard",
-            "scope 1", "scope 2", "scope 3",
             "value chain accounting", "land sector and removals",
         ],
         id_patterns=[],
