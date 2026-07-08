@@ -179,6 +179,37 @@ class TestMetadataExtractor:
         assert result.get("document_id") == "CR0001"
         assert result.get("version_number") == "1.0"
     
+    def test_registry_wins_tiebreak_over_category_with_id_patterns(self, extractor):
+        """A real registry with no id_patterns must win over a non-registry that has them.
+
+        Regression: the priority tie-break previously looked at id_patterns
+        presence, so a category pattern with id_patterns could beat a real
+        registry without them. The tie-break must use is_registry instead.
+        """
+        registry_pattern = RegistryPattern(
+            name="Registry Without IDs",
+            content_markers=["shared topic"],
+            id_patterns=[],
+            version_patterns=[],
+            is_registry=True,
+        )
+        category_pattern = RegistryPattern(
+            name="Category With IDs",
+            content_markers=["shared topic"],
+            id_patterns=[r'\b(CAT-\d+)\b'],
+            version_patterns=[],
+            is_registry=False,
+        )
+        custom_extractor = MetadataExtractor(
+            custom_patterns=[registry_pattern, category_pattern]
+        )
+        result = custom_extractor.extract("A document about a shared topic.", "test.md")
+
+        # Both patterns score the same (one marker, no ID match). The real
+        # registry should win the final tie-break.
+        assert result.get("registry") == "Registry Without IDs"
+        assert "category" not in result or result.get("category") is None
+
     # Edge cases
     def test_no_metadata_found(self, extractor):
         """Test handling of document with no extractable metadata."""

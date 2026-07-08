@@ -144,22 +144,9 @@ def _ensure_collection(client: QdrantClient) -> None:
             ),
         )
     # Index every metadata field the indexer writes to payloads so the query
-    # rewriter's filters are actually usable. Must stay in sync with the
-    # metadata dict in chunk_markdown().
-    for field in (
-        "metadata.doc_store_id",
-        "metadata.original_filename",
-        "metadata.file_type",
-        "metadata.tags",
-        "metadata.registry",
-        "metadata.category",
-        "metadata.publisher",
-        "metadata.document_id",
-        "metadata.title",
-        "metadata.version_number",
-        "metadata.registry_document_id",
-        "metadata.methodology_codes",
-    ):
+    # rewriter's filters are actually usable. _PAYLOAD_INDEX_FIELDS is the
+    # single source of truth shared with chunk_markdown().
+    for field in _PAYLOAD_INDEX_FIELDS:
         try:
             client.create_payload_index(
                 collection_name=collection_name,

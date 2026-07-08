@@ -134,8 +134,13 @@ class MetadataExtractor:
             - category: Document category (for non-registry patterns like
               Market Intelligence, VCM Policy, ICVCM, SBTi, etc.)
             - document_id: Unique document identifier
-            - version: Document version
-            - title: Document title (from first heading)
+            - version_number: Document version
+            - publisher: Document publisher (from filename prefix or registry
+              alias, when available)
+
+            Title extraction is intentionally not performed here; the converter
+            calls title_utils._ensure_title() afterwards for a higher-quality,
+            content-aware title.
         """
         metadata: Dict[str, Any] = {}
 
@@ -258,7 +263,7 @@ class MetadataExtractor:
                         break
 
                 # Prefer true registry patterns over generic categories when all else ties.
-                registry_priority = 1 if pattern.id_patterns else 0
+                registry_priority = 1 if pattern.is_registry else 0
                 scores[pattern.name] = (has_id_match, score, registry_priority)
                 pattern_by_name[pattern.name] = pattern
 

@@ -75,7 +75,7 @@ CATEGORY_PATTERNS: List[RegistryPattern] = [
             "redd+", "redd", "afolu",
             "avoided deforestation", "reforestation",
             "afforestation", "land use", "nesting",
-            "trees", "jurisdictional", "sbti flag",
+            "jurisdictional", "sbti flag",
             "forest, land and agriculture",
             "agroforestry", "silvopasture",
             "forest carbon", "forest management",

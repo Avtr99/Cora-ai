@@ -24,7 +24,6 @@ REGISTRY_PATTERNS: List[RegistryPattern] = [
             "verra", "vcs", "verified carbon standard", "vcu",
             "vm0", "vmd0", "vmr0",
             "s&p global energy",  # Verra registry migrated to S&P Global (July 2026)
-            "environmental registry",  # S&P Global Environmental Registry
         ],
         id_patterns=[
             r'\b(VM[DR]?\d{4})\b',  # VM0007, VMD0001, VMR0004
