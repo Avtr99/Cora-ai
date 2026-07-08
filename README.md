@@ -3,9 +3,9 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 [![CI](https://github.com/Avtr99/Cora-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/Avtr99/Cora-ai/actions/workflows/ci.yml)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/Avtr99/Cora-ai/badge)](https://scorecard.dev/viewer/?platform=github.com&org=Avtr99&repo=Cora-ai)
-<!-- OpenSSF Best Practices baseline badge — detected by Scorecard's CII-Best-Practices check.
+<!-- OpenSSF Best Practices badge — detected by Scorecard's CII-Best-Practices check.
      Project page: https://www.bestpractices.dev/projects/13501 -->
-[![OpenSSF Baseline](https://www.bestpractices.dev/projects/13501/baseline)](https://www.bestpractices.dev/projects/13501)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/13501/badge)](https://www.bestpractices.dev/projects/13501)
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
 [![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
 [![SDG 13](https://img.shields.io/badge/SDG%2013-Climate%20Action-3F7E44)](https://sdgs.un.org/goals/goal13)

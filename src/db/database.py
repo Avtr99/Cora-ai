@@ -10,6 +10,58 @@ logger = logging.getLogger(__name__)
 
 _MIGRATION_FILENAME_RE = re.compile(r"^\d{3}_[a-zA-Z0-9_]+\.sql$")
 
+# Matches simple ``ALTER TABLE <table> ADD COLUMN <column> ...;`` statements.
+# Used to make ADD COLUMN migrations idempotent when another code path already
+# created the schema (e.g. ``ensure_document_store_tables`` running before
+# ``run_migrations``).
+#
+# Limitation: this regex only handles unquoted table/column identifiers.
+# Quoted identifiers (double quotes, backticks, square brackets), schema
+# prefixes, or multi-line statements may not match. Migration scripts in
+# this project should stick to simple one-line ``ALTER TABLE table ADD COLUMN col TYPE;``
+# statements for safety.
+_ADD_COLUMN_RE = re.compile(
+    r"^\s*ALTER\s+TABLE\s+(?P<table>\w+)\s+ADD\s+COLUMN\s+(?P<column>\w+)[^;]*;",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+
+def _columns_in_table(conn: sqlite3.Connection, table_name: str) -> set[str]:
+    """Return the set of column names in a SQLite table."""
+    # Validate the table name to avoid accidental string interpolation issues,
+    # even though callers currently only pass migration-controlled identifiers.
+    if not re.fullmatch(r"\w+", table_name):
+        raise ValueError(f"Invalid table name: {table_name!r}")
+    cursor = conn.execute(f"PRAGMA table_info({table_name})")
+    return {row["name"] for row in cursor.fetchall()}
+
+
+def _skip_existing_add_columns(conn: sqlite3.Connection, script: str) -> str:
+    """Remove ``ALTER TABLE ... ADD COLUMN`` lines for columns that already exist.
+
+    SQLite does not support ``ADD COLUMN IF NOT EXISTS``, so migrations that
+    add columns can fail when a previous code path already created the schema
+    (e.g. ``ensure_document_store_tables`` running before ``run_migrations``).
+    Filtering those statements lets us record the migration while avoiding
+    duplicate-column errors.
+    """
+    existing: dict[str, set[str]] = {}
+
+    def _replace(match: re.Match[str]) -> str:
+        table = match.group("table").lower()
+        column = match.group("column").lower()
+        if table not in existing:
+            existing[table] = {c.lower() for c in _columns_in_table(conn, table)}
+        if column in existing[table]:
+            logger.warning(
+                f"Column '{column}' already exists in '{table}'; skipping ADD COLUMN"
+            )
+            return ""
+        return match.group(0)
+
+    return _ADD_COLUMN_RE.sub(_replace, script)
+
+
 def get_db_path() -> str:
     db_path = get_settings().DATABASE_URL
     if db_path.startswith("sqlite:///"):
@@ -68,9 +120,9 @@ def run_migrations():
             if file not in applied:
                 logger.info(f"Applying migration {file}...")
                 with open(os.path.join(migrations_dir, file), 'r') as f:
-                    script = f.read()
-                    
-                # Run the migration
+                    script = _skip_existing_add_columns(conn, f.read())
+
+                # Run the migration (may be a no-op if every ADD COLUMN was skipped)
                 cursor.executescript(script)
                 # Record it
                 cursor.execute("INSERT INTO schema_migrations (version) VALUES (?)", (file,))

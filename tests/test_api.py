@@ -1,15 +1,3 @@
-import os
-
-# Set mock environment variables BEFORE importing modules that require Settings
-if not os.environ.get("VOYAGE_API_KEY"):
-    os.environ["VOYAGE_API_KEY"] = "test-voyage-api-key"
-if not os.environ.get("QDRANT_URL"):
-    os.environ["QDRANT_URL"] = "http://localhost:6333"
-if not os.environ.get("SECRET_KEY"):
-    os.environ["SECRET_KEY"] = "test-secret-key-for-ci-testing"
-if not os.environ.get("JWT_SECRET_KEY"):
-    os.environ["JWT_SECRET_KEY"] = "test-jwt-secret-key-for-ci-testing"
-
 import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock, patch
