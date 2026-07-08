@@ -883,3 +883,27 @@ def test_category_backfill_migration_moves_non_registry_names(document_store_env
     # Already-normalized rows are untouched.
     assert rows["doc_already_normalized"]["registry"] is None
     assert rows["doc_already_normalized"]["category"] == "Market Intelligence"
+
+
+def test_migrations_recorded_when_table_created_outside_migrations(document_store_env):
+    """If ensure_document_store_tables creates the schema before run_migrations,
+    later migrations that add existing columns must be recorded instead of crashing."""
+    from src.db.database import get_connection, run_migrations
+    from src.document_store.storage import ensure_document_store_tables
+
+    ensure_document_store_tables()
+
+    # This should not raise despite the table already containing columns added by 004/005.
+    run_migrations()
+
+    conn = get_connection()
+    try:
+        applied = {
+            row["version"]
+            for row in conn.execute("SELECT version FROM schema_migrations").fetchall()
+        }
+    finally:
+        conn.close()
+
+    assert "004_document_metadata.sql" in applied
+    assert "005_document_category.sql" in applied

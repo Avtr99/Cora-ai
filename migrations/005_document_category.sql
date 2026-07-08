@@ -4,7 +4,8 @@
 -- the registry field only contains real credit-issuing registries (Verra,
 -- Gold Standard, CDM, etc.).
 --
--- Migrations are tracked in schema_migrations and only run once, so plain
--- ALTER TABLE is safe (no IF NOT EXISTS needed).
+-- The migration runner skips ADD COLUMN statements for columns that already
+-- exist, so this remains safe even if another code path created the table
+-- schema before migrations ran.
 
 ALTER TABLE document_store_documents ADD COLUMN category TEXT;
