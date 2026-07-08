@@ -53,6 +53,18 @@ def _sanitize_additional_claims(additional_claims: Dict[str, Any]) -> Dict[str, 
     return sanitized
 
 
+def _validate_jwt_secret_key(secret: Optional[str]) -> None:
+    """Validate that the JWT secret key is present and sufficiently long for HS256."""
+    if not secret:
+        raise JWTError("JWT_SECRET_KEY environment variable is required but not set", "JWT_CONFIG_ERROR")
+
+    if len(secret.encode("utf-8")) < 32:
+        raise JWTError(
+            "JWT_SECRET_KEY must be at least 32 bytes long for HS256 security",
+            "JWT_CONFIG_ERROR"
+        )
+
+
 def create_access_token(
     user_id: str,
     expires_delta: Optional[timedelta] = None,
@@ -78,9 +90,7 @@ def create_access_token(
         raise JWTError(str(exc), "JWT_INVALID_INPUT") from exc
     
     settings = get_settings()
-    
-    if not settings.JWT_SECRET_KEY:
-        raise JWTError("JWT_SECRET_KEY environment variable is required but not set", "JWT_CONFIG_ERROR")
+    _validate_jwt_secret_key(settings.JWT_SECRET_KEY)
     
     if expires_delta is None:
         expires_delta = timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -127,9 +137,7 @@ def decode_access_token(token: str) -> dict:
         JWTError: If token is invalid, expired, or malformed
     """
     settings = get_settings()
-    
-    if not settings.JWT_SECRET_KEY:
-        raise JWTError("JWT_SECRET_KEY environment variable is required but not set", "JWT_CONFIG_ERROR")
+    _validate_jwt_secret_key(settings.JWT_SECRET_KEY)
     
     try:
         payload = jwt.decode(

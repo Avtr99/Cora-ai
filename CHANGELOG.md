@@ -42,6 +42,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Generated hash-pinned lockfiles via `uv pip compile --generate-hashes` targeting `x86_64-unknown-linux-gnu`/Python 3.11: `requirements-core.lock`, `requirements-ingestion.lock` (CPU torch via PyTorch index), `requirements-ci.lock` (core + ingestion + dev). Dockerfile and CI now install with `pip install --require-hashes` for verified reproducible builds.
 - Added OpenSSF Baseline Best Practices badge to README (project 13501 on bestpractices.dev). Detected by Scorecard's CII-Best-Practices check.
 - CI workflow runs on both `pull_request` and `push` to main (defense-in-depth for direct pushes / admin bypass). The push trigger will become redundant once branch protection requires PRs (Phase 2). SAST (CodeQL) runs independently via GitHub built-in scanning and is unaffected.
+- Added `npm audit --audit-level=high` to the frontend CI job to catch high/critical npm vulnerabilities in pull requests.
+- Enforced minimum 32-byte `JWT_SECRET_KEY` length in `src/api/auth/token_utils.py` before creating or decoding HS256 tokens.
+- Added targeted security tests for JWT token handling (`tests/test_token_utils.py`) and API key middleware/security headers (`tests/test_security_middleware.py`).
+- Made document-store `ALTER TABLE ... ADD COLUMN` migrations idempotent in `src/db/database.py` so existing schemas created by `ensure_document_store_tables()` no longer cause migration failures on startup.
 
 ### Fixed
 
