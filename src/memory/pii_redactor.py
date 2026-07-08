@@ -14,6 +14,8 @@ from typing import Dict, List, Tuple, Optional
 from dataclasses import dataclass, field
 from loguru import logger
 
+from ..utils.pii_patterns import EMAIL_RE, IP_ADDRESS_RE, UUID_RE
+
 
 @dataclass
 class PIIPattern:
@@ -48,9 +50,8 @@ DEFAULT_PII_PATTERNS: List[PIIPattern] = [
     ),
     PIIPattern(
         name="email",
-        # Safe regex: domain uses mutually exclusive tokens (label without '.' + explicit dot+label group)
-        # This prevents catastrophic backtracking from overlapping '.' in character class
-        pattern=re.compile(r'\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,}\b'),
+        # Uses the shared safe regex from utils.pii_patterns.
+        pattern=EMAIL_RE,
         replacement="[EMAIL]",
         description="Email addresses",
     ),
@@ -70,13 +71,13 @@ DEFAULT_PII_PATTERNS: List[PIIPattern] = [
     # IP address - must come after phone patterns to avoid false matches
     PIIPattern(
         name="ip_address",
-        pattern=re.compile(r'\b(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\b'),
+        pattern=IP_ADDRESS_RE,
         replacement="[IP]",
         description="IPv4 addresses",
     ),
     PIIPattern(
         name="uuid",
-        pattern=re.compile(r'\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b'),
+        pattern=UUID_RE,
         replacement="[ID]",
         description="UUIDs (may contain user identifiers)",
     ),

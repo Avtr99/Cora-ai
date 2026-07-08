@@ -1,11 +1,3 @@
-import os
-
-# Set mock environment variables BEFORE importing modules that require Settings
-if not os.environ.get("SECRET_KEY"):
-    os.environ["SECRET_KEY"] = "test-secret-key-for-ci-testing"
-if not os.environ.get("JWT_SECRET_KEY"):
-    os.environ["JWT_SECRET_KEY"] = "test-jwt-secret-key-for-ci-testing"
-
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
