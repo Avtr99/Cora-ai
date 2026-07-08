@@ -14,8 +14,6 @@ from typing import Dict, List, Tuple, Optional
 from dataclasses import dataclass, field
 from loguru import logger
 
-from ..utils.pii_patterns import EMAIL_RE, IP_ADDRESS_RE, UUID_RE
-
 
 @dataclass
 class PIIPattern:
@@ -50,8 +48,9 @@ DEFAULT_PII_PATTERNS: List[PIIPattern] = [
     ),
     PIIPattern(
         name="email",
-        # Shared regex from utils.pii_patterns to avoid duplication with citation sanitization.
-        pattern=EMAIL_RE,
+        # Safe regex: domain uses mutually exclusive tokens (label without '.' + explicit dot+label group)
+        # This prevents catastrophic backtracking from overlapping '.' in character class
+        pattern=re.compile(r'\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,}\b'),
         replacement="[EMAIL]",
         description="Email addresses",
     ),
@@ -71,13 +70,13 @@ DEFAULT_PII_PATTERNS: List[PIIPattern] = [
     # IP address - must come after phone patterns to avoid false matches
     PIIPattern(
         name="ip_address",
-        pattern=IP_ADDRESS_RE,
+        pattern=re.compile(r'\b(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\b'),
         replacement="[IP]",
         description="IPv4 addresses",
     ),
     PIIPattern(
         name="uuid",
-        pattern=UUID_RE,
+        pattern=re.compile(r'\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b'),
         replacement="[ID]",
         description="UUIDs (may contain user identifiers)",
     ),
@@ -152,11 +151,15 @@ class PIIRedactor:
         detections: Dict[str, int] = {}
         
         for pii_pattern in self.patterns:
-            # Single-pass substitution with count; re.subn returns (new_text, count)
-            redacted_text, count = pii_pattern.pattern.subn(
-                pii_pattern.replacement, redacted_text
-            )
-            if count:
+            # Single-pass substitution with counting callback
+            count = 0
+            def repl_callback(match, replacement=pii_pattern.replacement):
+                nonlocal count
+                count += 1
+                return replacement
+            
+            redacted_text = pii_pattern.pattern.sub(repl_callback, redacted_text)
+            if count > 0:
                 detections[pii_pattern.name] = count
         
         

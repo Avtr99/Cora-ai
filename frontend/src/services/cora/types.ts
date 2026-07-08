@@ -19,6 +19,10 @@ export interface CitationDetail {
   section: string | null;
   url: string | null;
   snippet: string | null;
+  // VCM metadata surfaced from the source document (registry, publisher,
+  // version_number, document_id, methodology_codes, etc.). Present for KB
+  // citations when the source carries VCM metadata; absent for web citations.
+  metadata?: Record<string, unknown> | null;
 }
 
 export interface CitationResponse {

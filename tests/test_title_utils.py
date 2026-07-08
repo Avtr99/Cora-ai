@@ -545,8 +545,8 @@ class TestBuildDisplayTitle:
         assert "v4.1" in title
 
     def test_no_publisher_omits_prefix(self):
-        """When publisher is None, no prefix is added (registry is a topic classifier)."""
-        metadata = {"registry": "VCM Policy", "document_id": "A6.4-STAN-METH-001"}
+        """When publisher is None, no prefix is added (category is a topic classifier)."""
+        metadata = {"category": "VCM Policy", "document_id": "A6.4-STAN-METH-001"}
         title = _build_display_title(metadata, "Application of Requirements", "doc.pdf")
         assert "VCM Policy" not in title
         assert "A6.4-STAN-METH-001" in title

@@ -123,33 +123,46 @@ class MetadataExtractor:
     def extract(self, content: str, filename: str) -> Dict[str, Any]:
         """
         Extract all available metadata from document.
-        
+
         Args:
             content: Document text content
             filename: Name of the file
-            
+
         Returns:
             Dictionary with extracted metadata fields:
-            - registry: Name of the carbon registry
+            - registry: Name of the carbon registry (only for real registries)
+            - category: Document category (for non-registry patterns like
+              Market Intelligence, VCM Policy, ICVCM, SBTi, etc.)
             - document_id: Unique document identifier
             - version: Document version
             - title: Document title (from first heading)
         """
         metadata: Dict[str, Any] = {}
-        
+
         # Combine filename and first 2000 chars of content for analysis
         analysis_text = f"{filename}\n{content[:2000]}"
-        
-        # Detect registry
-        registry = self._detect_registry(analysis_text)
-        if registry:
-            metadata["registry"] = registry
-        
+
+        # Detect registry/category — returns the matched RegistryPattern so we
+        # can distinguish real registries (Verra, Gold Standard, ...) from
+        # governance bodies and topic classifiers (ICVCM, Market Intelligence,
+        # ...). Real registries go into ``registry``; everything else goes into
+        # ``category`` so the ``registry`` field is never polluted with
+        # non-registry values.
+        matched_pattern = self._detect_registry_pattern(analysis_text)
+        if matched_pattern:
+            if matched_pattern.is_registry:
+                metadata["registry"] = matched_pattern.name
+            else:
+                metadata["category"] = matched_pattern.name
+        # Keep a plain-string registry name for downstream ID/version extraction
+        # and publisher fallback (those still work with category names too).
+        registry = matched_pattern.name if matched_pattern else None
+
         # Extract document ID
         doc_id = self._extract_document_id(analysis_text, registry)
         if doc_id:
             metadata["document_id"] = doc_id
-        
+
         # Extract version — prefer the reliable filename convention (vX.Y),
         # fall back to content/marker patterns for un-renamed legacy files.
         version = self._extract_version_from_filename(filename)
@@ -157,7 +170,7 @@ class MetadataExtractor:
             version = self._extract_version(analysis_text, registry)
         if version:
             metadata["version_number"] = version
-        
+
         # Note: title extraction is intentionally NOT done here. The converter
         # calls title_utils._ensure_title() after metadata extraction, which
         # produces a far better content-derived title (repetition detection,
@@ -178,7 +191,7 @@ class MetadataExtractor:
                 )
         if publisher:
             metadata["publisher"] = publisher
-        
+
         return metadata
 
     def _extract_publisher_from_filename(self, filename: str) -> Optional[str]:
@@ -214,21 +227,24 @@ class MetadataExtractor:
             return matches[-1]
         return None
     
-    def _detect_registry(self, text: str) -> Optional[str]:
+    def _detect_registry_pattern(self, text: str) -> Optional[RegistryPattern]:
         """
-        Detect which carbon registry the document belongs to.
-        
+        Detect which registry/category pattern the document matches.
+
         Args:
             text: Text to analyze
-            
+
         Returns:
-            Registry name if detected, None otherwise
+            The matched RegistryPattern, or None if no pattern matched.
+            Caller checks ``pattern.is_registry`` to decide whether to store
+            the name as ``registry`` or ``category``.
         """
         text_lower = text.lower()
 
-        # Score each registry based on marker matches and explicit ID matches.
+        # Score each pattern based on marker matches and explicit ID matches.
         # Prefer concrete registry ID matches over generic thematic categories.
         scores: Dict[str, Tuple[int, int, int]] = {}
+        pattern_by_name: Dict[str, RegistryPattern] = {}
         for pattern in self.patterns:
             score = 0
             for marker in pattern.content_markers:
@@ -244,11 +260,12 @@ class MetadataExtractor:
                 # Prefer true registry patterns over generic categories when all else ties.
                 registry_priority = 1 if pattern.id_patterns else 0
                 scores[pattern.name] = (has_id_match, score, registry_priority)
-        
+                pattern_by_name[pattern.name] = pattern
+
         if scores:
-            # Return registry with highest score
-            return max(scores.items(), key=lambda item: item[1])[0]
-        
+            best_name = max(scores.items(), key=lambda item: item[1])[0]
+            return pattern_by_name[best_name]
+
         return None
     
     def _extract_document_id(self, text: str, registry: Optional[str] = None) -> Optional[str]:

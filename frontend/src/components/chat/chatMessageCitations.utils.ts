@@ -147,7 +147,7 @@ const FILE_EXT_BLACKLIST = new Set([
       const safeUrl = safeExplicitUrl || snippetUrl;
       if (!sourceName && !safeUrl) continue;
 
-      // Use explicit source_type from backend if available (hybrid retrieval provides this)
+      // Use explicit source_type from backend if available
       const hasExplicitWebType = sourceType.includes('web');
       const hasUrl = typeof safeUrl === 'string';
       const isWeb = hasExplicitWebType || hasUrl || (sourceName ? isWebSource(sourceName) : false);

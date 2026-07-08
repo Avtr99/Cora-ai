@@ -101,21 +101,21 @@ class LangChainRetriever(MultiRoundRetrievalMixin):
         
         # Pluggable embeddings (Voyage / Cohere / Ollama)
         embeddings = create_embeddings()
-        
+
         self._vector_store = QdrantVectorStore(
             client=qdrant_client,
             collection_name=self.collection_name,
             embedding=embeddings,
             validate_collection_config=False,
         )
-        
+
         # Pluggable reranker (Voyage / Cohere / none)
         if self.enable_reranking:
             self._reranker = create_reranker()
             if self._reranker is None:
                 # RERANK_PROVIDER=none — disable reranking
                 self.enable_reranking = False
-        
+
         # Initialize helper modules
         self._filter_builder = QdrantFilterBuilder(
             vector_store=self._vector_store,
@@ -309,7 +309,7 @@ class LangChainRetriever(MultiRoundRetrievalMixin):
         allow_unfiltered_fallback: bool,
     ) -> List:
         """Perform vector search with comprehensive error handling.
-        
+
         Handles Qdrant index-missing errors with optional unfiltered fallback.
         Returns an empty list on fail-closed errors.
         """

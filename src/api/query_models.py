@@ -47,6 +47,11 @@ class CitationDetail(BaseModel):
     section: Optional[str] = None
     url: Optional[str] = None
     snippet: Optional[str] = None
+    # VCM metadata surfaced from the source document (registry, publisher,
+    # version_number, document_id, methodology_codes, etc.). Present for KB
+    # citations when the source document carries VCM metadata; absent for web
+    # citations.
+    metadata: Optional[Dict[str, Any]] = None
 
 
 class CitationResponse(BaseModel):

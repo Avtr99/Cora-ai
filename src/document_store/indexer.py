@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 import uuid
 from pathlib import Path
 
@@ -16,11 +17,40 @@ from .models import DocumentRecord
 from .storage import read_markdown, update_document
 from .title_utils import _extract_first_heading
 
+# Payload field indexes created on the dense collection.
+# Must stay in sync with the metadata dict built in chunk_markdown() so the
+# query rewriter's filters are usable on the collection.
+_PAYLOAD_INDEX_FIELDS = (
+    "metadata.doc_store_id",
+    "metadata.original_filename",
+    "metadata.file_type",
+    "metadata.tags",
+    "metadata.registry",
+    "metadata.category",
+    "metadata.publisher",
+    "metadata.document_id",
+    "metadata.title",
+    "metadata.version_number",
+    "metadata.registry_document_id",
+    "metadata.methodology_codes",
+)
+
+# Docling's standard-mode Markdown serializer emits ``<!-- image -->`` for every
+# detected image region. These placeholders carry zero retrieval signal, waste
+# embedding budget, and produce 14-char garbage chunks. llm_api mode, by
+# contrast, sends the page image to an LLM that writes a real text description —
+# so we must NOT strip placeholders from llm_api-converted documents.
+_IMAGE_PLACEHOLDER_RE = re.compile(r"<!--\s*image\s*-->\s*")
 
 def chunk_markdown(record: DocumentRecord) -> list[Document]:
     from langchain_text_splitters import RecursiveCharacterTextSplitter
 
     text = read_markdown(record)
+    # Strip Docling's ``<!-- image -->`` placeholders from standard-mode
+    # conversions. They carry no retrieval signal and produce garbage chunks.
+    # llm_api mode writes real image descriptions — keep those.
+    if record.conversion_mode == "standard":
+        text = _IMAGE_PLACEHOLDER_RE.sub("", text)
     settings = get_settings()
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=settings.CHUNK_SIZE,
@@ -53,6 +83,7 @@ def chunk_markdown(record: DocumentRecord) -> list[Document]:
             "document_id": record.document_id,
             "title": title,
             "registry": record.registry,
+            "category": record.category,
             "publisher": record.publisher,
             "registry_document_id": record.document_id,
             "version_number": record.version_number,
@@ -121,6 +152,7 @@ def _ensure_collection(client: QdrantClient) -> None:
         "metadata.file_type",
         "metadata.tags",
         "metadata.registry",
+        "metadata.category",
         "metadata.publisher",
         "metadata.document_id",
         "metadata.title",

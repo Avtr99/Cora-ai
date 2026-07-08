@@ -316,6 +316,169 @@ class TestFormatCitationsForResponse:
         formatted = self.manager.format_citations_for_response(citations)
         assert formatted["details"][0]["page_number"] == 0
 
+    def test_citation_metadata_surfaces_vcm_fields(self):
+        """VCM metadata on a KB citation should appear in the formatted detail, curated."""
+        vcm_metadata = {
+            "registry": "Verra",
+            "publisher": "Verra",  # == registry → dropped by curator
+            "document_id": "VM0047",
+            "version_number": "1.0",
+            "registry_document_id": "VM0047",  # == document_id → dropped
+            "methodology_codes": "VM0047",     # == document_id → dropped
+            "title": "VM0047 Methodology",     # ≈ source_name → dropped
+        }
+        citations = [
+            Citation(
+                source_id="kb_1",
+                source_name="VM0047 Methodology v1.0.pdf",
+                source_type="knowledge_base",
+                content_snippet="Methodology content",
+                relevance_score=0.92,
+                page_number=3,
+                metadata=vcm_metadata,
+            ),
+        ]
+
+        formatted = self.manager.format_citations_for_response(citations)
+
+        detail = formatted["details"][0]
+        # Curated: only non-redundant fields survive
+        assert detail["metadata"] == {
+            "registry": "Verra",
+            "document_id": "VM0047",
+            "version_number": "1.0",
+        }
+        # Redundant fields are NOT in the curated output
+        assert "publisher" not in detail["metadata"]
+        assert "methodology_codes" not in detail["metadata"]
+        assert "registry_document_id" not in detail["metadata"]
+        assert "title" not in detail["metadata"]
+
+    def test_citation_metadata_market_report_uses_category(self):
+        """Non-registry docs (market reports) use category, not registry."""
+        # Market report: category is a topic classifier, publisher is the org
+        market_metadata = {
+            "category": "Market Intelligence",
+            "publisher": "Ecosystem Marketplace",
+            # No registry, document_id, or version_number for market reports
+        }
+        citations = [
+            Citation(
+                source_id="kb_2",
+                source_name="State of the Voluntary Carbon Market 2024.pdf",
+                source_type="knowledge_base",
+                content_snippet="Market volumes reached...",
+                relevance_score=0.85,
+                metadata=market_metadata,
+            ),
+        ]
+
+        formatted = self.manager.format_citations_for_response(citations)
+
+        detail = formatted["details"][0]
+        # category (topic) and publisher (org) survive — they differ
+        assert detail["metadata"] == {
+            "category": "Market Intelligence",
+            "publisher": "Ecosystem Marketplace",
+        }
+        # registry is NOT present — Market Intelligence is not a registry
+        assert "registry" not in detail["metadata"]
+
+    def test_citation_metadata_policy_doc_uses_category(self):
+        """Policy docs (UNFCCC) use category, not registry, but still surface document_id."""
+        policy_metadata = {
+            "category": "VCM Policy",
+            "publisher": "UNFCCC",
+            "document_id": "A6.4-SBM014-A06",
+            # No registry or version_number
+        }
+        citations = [
+            Citation(
+                source_id="kb_3",
+                source_name="Article 6.4 Supervisory Body Decision.pdf",
+                source_type="knowledge_base",
+                content_snippet="The Supervisory Body decided...",
+                relevance_score=0.88,
+                metadata=policy_metadata,
+            ),
+        ]
+
+        formatted = self.manager.format_citations_for_response(citations)
+
+        detail = formatted["details"][0]
+        assert detail["metadata"] == {
+            "category": "VCM Policy",
+            "publisher": "UNFCCC",
+            "document_id": "A6.4-SBM014-A06",
+        }
+        assert "registry" not in detail["metadata"]
+
+    def test_citation_metadata_absent_when_empty_for_web(self):
+        """Web citations with no metadata should not get a metadata key."""
+        citations = [
+            Citation(
+                source_id="web_1",
+                source_name="Climate News",
+                source_type="web",
+                content_snippet="Web snippet",
+                relevance_score=0.8,
+                url="https://example.com/article",
+                # metadata defaults to None
+            ),
+        ]
+
+        formatted = self.manager.format_citations_for_response(citations)
+
+        detail = formatted["details"][0]
+        # No metadata key emitted for web citations without metadata
+        assert "metadata" not in detail
+
+    def test_extractor_preserves_all_allowlisted_fields(self):
+        """Extractor allowlist should retain all VCM fields (curator trims later)."""
+        from src.citations.extractor import CitationExtractor
+        from src.citations.config import CitationConfig
+
+        config = CitationConfig(min_relevance_score=0.0)
+        extractor = CitationExtractor(
+            config=config,
+            # Use the production allowlist (matches CitationManager)
+            safe_metadata_fields={
+                "file_name", "parent_doc", "source", "page_number",
+                "section", "registry", "category", "document_id", "version_number", "title",
+                "publisher", "registry_document_id", "methodology_codes",
+            },
+        )
+
+        vector_results = {
+            "documents": ["VM0047 ARR methodology content"],
+            "metadatas": [{
+                "file_name": "VM0047.pdf",
+                "registry": "Verra",
+                "publisher": "Verra",
+                "document_id": "VM0047",
+                "registry_document_id": "VM0047",
+                "version_number": "1.0",
+                "methodology_codes": "VM0047",
+                # A field NOT in the allowlist — must be filtered out
+                "internal_path": "/secret/internal/path",
+            }],
+            "distances": [0.2],
+        }
+
+        citations = extractor.extract_from_vector_results(vector_results)
+        assert len(citations) == 1
+        md = citations[0].metadata
+
+        # All allowlisted VCM fields survive at the extractor layer
+        # (the formatter curates them down for the API payload)
+        assert md.get("registry") == "Verra"
+        assert md.get("publisher") == "Verra"
+        assert md.get("registry_document_id") == "VM0047"
+        assert md.get("methodology_codes") == "VM0047"
+        assert md.get("version_number") == "1.0"
+        # Non-allowlisted field is filtered out
+        assert "internal_path" not in md
+
 
 class TestCleanSourceName:
     """Test clean_source_name() function for Phase 2."""
