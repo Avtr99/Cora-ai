@@ -163,3 +163,4 @@ document-update-report.json
 bundle-report.json
 tests/test_secret_key_auto.py
 Improve securtiy.md
+docs/OPEN_SOURCE_PLAN.md
