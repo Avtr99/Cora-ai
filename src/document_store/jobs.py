@@ -285,7 +285,7 @@ async def _process_document_job_inner(document_id: str, job_id: str) -> None:
         _log_ingestion_stage("job", "indexing", document_id, job_id, time.perf_counter() - start, chunk_count)
         update_job(job_id, "completed", f"Ready to use. {chunk_count} text sections added.")
     except Exception as exc:
-        logger.exception("Document processing failed for %s", document_id)
+        logger.exception("Document processing failed for {}", document_id)
         user_error = _classify_conversion_error(exc, record.conversion_mode if record else "standard")
         update_document(document_id, status="failed", error=user_error)
         update_job(job_id, "failed", error=user_error)
@@ -342,7 +342,7 @@ async def _reindex_document_job_inner(document_id: str, job_id: str) -> None:
         _log_ingestion_stage("job", "indexing", document_id, job_id, time.perf_counter() - start, chunk_count)
         update_job(job_id, "completed", f"Document refreshed. {chunk_count} text sections added.")
     except Exception as exc:
-        logger.exception("Document re-index failed for %s", document_id)
+        logger.exception("Document re-index failed for {}", document_id)
         user_error = _classify_conversion_error(exc, record.conversion_mode if record else "standard")
         update_document(document_id, status="failed", error=user_error)
         update_job(job_id, "failed", error=user_error)
@@ -364,7 +364,7 @@ async def delete_document_job(document_id: str, job_id: str) -> None:
         try:
             update_document(document_id, status="deleting", error=None)
         except Exception as exc:
-            logger.warning("Could not mark document %s as deleting: %s", document_id, exc)
+            logger.warning("Could not mark document {} as deleting: {}", document_id, exc)
 
     # Always run Qdrant cleanup — it's idempotent (deleting non-existent
     # points is a no-op) and is the only way to purge orphaned chunks left
@@ -373,13 +373,13 @@ async def delete_document_job(document_id: str, job_id: str) -> None:
     try:
         await delete_document_chunks(document_id)
     except Exception as exc:
-        logger.exception("Vector store deletion failed for %s", document_id)
+        logger.exception("Vector store deletion failed for {}", document_id)
         qdrant_error = str(exc)
 
     try:
         remove_document_files(record)
     except Exception:
-        logger.exception("Local file deletion failed for %s", document_id)
+        logger.exception("Local file deletion failed for {}", document_id)
 
     try:
         update_document(document_id, status="deleted", error=None)
@@ -391,5 +391,5 @@ async def delete_document_job(document_id: str, job_id: str) -> None:
             message = f"{message}; vector store cleanup failed: {qdrant_error}"
         update_job(job_id, "completed", message=message)
     except Exception as exc:
-        logger.exception("Could not mark document %s as deleted", document_id)
+        logger.exception("Could not mark document {} as deleted", document_id)
         update_job(job_id, "failed", error=str(exc))

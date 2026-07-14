@@ -10,43 +10,27 @@ the design.
 
 ### Retrieval-aware post-generation relevance judge
 
-**Status:** Deferred — not scheduled.
-**Owner:** Unassigned.
-**Target component:** `src/agents/validator.py`, `src/agents/route_processor_utils.py`, `src/agents/orchestrator_config.py`.
+**Status:** Completed.
+**Owner:** Implemented.
+**Target component:** `src/agents/validator.py`, `src/agents/route_processor_utils.py`, `src/agents/orchestrator_config.py`, `src/agents/kb_route_handler.py`, `src/agents/hybrid_route_handler.py`.
 
-#### Rationale
+#### Implementation
 
-The current Layer-4 relevance judge (`AnswerValidator.check_relevance`) receives only:
+The Layer-4 relevance check is now retrieval-aware:
 
-- the original user query,
-- the generated answer,
-- an optional list of source document titles.
-
-It does **not** see the retrieved chunks. For VCM queries this is structurally unreliable:
-
-- Entity-dense queries (e.g., "What is VM0048?") have little lexical overlap with correct answers, so the judge flags correct answers as irrelevant.
-- Short queries produce high-confidence false negatives, triggering unnecessary web supplementation.
-- A lexical override guard was added to suppress these false negatives, but it is too broad: it also suppresses valid web fallbacks when the answer merely mentions the queried entity without actually answering the question (e.g., "Explain the VCS JNR framework." with no dedicated JNR document in the corpus).
-
-The judge is already running on `gemini-2.5-flash` (via OpenRouter), so model switching will not help. The fix must be architectural.
-
-#### Proposed redesign
-
-Replace the query-vs-answer surface check with a **retrieval-aware grounding check**:
-
-1. Pass the top-k retrieved chunks (or their concatenated text) into the relevance prompt.
-2. Ask the model: "Given these retrieved sources, does the answer address the user's query? Is the answer supported by the sources?"
-3. Return `is_relevant` only when the answer is both on-topic and grounded.
-4. Use this check as a **fallback trigger**, not a hard override.
-
-Optionally expose a config flag to disable the post-generation relevance check entirely, because `ENABLE_VALIDATION` currently controls only the grounding-validation step, not the web-supplement relevance check.
+- `AnswerValidator.check_relevance` accepts `source_chunks` and `source_titles` and passes them into the relevance prompt.
+- `route_processor_utils.check_answer_relevance` extracts top-k retrieved chunks from `vector_results` and forwards them to the validator.
+- `KBRouteHandler` and `HybridRouteHandler` call `check_answer_relevance` before triggering web supplementation.
+- `ENABLE_WEB_SUPPLEMENT_RELEVANCE_CHECK` controls the post-generation relevance check independently of `ENABLE_VALIDATION`.
+- `WEB_SUPPLEMENT_RELEVANCE_CONFIDENCE_THRESHOLD` requires high confidence before a relevance failure triggers a web fallback.
 
 #### Acceptance criteria
 
-- [ ] Relevance prompt includes top retrieved chunks, not just titles.
-- [ ] Unit tests cover: on-topic grounded answer (kept KB), off-topic answer (web supplement), answer that mentions entity but does not answer detail (web supplement).
-- [ ] Config flag exists to disable web-supplement relevance check without disabling grounding validation.
-- [ ] End-to-end verification on VM0048 definition, VCS JNR framework, and Article 6 queries shows expected route behavior.
+- [x] Relevance prompt includes top retrieved chunks, not just titles.
+- [x] Unit tests cover: on-topic grounded answer (kept KB), off-topic answer (web supplement), answer that mentions entity but does not answer detail (web supplement). See `tests/test_relevance_check.py`.
+- [x] Config flag `ENABLE_WEB_SUPPLEMENT_RELEVANCE_CHECK` exists to disable the web-supplement relevance check without disabling grounding validation (`ENABLE_VALIDATION`).
+- [x] Wired through `route_processor_utils.check_answer_relevance`, `KBRouteHandler`, and `HybridRouteHandler`.
+- [x] End-to-end verification on VM0048 definition, VCS JNR framework, and Article 6 queries shows expected route behavior.
 
 #### Trade-offs
 
@@ -55,7 +39,7 @@ Optionally expose a config flag to disable the post-generation relevance check e
 
 #### Related documents
 
-- Investigation report: `docs/plans/pdf-prefix-in-citations.md`
+- Implementation and tests: `src/agents/validator.py`, `src/agents/route_processor_utils.py`, `tests/test_relevance_check.py`
 
 ---
 
@@ -84,7 +68,7 @@ The legacy **`local_vlm`** mode has already been removed from the codebase.
 Attempting to use it raises a `ValueError` directing users to `standard` or
 `llm_api` instead.
 
-Both active modes still depend on Docling. Docling's OmniDocBench performance is
+Only the `standard` mode depends on Docling. The `llm_api` mode communicates directly with its configured OpenAI-compatible endpoint and does not use Docling. Docling's OmniDocBench performance is
 the **worst in the entire benchmark** — Edit distance 0.589 (EN) / 0.909 (ZH),
 4x worse than PP-StructureV3 (0.145 / 0.206) and worse than every other
 pipeline tool and most VLMs tested.
@@ -198,8 +182,8 @@ The `standard` mode becomes a smart router:
   structured markdown with tables, formulas, reading order)
 
 The `llm_api` mode stays for complex documents (images, difficult tables,
-formulas) and is migrated from Docling's `VlmPipeline` to a direct HTTP call
-to the OpenAI-compatible API — removing the last Docling dependency.
+formulas) and already calls the OpenAI-compatible API directly via `httpx` —
+it does not use Docling.
 
 #### Scope
 
@@ -334,13 +318,11 @@ to the OpenAI-compatible API — removing the last Docling dependency.
   Markdown (`<img src="..." />`). It does not describe image content (it's
   not a VLM). This is correct behavior for the `standard` tier — image
   description is the job of `llm_api` if needed.
-- **`llm_api` migration.** The current `llm_api` uses Docling's
-  `VlmPipeline` + `ApiVlmOptions` to call cloud providers. The new
-  implementation calls the OpenAI-compatible endpoint directly via `httpx`,
-  removing the Docling dependency. The prompt
-  (`DOCUMENT_LLM_CONVERSION_PROMPT`) is reused unchanged. Concurrency and
-  retry settings (`DOCUMENT_LLM_CONVERSION_CONCURRENCY`,
-  `DOCUMENT_LLM_CONVERSION_MAX_RETRIES`) are reused.
+- **`llm_api` mode.** The `llm_api` mode calls the OpenAI-compatible endpoint
+  directly via `httpx` and does not depend on Docling. The prompt
+  (`DOCUMENT_LLM_CONVERSION_PROMPT`), concurrency
+  (`DOCUMENT_LLM_CONVERSION_CONCURRENCY`), and retry
+  (`DOCUMENT_LLM_CONVERSION_MAX_RETRIES`) settings are reused unchanged.
 - **PaddlePaddle + PyTorch coexistence.** PaddlePaddle and PyTorch can
   coexist in the same Python environment. No conflict. The Cora backend
   uses PyTorch for nothing else after Docling is removed — but if future
@@ -407,11 +389,11 @@ to the OpenAI-compatible API — removing the last Docling dependency.
   mode. For a 50-page PDF, that's ~1-2 minutes — acceptable for ingestion.
   Users with GPUs can set `DOCUMENT_PADDLEOCR_DEVICE=gpu` for faster
   processing.
-- **`llm_api` migration risk.** Moving `llm_api` from Docling's
-  `VlmPipeline` to a direct HTTP call changes the request format. Test
-  thoroughly with both Gemini and OpenAI endpoints. The prompt is reused
-  unchanged, but the image encoding and request structure differ. Run a
-  side-by-side comparison on 5 PDFs before release.
+- **`llm_api` endpoint compatibility.** The `llm_api` mode uses a direct
+  HTTP call to the configured OpenAI-compatible endpoint. Test thoroughly
+  with Gemini, OpenAI, OpenRouter, and local vLLM endpoints, as the image
+  encoding and request structure may differ. Run a side-by-side comparison on
+  5 PDFs before release.
 - **PP-StructureV3 OmniDocBench score is from PaddleOCR's own technical
   report.** The 0.145 EN edit distance is vendor-reported but measured on
   the standard OmniDocBench benchmark. The independent OmniDocBench

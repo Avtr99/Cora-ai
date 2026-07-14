@@ -73,7 +73,7 @@ Cora is evaluated with the following metrics and scripts:
 To run the evaluation:
 
 ```bash
-python scripts/evaluation/evaluate_rag.py --dataset tests/test_queries.json
+python scripts/evaluation/evaluate_rag.py --dataset scripts/evaluation/test_queries.json
 ```
 
 Test queries are provided in `scripts/evaluation/test_queries.json`. Evaluation output files are generated locally and are not committed (they are excluded by `.gitignore` because they may contain user documents and API-dependent results). The evaluation methodology and scripts are in the repository.

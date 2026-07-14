@@ -77,7 +77,7 @@ class ConversationMemory:
             # Initialize storage (embeddings created inside MemoryStorage via factory)
             self.storage = MemoryStorage(self.client, self.collection_name)
             self._initialized = True
-            logger.info("Conversation memory initialized (embeddings=%s + Qdrant)", settings.EMBEDDING_PROVIDER)
+            logger.info("Conversation memory initialized (embeddings={} + Qdrant)", settings.EMBEDDING_PROVIDER)
             
         except Exception as e:
             logger.error(f"Failed to initialize conversation memory: {e}", exc_info=True)

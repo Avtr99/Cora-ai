@@ -52,8 +52,8 @@ _IMAGE_PLACEHOLDER_RE = re.compile(r"<!--\s*image\s*-->\s*")
 # the same burst are coalesced into one call after the delay expires.
 # Trade-off: the invalidation is asynchronous, so for ~0.7s after a document is
 # marked "completed" the query cache may still return stale results. This is
-# acceptable for the ingestion backlog use case; operators who need strict
-# consistency can set this delay to 0.
+# acceptable for the ingestion backlog use case; the delay is a fixed module
+# constant, not a runtime setting.
 _CACHE_INVALIDATION_DEBOUNCE_SECONDS = 0.7
 
 _invalidation_task: Optional[asyncio.Task] = None
@@ -215,7 +215,7 @@ def _ensure_collection(client: QdrantClient) -> None:
             )
         except Exception as exc:
             # Index already exists or creation is unsupported — safe to skip.
-            logger.debug("Payload index not created for %s: %s", field, exc)
+            logger.debug("Payload index not created for {}: {}", field, exc)
 
 
 def _get_vector_store() -> QdrantVectorStore:
@@ -276,7 +276,7 @@ def _replace_document_chunks(
                 vectors.extend(vector_store.embeddings.embed_documents(batch))
     except Exception as e:
         logger.exception(
-            "Embedding failed for document %s: %s", record.id, e
+            "Embedding failed for document {}: {}", record.id, e
         )
         raise
     _log_ingestion_stage(
@@ -306,14 +306,14 @@ def _replace_document_chunks(
             )
         except Exception as e:
             logger.exception(
-                "Qdrant upsert failed for document %s: %s", record.id, e
+                "Qdrant upsert failed for document {}: {}", record.id, e
             )
             raise
     _log_ingestion_stage("indexer", "upsert", record.id, job_id, time.perf_counter() - start, len(chunks))
 
 
 def _delete_document_chunks_sync(document_id: str, client: Optional[QdrantClient] = None) -> None:
-    qdrant_client = client or _get_vector_store().client
+    qdrant_client = client or _qdrant_client()
     settings = get_settings()
     if not qdrant_client.collection_exists(settings.QDRANT_COLLECTION_NAME):
         return

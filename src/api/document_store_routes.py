@@ -121,7 +121,7 @@ async def upload_document(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         error_id = str(uuid.uuid4())[:8]
-        logger.exception("Document upload failed [error_id=%s]", error_id)
+        logger.exception("Document upload failed [error_id={}]", error_id)
         raise HTTPException(status_code=500, detail=f"Document upload failed (error_id: {error_id})") from exc
 
 
@@ -136,7 +136,7 @@ async def reindex_all_documents(background_tasks: BackgroundTasks):
         job = create_job(record.id, "reindex", "Document refresh queued")
         background_tasks.add_task(reindex_document_job, record.id, job.id)
         job_ids.append(job.id)
-    logger.info("Reindex-all queued %s documents", len(records))
+    logger.info("Reindex-all queued {} documents", len(records))
     return {"queued": len(records), "job_ids": job_ids}
 
 
@@ -151,7 +151,7 @@ async def clear_all_documents(background_tasks: BackgroundTasks):
         job = create_job(record.id, "delete", "Document deletion queued")
         background_tasks.add_task(delete_document_job, record.id, job.id)
         job_ids.append(job.id)
-    logger.info("Clear-all queued %s documents for deletion", len(records))
+    logger.info("Clear-all queued {} documents for deletion", len(records))
     return {"queued": len(records), "job_ids": job_ids}
 
 
