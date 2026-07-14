@@ -1,5 +1,5 @@
 Cora AI
-Copyright 2026 Akshay Rajesh — All rights reserved.
+Copyright 2026 Akshay Rajesh
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,15 +15,22 @@ limitations under the License.
 
 ================================================================================
 
-This product includes software developed as part of the Cora AI project
+This product is the original work of Cora AI
 (https://github.com/Avtr99/Cora-ai).
 
 Owner: Akshay Rajesh
 Contact: akshay@cora-ai.org
 
-Third-Party Components:
-This product includes components from the following third-party projects,
-licensed under their respective terms (see requirements.txt and
+The Cora AI source code is released under the Apache License, Version 2.0.
+See LICENSE for the full license text.
+
+Third-Party Components
+----------------------
+
+This product includes or depends on the following third-party components,
+used under their respective licenses.
+
+Software dependencies (not exhaustive; see requirements.txt and
 frontend/package.json for the full list):
 
 - FastAPI (MIT)
@@ -33,3 +40,41 @@ frontend/package.json for the full list):
 - React (MIT)
 - Vite (MIT)
 - Tailwind CSS (MIT)
+
+Content and data
+----------------
+
+- Humbo Ethiopia case-study hero image
+  URL: https://github.com/Avtr99/Cora-ai/blob/main/frontend/src/assets/case-studies/humbo/pexels-abiy-fikru-176179-27534668.webp
+  Source: https://www.pexels.com/photo/27534668/
+  Author: Abiy Fikru
+  License: Pexels License (free for commercial and non-commercial use,
+           attribution not required but provided)
+  License URL: https://www.pexels.com/license/
+
+- Myanmar Mangrove case-study hero image
+  URL: https://github.com/Avtr99/Cora-ai/blob/main/frontend/src/assets/case-studies/mangrove/Mangrove_Rakhine_Myanmar_2_landscape.webp
+  Source: https://commons.wikimedia.org/wiki/File:Mangrove,_Rakhine,_Myanmar_2.jpg
+  Original iNaturalist: https://www.inaturalist.org/observations/146600482
+  Author: scottedmunds
+  License: CC0 1.0 Universal / Public Domain
+  See: https://creativecommons.org/publicdomain/zero/1.0/
+
+- Case-study satellite imagery
+  Derived from Copernicus Sentinel-2 open data (European Union's Copernicus
+  programme) and processed by Cora AI.
+  License: Copernicus open data, free to use with attribution.
+  Details: https://github.com/Avtr99/Cora-ai/blob/main/docs/ATTRIBUTION.md
+
+- Voluntary Carbon Market project data
+  Source: Voluntary Registry Offsets Database
+  Publisher: Berkeley Carbon Trading Project, Goldman School of Public Policy,
+             University of California, Berkeley
+  URL: https://gspp.berkeley.edu/berkeley-carbon-trading-project/offsets-database
+  License: Creative Commons Attribution 4.0 International (CC BY 4.0)
+  Citation: Pamela Quartson, Barbara K Haya, Tyler Bernard, Aline Abayo,
+            Xinyun Rong, Ivy S So, Micah Elias. (2026).
+            Voluntary Registry Offsets Database v2026-04,
+            Berkeley Carbon Trading Project, University of California, Berkeley.
+  Processing: https://github.com/Avtr99/Cora-ai/blob/main/frontend/scripts/convert-projects.mjs
+  Display: https://github.com/Avtr99/Cora-ai/blob/main/frontend/src/components/projects/ProjectAttribution.tsx

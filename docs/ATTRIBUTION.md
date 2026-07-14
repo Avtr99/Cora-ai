@@ -55,16 +55,16 @@ not available in the materials found so far.
 
 | Filename | Description | Credit |
 |---|---|---|
-| `case-studies/mangrove/Mangrove_Rakhine_Myanmar_2_landscape.webp` | Mangrove forest illustrative photo. | Photo by scottedmunds / iNaturalist. License: [CC0 1.0 Universal / Public Domain](https://creativecommons.org/publicdomain/zero/1.0/). |
+| [`case-studies/mangrove/Mangrove_Rakhine_Myanmar_2_landscape.webp`](https://github.com/Avtr99/Cora-ai/blob/main/frontend/src/assets/case-studies/mangrove/Mangrove_Rakhine_Myanmar_2_landscape.webp) | Mangrove forest illustrative photo. | Photo by [scottedmunds](https://www.inaturalist.org/observations/146600482) / iNaturalist, via [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Mangrove,_Rakhine,_Myanmar_2.jpg). License: [CC0 1.0 Universal / Public Domain](https://creativecommons.org/publicdomain/zero/1.0/). |
 
 Required credit line on the page:
-> Photo by scottedmunds / iNaturalist. CC0 / public domain.
+> Photo by scottedmunds / iNaturalist, via Wikimedia Commons. CC0 / public domain.
 
 ### Humbo Ethiopia case-study hero image
 
 | Filename | Description | Credit |
 |---|---|---|
-| `case-studies/humbo/pexels-abiy-fikru-176179-27534668.webp` | Mountain forest landscape photo. | Photo by [Abiy Fikru](https://www.pexels.com/photo/27534668/) on Pexels. Pexels License: free for commercial and non-commercial use, no attribution required. |
+| [`case-studies/humbo/pexels-abiy-fikru-176179-27534668.webp`](https://github.com/Avtr99/Cora-ai/blob/main/frontend/src/assets/case-studies/humbo/pexels-abiy-fikru-176179-27534668.webp) | Mountain forest landscape photo. | Photo by [Abiy Fikru](https://www.pexels.com/photo/27534668/) on Pexels. [Pexels License](https://www.pexels.com/license/): free for commercial and non-commercial use, no attribution required. |
 
 Credit line on the page:
 > Photo by Abiy Fikru on Pexels.
@@ -75,3 +75,17 @@ Credit line on the page:
 - The Myanmar overview is a two-tile Sentinel-2 mosaic (tiles 46QFD and 46QFE)
   because the project area straddles the tile boundary.
 - The KML boundary for Myanmar is the official project boundary file from the registry.
+
+## Data sources
+
+### Voluntary Carbon Market project database
+
+The project comparison feature uses the *Voluntary Registry Offsets Database* from the
+Berkeley Carbon Trading Project, Goldman School of Public Policy, University of California,
+Berkeley.
+
+- **Source:** https://gspp.berkeley.edu/berkeley-carbon-trading-project/offsets-database
+- **License:** Creative Commons Attribution 4.0 International (CC BY 4.0)
+- **Citation:** Pamela Quartson, Barbara K Haya, Tyler Bernard, Aline Abayo, Xinyun Rong, Ivy S So, Micah Elias. (2026). *Voluntary Registry Offsets Database v2026-04*, Berkeley Carbon Trading Project, University of California, Berkeley.
+- **Processing:** [`frontend/scripts/convert-projects.mjs`](https://github.com/Avtr99/Cora-ai/blob/main/frontend/scripts/convert-projects.mjs) converts the CSV into [`frontend/public/data/projects-summary.json`](https://github.com/Avtr99/Cora-ai/blob/main/frontend/public/data/projects-summary.json) and [`frontend/public/data/projects-detail.json`](https://github.com/Avtr99/Cora-ai/blob/main/frontend/public/data/projects-detail.json).
+- **Display:** [`frontend/src/components/projects/ProjectAttribution.tsx`](https://github.com/Avtr99/Cora-ai/blob/main/frontend/src/components/projects/ProjectAttribution.tsx)
