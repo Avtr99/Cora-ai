@@ -80,7 +80,7 @@ class ConversationMemory:
             logger.info("Conversation memory initialized (embeddings={} + Qdrant)", settings.EMBEDDING_PROVIDER)
             
         except Exception as e:
-            logger.error(f"Failed to initialize conversation memory: {e}", exc_info=True)
+            logger.exception("Failed to initialize conversation memory: {}", e)
             self._initialized = False
     
     @property
@@ -158,7 +158,7 @@ class ConversationMemory:
                 "message": "Invalid input parameters"
             }
         except Exception as e:
-            logger.error(f"Error adding conversation to memory: {e}", exc_info=True)
+            logger.exception("Error adding conversation to memory: {}", e)
             return {
                 "status": "error",
                 "error_type": "internal",
@@ -206,7 +206,7 @@ class ConversationMemory:
             logger.warning(f"Validation error searching memories: {e}")
             return []
         except Exception as e:
-            logger.error(f"Error searching memories: {e}", exc_info=True)
+            logger.exception("Error searching memories: {}", e)
             return []
     
     def get_all_memories(
@@ -253,7 +253,7 @@ class ConversationMemory:
             logger.warning(f"Validation error getting memories: {e}")
             return {"memories": [], "count": 0, "limit": limit, "offset": offset, "has_more": False, "message": "Invalid request parameters"}
         except Exception as e:
-            logger.error(f"Error getting all memories: {e}", exc_info=True)
+            logger.exception("Error getting all memories: {}", e)
             return {"memories": [], "count": 0, "limit": limit, "offset": offset, "has_more": False, "message": "Internal error retrieving memories"}
     
     async def get_conversation_context(
@@ -350,7 +350,7 @@ class ConversationMemory:
             logger.warning(f"Validation error deleting memories: {e}")
             return {"status": "error", "error_type": "validation", "message": "Invalid request parameters"}
         except Exception as e:
-            logger.error(f"Error deleting memories: {e}", exc_info=True)
+            logger.exception("Error deleting memories: {}", e)
             return {
                 "status": "error",
                 "error_type": "internal",
