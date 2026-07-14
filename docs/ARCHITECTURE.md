@@ -192,12 +192,12 @@ Query result caching is backed by SQLite (`backend_cache` table). Agent-level in
 
 All external dependencies are swappable via env vars. The default stack uses hosted APIs; the offline stack uses local services.
 
-| Capability | Default (hosted) | Local/offline option | Env var |
+| Capability | Default (hosted) | Alternatives | Env var |
 |---|---|---|---|
-| LLM | Gemini 2.5 Flash / Flash Lite | — (Gemini is currently the only LLM client) | `GEMINI_MODEL_MAIN`, `GEMINI_MODEL_LITE` |
-| Embeddings | Voyage `voyage-4-lite` (1024d) | Ollama `bge-large-en-v1.5` (1024d) | `EMBEDDING_PROVIDER` |
-| Reranker | Voyage `rerank-2.5` | `none` (skip reranking) | `RERANK_PROVIDER` |
-| Web search | Tavily | `none` (answer only from local documents) | `SEARCH_PROVIDER`, `ENABLE_WEB_SEARCH` |
+| LLM | Gemini 2.5 Flash / Flash Lite | OpenAI `gpt-4.1-mini`, OpenRouter (any model), Ollama / vLLM / LM Studio (local). Override Gemini models with `GEMINI_MODEL_MAIN` / `GEMINI_MODEL_LITE`; set local/base URL and model through the `/setup` UI. | `GEMINI_API_KEY`, `OPENAI_API_KEY`, `OPENROUTER_API_KEY` |
+| Embeddings | Voyage `voyage-4-lite` (1024d) | Cohere `embed-v4.0`, OpenAI `text-embedding-3-small`, Ollama (`bge-large-en-v1.5`, `nomic-embed-text`, …) | `EMBEDDING_PROVIDER`, `EMBEDDING_MODEL`, `EMBEDDING_DIM` |
+| Reranker | Voyage `rerank-2.5` | Cohere rerank models, `none` (skip reranking) | `RERANK_PROVIDER`, `RERANK_MODEL` |
+| Web search | Tavily | Disable web search with `ENABLE_WEB_SEARCH=false`. `SEARCH_PROVIDER=none` leaves the provider slot unconfigured but currently falls back to Tavily if `ENABLE_WEB_SEARCH=true`. | `SEARCH_PROVIDER`, `ENABLE_WEB_SEARCH` |
 
 > **Important:** `EMBEDDING_DIM` **must match** the Qdrant collection's vector size. Changing the embedding model requires re-ingesting the collection. There is no online re-ingestion path.
 
@@ -205,12 +205,13 @@ All external dependencies are swappable via env vars. The default stack uses hos
 
 | Key | Required? | When |
 |---|---|---|
-| `GEMINI_API_KEY` | **Yes** | Always — the only LLM client is Gemini |
+| `GEMINI_API_KEY` | Only if the active LLM provider is Gemini | Default stack |
+| `OPENAI_API_KEY` | Only if the active LLM provider is OpenAI-compatible (OpenAI, Ollama, vLLM, etc.) | Optional |
+| `OPENROUTER_API_KEY` | Only if the active LLM provider is OpenRouter | Optional |
 | `VOYAGE_API_KEY` | Only if `EMBEDDING_PROVIDER=voyage` or `RERANK_PROVIDER=voyage` | Default stack |
-| `TAVILY_API_KEY` | Only if `SEARCH_PROVIDER=tavily` | Default stack |
+| `TAVILY_API_KEY` | Only if `SEARCH_PROVIDER=tavily` and `ENABLE_WEB_SEARCH=true` | Default stack |
 | `COHERE_API_KEY` | Only if using Cohere for embed/rerank | Optional |
-| `OPENAI_API_KEY` | Only if `EMBEDDING_PROVIDER=openai` | Optional |
-| `SECRET_KEY` | **Auto-generated** | Signs conversation-history HMAC and anonymizes memory user IDs. Auto-generated on first run and persisted to SQLite. Set in `.env` only for multi-instance deployments that need to share signed history. |
+| `SECRET_KEY` | **Auto-generated** | Signs conversation-history HMAC and pseudonymizes memory user IDs. Auto-generated on first run and persisted to SQLite. Set in `.env` only for multi-instance deployments that need to share signed history. |
 | `JWT_SECRET_KEY` | Only if auth endpoints are used | Optional |
 
 The app **starts successfully with no keys configured** — `/health` works, providers fail lazily on first use. This is by design, so health probes don't depend on external services.
@@ -314,7 +315,7 @@ All runtime configuration lives in `src/config.py` as a pydantic-settings `Setti
 | `EMBEDDING_PROVIDER=ollama` | voyage | You want a fully offline stack |
 | `RERANK_PROVIDER=none` | voyage | You want to skip reranking (faster, lower quality) |
 | `ENABLE_WEB_SEARCH=false` | true | You want to disable the web route entirely |
-| `SEARCH_PROVIDER=none` | tavily | You want to leave the web-search slot unconfigured |
+| `SEARCH_PROVIDER=none` | tavily | You want to leave the web-search slot unconfigured. `none` currently falls back to Tavily if `ENABLE_WEB_SEARCH=true`; use `ENABLE_WEB_SEARCH=false` to disable web search entirely. |
 | `ASYNC_QUERY_WORKERS` | 1 | You want concurrent long-query handling |
 | `QDRANT_MAX_CONCURRENCY` | 5 | You're hitting Qdrant connection limits |
 | `ENABLE_VALIDATION` | False | You need grounding checks and can tolerate extra latency |

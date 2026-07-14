@@ -4,9 +4,18 @@
 
 ## 1. Introduction
 
-This Privacy Policy describes how Cora AI (the "Service") handles information when you use this self-hosted Voluntary Carbon Market (VCM) research assistant. Cora AI is designed as a local-first application: by default, all data processing and storage occurs on the machine where the application is deployed. We are committed to protecting your privacy and ensuring compliance with the General Data Protection Regulation (GDPR) and other applicable data protection laws.
+This Privacy Policy is an operator-completed template. It describes how Cora AI (the "Service") handles information when you use this self-hosted Voluntary Carbon Market (VCM) research assistant. The default-behaviour description of the software is preserved below; operators must fill in the bracketed placeholders with their deployment-specific details before publishing this policy.
 
-Because Cora AI is open-source and self-hosted, the operator (the person or organization running the instance) is the data controller. This policy describes the default behaviour of the software. Operators are responsible for ensuring compliance with their local laws and may need to adapt this policy to their specific deployment.
+Cora AI is designed as a local-first application: by default, all data processing and storage occurs on the machine where the application is deployed. We are committed to protecting your privacy and supporting compliance with the General Data Protection Regulation (GDPR) and other applicable data protection laws.
+
+Because Cora AI is open-source and self-hosted, the operator (the person or organization running the instance) is the data controller. Operators are responsible for ensuring compliance with their local laws and may need to adapt this policy to their specific deployment.
+
+### Controller Information
+
+- **Controller name:** [CONTROLLER_NAME]
+- **Controller address:** [CONTROLLER_ADDRESS]
+- **Controller email:** [CONTROLLER_EMAIL]
+- **Controller phone (optional):** [CONTROLLER_PHONE]
 
 ## 2. Information Collected and Stored
 
@@ -16,7 +25,7 @@ Cora AI does not require user accounts or logins. All data is stored locally on 
 
 ### Conversation History
 
-- **Chat messages:** Your conversations are stored in the local Qdrant instance under the `cora_memories` collection. User identifiers are HMAC-hashed before storage for GDPR compliance.
+- **Chat messages:** Your conversations are stored in the local Qdrant instance under the `cora_memories` collection. User identifiers are HMAC-hashed before storage, pseudonymizing them and reducing the direct linkability of conversation history.
 - **Session data:** Chat sessions are stored locally in your browser via local storage. You can clear this at any time from your browser settings.
 
 ### Query and Cache Data
@@ -48,6 +57,8 @@ All external providers are configurable via environment variables. The operator 
 
 **Important:** When external API providers are enabled, the operator is responsible for reviewing the privacy policy and data handling practices of those providers and ensuring compliance with applicable laws.
 
+Other recipients or external providers the operator may use: [RECIPIENTS_OR_EXTERNAL_PROVIDERS]
+
 ## 4. How Data Is Used
 
 Data is processed solely for the following purposes:
@@ -59,16 +70,21 @@ Data is processed solely for the following purposes:
 
 No data is used for advertising, profiling, or sold to third parties. No telemetry or usage analytics are collected by the application itself.
 
+The operator may add additional processing purposes and legal bases:
+
+- **Processing purposes:** [PROCESSING_PURPOSES]
+- **Legal bases:** [LEGAL_BASES]
+
 ## 5. Data Security
 
 Cora AI implements the following security measures:
 
 - **Local storage:** All data remains on the operator's machine by default. No external databases or cloud services are required.
 - **PII redaction:** Automatic detection and redaction of personal identifiers before storage in conversation memory.
-- **HMAC-hashed user IDs:** User identifiers are hashed before being stored in the memory collection, preventing direct association with individuals.
+- **HMAC-hashed user IDs:** User identifiers are hashed before being stored in the memory collection, pseudonymizing them and reducing direct linkability to individuals.
 - **API key isolation:** All API keys are stored in a local `.env` file that is gitignored and never committed to version control.
 - **Optional API authentication:** The operator can enable API key authentication to restrict access to the service.
-- **Input sanitization:** All user inputs are sanitized to prevent injection attacks. HTML content in responses is sanitized via `nh3`.
+- **Input sanitization:** HTML content in responses is sanitized via `nh3`. This does not protect against SQL, command, prompt, or other input-injection types.
 
 **Note:** Because Cora AI is self-hosted, physical and network security of the deployment machine is the operator's responsibility. We recommend running the application behind a reverse proxy with TLS encryption if exposed to a network.
 
