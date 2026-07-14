@@ -23,6 +23,7 @@ from .route_processor_utils import (
     clean_source_display_name,
     compute_merged_coverage_score,
     derive_web_timeout_ms,
+    extract_source_chunks,
     extract_source_titles,
     kb_top_relevance,
     normalize_sources,
@@ -194,6 +195,7 @@ class HybridRouteHandler:
                 self.validator, self.config,
                 original_query, result.get("answer", ""), log_tag="Hybrid",
                 source_titles=extract_source_titles(vector_results),
+                source_chunks=extract_source_chunks(vector_results),
             )
             if is_irrelevant:
                 web_usable = bool(web_results.get("answer")) and not web_results.get("timed_out")

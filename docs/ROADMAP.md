@@ -8,6 +8,57 @@ the design.
 
 ## Active Candidates
 
+### Retrieval-aware post-generation relevance judge
+
+**Status:** Deferred — not scheduled.
+**Owner:** Unassigned.
+**Target component:** `src/agents/validator.py`, `src/agents/route_processor_utils.py`, `src/agents/orchestrator_config.py`.
+
+#### Rationale
+
+The current Layer-4 relevance judge (`AnswerValidator.check_relevance`) receives only:
+
+- the original user query,
+- the generated answer,
+- an optional list of source document titles.
+
+It does **not** see the retrieved chunks. For VCM queries this is structurally unreliable:
+
+- Entity-dense queries (e.g., "What is VM0048?") have little lexical overlap with correct answers, so the judge flags correct answers as irrelevant.
+- Short queries produce high-confidence false negatives, triggering unnecessary web supplementation.
+- A lexical override guard was added to suppress these false negatives, but it is too broad: it also suppresses valid web fallbacks when the answer merely mentions the queried entity without actually answering the question (e.g., "Explain the VCS JNR framework." with no dedicated JNR document in the corpus).
+
+The judge is already running on `gemini-2.5-flash` (via OpenRouter), so model switching will not help. The fix must be architectural.
+
+#### Proposed redesign
+
+Replace the query-vs-answer surface check with a **retrieval-aware grounding check**:
+
+1. Pass the top-k retrieved chunks (or their concatenated text) into the relevance prompt.
+2. Ask the model: "Given these retrieved sources, does the answer address the user's query? Is the answer supported by the sources?"
+3. Return `is_relevant` only when the answer is both on-topic and grounded.
+4. Use this check as a **fallback trigger**, not a hard override.
+
+Optionally expose a config flag to disable the post-generation relevance check entirely, because `ENABLE_VALIDATION` currently controls only the grounding-validation step, not the web-supplement relevance check.
+
+#### Acceptance criteria
+
+- [ ] Relevance prompt includes top retrieved chunks, not just titles.
+- [ ] Unit tests cover: on-topic grounded answer (kept KB), off-topic answer (web supplement), answer that mentions entity but does not answer detail (web supplement).
+- [ ] Config flag exists to disable web-supplement relevance check without disabling grounding validation.
+- [ ] End-to-end verification on VM0048 definition, VCS JNR framework, and Article 6 queries shows expected route behavior.
+
+#### Trade-offs
+
+- **Pros:** Fewer false negatives on correct KB answers; fewer false positives from lexical overrides; judge evaluates actual grounding.
+- **Cons:** Higher token cost and latency (one extra full-context LLM call per KB/hybrid query); may still produce edge-case errors on ambiguous queries.
+
+#### Related documents
+
+- Investigation report: `docs/plans/pdf-prefix-in-citations.md`
+
+---
+
 ### Replace Docling with PaddleOCR; remove `local_vlm` mode
 
 **Status:** Planned — not yet scheduled.
@@ -18,21 +69,23 @@ the design.
 
 #### Rationale
 
-The current ingestion pipeline has three PDF conversion modes:
+The current ingestion pipeline has two PDF conversion modes:
 
-1. **`standard`** — Docling with `do_ocr=False`, `do_table_structure=False`
-   (disabled to keep memory low). Falls back to pypdfium2 text extraction on
-   any error. Produces no table structure, no formula recovery, no heading
-   detection beyond what pypdfium2 guesses.
-2. **`llm_api`** — Docling's `VlmPipeline` with `ApiVlmOptions` calling
-   Gemini/OpenAI. Good accuracy but requires a paid API key and depends on
-   Docling's VLM plumbing.
-3. **`local_vlm`** — Docling's `VlmPipeline` with Granite-Docling-258M.
-   Unusable: ~2 min/page on GPU, 10+ min/page on CPU, not ranked on
-   OmniDocBench, requires PyTorch+CUDA or Apple MLX.
+1. **`standard`** — Docling classical pipeline with OCR and table structure enabled
+   (`DOCUMENT_DOCLING_DO_OCR=True`, `DOCUMENT_DOCLING_DO_TABLES=True`, fast
+   TableFormer mode). It preserves headings, tables, and reading order locally
+   on CPU. Formula/picture enrichment remains off by default
+   (`DOCUMENT_DOCLING_DO_FORMULAS=False`).
+2. **`llm_api`** — Direct HTTP to an OpenAI-compatible endpoint (Gemini,
+   OpenAI, OpenRouter, or a local vLLM server). High accuracy on complex
+   layouts, images, and formulas; requires a paid API key or a self-hosted VLM.
 
-All three modes depend on Docling. Docling's OmniDocBench performance is the
-**worst in the entire benchmark** — Edit distance 0.589 (EN) / 0.909 (ZH),
+The legacy **`local_vlm`** mode has already been removed from the codebase.
+Attempting to use it raises a `ValueError` directing users to `standard` or
+`llm_api` instead.
+
+Both active modes still depend on Docling. Docling's OmniDocBench performance is
+the **worst in the entire benchmark** — Edit distance 0.589 (EN) / 0.909 (ZH),
 4x worse than PP-StructureV3 (0.145 / 0.206) and worse than every other
 pipeline tool and most VLMs tested.
 
@@ -43,16 +96,17 @@ CPU and produces structured Markdown with headings, tables, formulas, and
 reading order. It is the SOTA pipeline tool on OmniDocBench, beating MinerU,
 Mathpix, Marker, and Docling.
 
-The result is a **2-tier system**:
+The result is a **2-tier system** (after the migration):
 
 | Tier | Engine | Hardware | When |
 |---|---|---|---|
 | 1 (default) | PyMuPDF (born-digital) or PP-StructureV3 (scanned) | CPU only | Most VCM documents |
-| 2 (fallback) | `llm_api` (Gemini / OpenAI) | Any + API key | Reports with images, complex tables, formulas |
+| 2 (fallback) | `llm_api` (Gemini / OpenAI / local vLLM) | Any + API key or GPU | Reports with images, complex tables, formulas |
 
-`local_vlm` is removed entirely. Users who want a local VLM (e.g.
+`local_vlm` has already been removed. Users who want a local VLM (e.g.
 PaddleOCR-VL-1.6, 0.9B params, 2.1GB VRAM) can point `llm_api` at a local
-vLLM server via `OPENAI_BASE_URL` — a config change, not a code mode.
+vLLM server via the AI Model settings or `OPENAI_BASE_URL` — a config change,
+not a code mode.
 
 #### Accuracy comparison (OmniDocBench, independent — PaddleOCR 3.0 technical report)
 
@@ -111,29 +165,26 @@ All models combined are <100M parameters. First-run download is ~150MB.
 
 | | Current (Docling) | Proposed (PaddleOCR) |
 |---|---|---|
-| converter.py lines | 617 | ~200 (estimated) |
-| Conversion modes | 3 | 2 |
+| converter.py lines | ~607 | ~200 (estimated) |
+| Conversion modes | 2 (`standard`, `llm_api`) | 2 |
 | Docling-specific functions | 10 | 0 |
-| VLM-specific functions | 5 | 0 |
+| VLM-specific functions | 0 | 0 |
 | Platform branching (MLX/CUDA/CPU) | Yes | No (PaddlePaddle auto-detects) |
 | Retry session patching | Yes (patches Docling internals) | No |
-| pypdfium2 fallback | Yes (Docling crashes on memory) | No (PP-StructureV3 is lightweight) |
+| pypdfium2 fallback | No | No (PP-StructureV3 is lightweight) |
 
-#### Functions removed from converter.py
+#### Functions expected to be removed/rewritten in converter.py
 
-- `_select_granite_docling_spec` (lines 179-199)
-- `_convert_with_docling_standard` (lines 202-220)
-- `_convert_pdf_with_pypdfium2` (lines 222-251)
-- `_convert_with_docling_local_vlm` (lines 253-276)
-- `_convert_pdf_with_vlm` (lines 278-305)
-- `_detect_accelerator` (lines 352-370)
-- `_local_vlm_capabilities` (lines 372-396)
-- `_ensure_vlm_retry_session` (lines 466-515)
-- `_convert_pdf_with_llm` (lines 517-557) — replaced with direct HTTP call
-- `_build_standard_docling_converter` (lines 559-579)
-- `_docling_markdown` (lines 581-590)
-- `_docling_page_count` (lines 592-600)
-- `_docling_warnings` (lines 602-611)
+Current Docling-specific helpers that would be replaced:
+
+- `_convert_pdf_with_docling_standard` (standard-mode Docling PDF conversion)
+- `_docling_available` (Docling import/availability check)
+- `_recover_flattened_formulas` (kept only if PP-StructureV3 formula recovery is insufficient)
+- `_resolve_llm_provider` / `_extract_llm_choice_text` (kept for `llm_api` mode)
+- Any remaining Docling converter setup and markdown-extraction helpers
+
+The `llm_api` mode (`_convert_pdf_with_llm_api`) stays as the fallback tier and is
+not Docling-dependent.
 
 #### Architectural principle
 

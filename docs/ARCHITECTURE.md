@@ -78,15 +78,15 @@ startup
   ├─ run_migrations()              ← SQLite schema (synchronous, blocking)
   ├─ initialize_components()       ← async background task
   │    ├─ LangChainRetriever       ← connects to Qdrant
-  │    ├─ GeminiClient             ← validates API key lazily
-  │    ├─ StreamingRAGOrchestrator ← wires retriever + gemini + config
+  │    ├─ LLMClient                  ← GeminiClient or OpenAICompatibleClient, validated lazily
+  │    ├─ StreamingRAGOrchestrator ← wires retriever + LLM + config
   │    ├─ CitationManager
   │    ├─ AsyncQueryJobManager     ← starts N worker tasks
   │    └─ warmup_connections()     ← pre-warms Qdrant, Gemini, schema discovery, SQLite
   └─ /ready becomes 200 once initialization_complete
 ```
 
-Access in request handlers is via the module-level globals `retriever`, `gemini_client`, `rag_orchestrator`, `citation_manager` — **not** via FastAPI's `Depends`. This is intentional: the lifespan owns them, and handlers read the globals.
+Access in request handlers is via the module-level globals `retriever`, `llm_client`, `rag_orchestrator`, `citation_manager` — **not** via FastAPI's `Depends`. This is intentional: the lifespan owns them, and handlers read the globals. `get_gemini_client()` remains a backwards-compatible alias for `get_llm_client()`.
 
 ---
 
@@ -197,7 +197,7 @@ All external dependencies are swappable via env vars. The default stack uses hos
 | LLM | Gemini 2.5 Flash / Flash Lite | — (Gemini is currently the only LLM client) | `GEMINI_MODEL_MAIN`, `GEMINI_MODEL_LITE` |
 | Embeddings | Voyage `voyage-4-lite` (1024d) | Ollama `bge-large-en-v1.5` (1024d) | `EMBEDDING_PROVIDER` |
 | Reranker | Voyage `rerank-2.5` | `none` (skip reranking) | `RERANK_PROVIDER` |
-| Web search | Tavily | `none` (disables web route) | `SEARCH_PROVIDER` |
+| Web search | Tavily | `none` (answer only from local documents) | `SEARCH_PROVIDER`, `ENABLE_WEB_SEARCH` |
 
 > **Important:** `EMBEDDING_DIM` **must match** the Qdrant collection's vector size. Changing the embedding model requires re-ingesting the collection. There is no online re-ingestion path.
 
@@ -253,8 +253,8 @@ POST /v1/documents (conversion_mode: standard | llm_api)
        └─ storage.py                   ← SQLite document/job records
 ```
 
-- **Conversion modes:** `standard` (Docling classical, non-VLM pipeline — layout + OCR + table structure, free, CPU, ~1-2s/page on properly provisioned hardware, default for most users), `llm_api` (AI service, high accuracy — requires paid API key, direct HTTP call to OpenAI-compatible endpoint). Power users can point `llm_api` at a local vLLM server via `OPENAI_BASE_URL`.
-- **`standard` mode:** Docling's classical pipeline (layout model + RapidOCR + TableFormer in fast mode). No VLM is loaded — formula/picture enrichment are off by default. The `DocumentConverter` is a lifespan-managed lazy singleton (`get_docling_converter()`), built on first conversion so missing Docling never breaks startup. Docker images prebake ~700MB of models (layout 327MB + tableformer 342MB + RapidOCR 30MB) into the image at build time via `scripts/docker/download_docling_models.py` — only the models the standard route needs are included (VLM models like CodeFormulaV2 and picture classifier are skipped, saving ~610MB+). RapidOCR is configured for English (VCM docs are English; Docling's default is Chinese). Override with `DOCLING_ARTIFACTS_PATH` to use custom/newer models. PyMuPDF is no longer used for standard extraction — it remains for `llm_api` page rendering and the scanned-doc detection heuristic. Memory peaks ~2GB; `DOCUMENT_DOCLING_MAX_PAGES` bounds page count. Complex merged-cell/nested VCM tables degrade in Markdown — use `llm_api` for table-heavy docs.
+- **Conversion modes:** `standard` (Docling classical, non-VLM pipeline — layout + OCR + table structure, free, CPU, ~1-2s/page on properly provisioned hardware, default for most users) and `llm_api` (AI service, high accuracy — requires paid API key, direct HTTP call to OpenAI-compatible endpoint). The legacy `local_vlm` mode has been removed; power users can point `llm_api` at a local vLLM server via the AI Model settings or `OPENAI_BASE_URL`.
+- **`standard` mode:** Docling's classical pipeline (layout model + RapidOCR + TableFormer in fast mode). No VLM is loaded — formula/picture enrichment are off by default. The `DocumentConverter` is a lifespan-managed lazy singleton (`get_docling_converter()`), built on first conversion so missing Docling never breaks startup. Docker images prebake ~700MB of models (layout 327MB + tableformer 342MB + RapidOCR 30MB) into the image at build time via `scripts/docker/download_docling_models.py` — only the models the standard route needs are included (VLM models like CodeFormulaV2 and picture classifier are skipped, saving ~610MB+). RapidOCR is configured for English (VCM docs are English; Docling's default is Chinese). Override with `DOCLING_ARTIFACTS_PATH` to use custom/newer models. PyMuPDF is no longer used for standard extraction — it remains for `llm_api` page rendering and the scanned-doc detection heuristic. Memory peaks ~2GB; concurrent ingestion is capped by `DOCUMENT_INGESTION_CONCURRENCY`, and a per-document `DOCUMENT_DOCLING_TIMEOUT` (default 30 min) prevents runaway conversions. Complex merged-cell/nested VCM tables degrade in Markdown — use `llm_api` for table-heavy docs.
 - **Docling A/B benchmark (completed):** Defaults are locked to RapidOCR + fast table mode + OCR on, based on benchmarking against EasyOCR, OnnxTR, Tesseract, and PyMuPDF on VCM methodology documents (VM0001, 23 pages). Key findings:
   - **RapidOCR** won on footprint (232MB engine-only vs 598MB for EasyOCR, 2,163MB for OnnxTR) with within-2% speed of EasyOCR. No PyTorch dependency, no system binaries.
   - **Fast table mode** is 20% faster than accurate (3.39 vs 4.25 s/page) with identical heading/table detection on VCM docs. Both tableformer models ship in the same download, so no disk footprint difference.
@@ -264,6 +264,7 @@ POST /v1/documents (conversion_mode: standard | llm_api)
 - **`llm_api` provider requirements:** Sends one API call per PDF page, so a paid API key is required. If 429 errors occur, upgrade to a paid plan or use `standard` mode. See README.md for the provider comparison table.
 - **Concurrency:** `DOCUMENT_LLM_CONVERSION_CONCURRENCY` controls parallel page processing (default 5). Reduces conversion time significantly for large PDFs.
 - **Retry:** `tenacity` exponential backoff on the direct HTTP call for 429/5xx resilience (backoff 5s/10s/20s/40s, `DOCUMENT_LLM_CONVERSION_MAX_RETRIES`).
+- **Qdrant upsert batching:** `QDRANT_UPSERT_BATCH_SIZE` (default 1000) caps the number of points per Qdrant upsert request. This avoids oversized payloads and memory spikes when indexing documents that produce many chunks (e.g., 1000+ page PDFs).
 - **Re-ingestion requirement:** Changing `EMBEDDING_PROVIDER` or `EMBEDDING_DIM` requires clearing and re-uploading all documents. There is no online migration path.
 
 ---
@@ -312,7 +313,8 @@ All runtime configuration lives in `src/config.py` as a pydantic-settings `Setti
 |---|---|---|
 | `EMBEDDING_PROVIDER=ollama` | voyage | You want a fully offline stack |
 | `RERANK_PROVIDER=none` | voyage | You want to skip reranking (faster, lower quality) |
-| `SEARCH_PROVIDER=none` | tavily | You want to disable the web route entirely |
+| `ENABLE_WEB_SEARCH=false` | true | You want to disable the web route entirely |
+| `SEARCH_PROVIDER=none` | tavily | You want to leave the web-search slot unconfigured |
 | `ASYNC_QUERY_WORKERS` | 1 | You want concurrent long-query handling |
 | `QDRANT_MAX_CONCURRENCY` | 5 | You're hitting Qdrant connection limits |
 | `ENABLE_VALIDATION` | False | You need grounding checks and can tolerate extra latency |

@@ -136,9 +136,11 @@ const FILE_EXT_BLACKLIST = new Set([
       if (typeof detail !== 'object' || detail === null) continue;
       const d = detail as CitationDetailShape;
 
-      // Backend now automatically URL-decodes and strips file extensions
-      // We only do minimal path cleaning for display purposes
-      const sourceName = decodeSourceLabel(toStringValue(d.source_name).replace(/^data[\\/]/, '').trim());
+      // Backend now automatically URL-decodes, strips file extensions, and
+      // removes search-engine prefixes (e.g. [PDF]). We only do minimal path
+      // cleaning for display purposes.
+      const sourceName = decodeSourceLabel(toStringValue(d.source_name).replace(/^data[\\/]/, '').trim())
+        .replace(/\.(?:pdf|docx?|txt|md|html?)$/i, '');
       const sourceType = toStringValue(d.source_type).toLowerCase();
       const explicitUrl = toStringValue(d.url);
       const snippetText = toStringValue(d.snippet);
@@ -202,7 +204,8 @@ const FILE_EXT_BLACKLIST = new Set([
         }
         const label = isWeb
           ? extractDomain(sourceText)
-          : decodeSourceLabel(sourceText).replace(/^data[\\/]/, '').trim();
+          : decodeSourceLabel(sourceText).replace(/^data[\\/]/, '').trim()
+            .replace(/\.(?:pdf|docx?|txt|md|html?)$/i, '');
 
         let url: string | undefined;
         if (isWeb) {
@@ -224,9 +227,11 @@ const FILE_EXT_BLACKLIST = new Set([
 
       if (typeof source === 'object' && source !== null) {
         const src = source as Record<string, unknown>;
-        const sourceName = toStringValue(src.source_name ?? src.name ?? src.title ?? src.label)
-          .replace(/^data[\\/]/, '')
-          .trim();
+        const sourceName = decodeSourceLabel(
+          toStringValue(src.source_name ?? src.name ?? src.title ?? src.label)
+            .replace(/^data[\\/]/, '')
+            .trim()
+        ).replace(/\.(?:pdf|docx?|txt|md|html?)$/i, '');
         const sourceType = toStringValue(src.source_type ?? src.type).toLowerCase();
         const explicitUrl = toStringValue(src.url ?? src.link ?? src.href);
         const safeUrl = explicitUrl ? sanitizeUrl(explicitUrl) || undefined : undefined;

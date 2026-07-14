@@ -91,7 +91,9 @@ class FusionRetriever:
         sub_candidates = getattr(settings, "SUBQUERY_CANDIDATES", 15)
 
         # Build qdrant filter once
-        qdrant_filter = await self._build_fusion_filter(where, allow_unfiltered_fallback)
+        qdrant_filter, supported_filters = await self._build_fusion_filter(
+            where, allow_unfiltered_fallback
+        )
 
         # Run main query + sub-queries in parallel
         tasks = [self._dense_search(query, self.initial_candidates, qdrant_filter)]
@@ -112,6 +114,14 @@ class FusionRetriever:
                 if content_key not in seen_content:
                     seen_content[content_key] = len(merged)
                     merged.append((doc, score))
+
+        relaxed_fields: List[str] = []
+        if not merged and supported_filters and len(supported_filters) > 1:
+            relaxed = await self._filter_builder.relax_and_retry(
+                query, supported_filters, self.initial_candidates
+            )
+            if relaxed:
+                merged, relaxed_fields = relaxed
 
         if not merged:
             logger.info("Fusion retrieval: no candidates from any query")
@@ -153,7 +163,10 @@ class FusionRetriever:
 
         # Apply post-processing pipeline
         max_per_source = int(max(getattr(settings, "MAX_CHUNKS_PER_SOURCE", 5), 0))
-        return apply_post_processing(results, query, max_per_source)
+        results = apply_post_processing(results, query, max_per_source)
+        if relaxed_fields:
+            results["relaxed_fields"] = relaxed_fields
+        return results
 
     async def _build_fusion_filter(
         self,
@@ -162,13 +175,12 @@ class FusionRetriever:
     ):
         """Build a Qdrant filter for fusion retrieval, handling errors gracefully."""
         if not where:
-            return None
+            return None, None
 
         try:
-            qdrant_filter, _ = await self._filter_builder.build_validated_filter(
+            return await self._filter_builder.build_validated_filter(
                 where, allow_unfiltered_fallback
             )
-            return qdrant_filter
         except Exception as e:
             if allow_unfiltered_fallback:
                 logger.warning(
@@ -176,7 +188,7 @@ class FusionRetriever:
                     "continuing with unfiltered search. error=%s",
                     e,
                 )
-                return None
+                return None, None
             logger.error(
                 "Filter build failed for fusion retrieval and was blocked (fail-closed). "
                 "allow_unfiltered_fallback=False error=%s",

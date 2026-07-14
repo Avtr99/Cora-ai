@@ -22,10 +22,15 @@ SOURCE_SNIPPET_MAX_CHARS = 1500
 ANSWER_VALIDATION_MAX_CHARS = 2000
 RELEVANCE_QUERY_MAX_CHARS = 500
 MAX_SOURCE_TITLES = 5
+RELEVANCE_SOURCE_SNIPPET_MAX_CHARS = 1600
+MAX_RELEVANCE_SOURCE_CHUNKS = 10
 
 
-VALIDATION_INSTRUCTIONS = """You are a fact-checking assistant. Validate if the answer is grounded in the provided sources.
+VALIDATION_INSTRUCTIONS = """<system_role>
+You are a fact-checking assistant. Validate if the answer is grounded in the provided sources.
+</system_role>
 
+<instructions>
 Check:
 1. Are the claims in the answer supported by the sources?
 2. Are there any hallucinations or unsupported claims?
@@ -38,24 +43,25 @@ Return ONLY a JSON object:
     "unsupported_claims": ["list of claims not in sources"],
     "suggestions": "how to improve the answer if needed"
 }}
+</instructions>
 """
 
-RELEVANCE_CHECK_PROMPT = """You are a relevance checker. Determine whether the answer directly addresses the user's query.
+RELEVANCE_CHECK_PROMPT = """<system_role>
+You are a retrieval-aware relevance judge. Given the retrieved source chunks below, determine whether the answer directly addresses the user's query and is supported by those sources.
+</system_role>
 
-User Query: {query}
+<instructions>
+Follow this procedure:
+1. Identify the main subject and intent of the user query (the specific topic, entity, mechanism, policy, or concept being asked about).
+2. Check whether the answer actually answers the user's query, not merely mentions the same entity or topic.
+3. Check whether the answer's main claims are grounded in the retrieved source chunks. The answer does not need to quote the chunks verbatim; a faithful summary or paraphrase is acceptable.
+4. "is_relevant" is true if the answer is on-topic AND its main claims are supported by the retrieved sources. Minor details or background context not present in the source chunks do not make the answer irrelevant.
 
-Answer: {answer}
-{sources_section}Follow this procedure:
-1. Identify the main subject and intent of the user query (the specific topic, entity, document, concept, mechanism, or policy being asked about).
-2. Identify the main subject of the answer.
-3. Compare them: "is_relevant" is true ONLY if the answer directly addresses the query's subject and intent.
-
-Answer "is_relevant": false if ANY of these are true:
-- The answer's main subject is a different topic, entity, or document than what the query asks about.
-- The answer does not contain the key terms, entities, or concepts from the query.
+Answer "is_relevant": false only if one of these is true:
+- The answer's main subject is different from the query's subject or intent.
+- The answer only mentions the queried entity but does not explain or answer the requested detail.
+- The answer's main factual claims are not supported by the retrieved source chunks.
 - The answer says the information is "not available", "not found", "does not contain", or similar.
-
-Note: if the query explicitly names a specific entity, code, or document and the answer describes that same entity, code, or document, the answer IS relevant.
 
 Return ONLY a JSON object:
 {{
@@ -63,6 +69,15 @@ Return ONLY a JSON object:
     "confidence": 0.0-1.0,
     "reason": "brief explanation"
 }}
+</instructions>
+
+<user_query>
+User Query: {query}
+
+Answer: {answer}
+
+{sources_section}
+</user_query>
 """
 
 
@@ -149,8 +164,10 @@ class AnswerValidator:
             truncated_answer = answer[:ANSWER_VALIDATION_MAX_CHARS]
             base_prompt = (
                 f"{VALIDATION_INSTRUCTIONS}\n\n"
+                f"<user_query>\n"
                 f"Sources:\n{sources_text}\n\n"
-                f"Answer to validate:\n{truncated_answer}"
+                f"Answer to validate:\n{truncated_answer}\n"
+                f"</user_query>"
             )
 
             settings = get_settings()
@@ -171,13 +188,17 @@ class AnswerValidator:
             )
             
             result = self._parse_response(result_text)
-            logger.debug(f"Validation result: grounded={result['is_grounded']}, confidence={result['confidence']}")
+            logger.debug(
+                "Validation result: grounded=%s confidence=%s",
+                result["is_grounded"],
+                result["confidence"],
+            )
             
             return result
             
         except Exception as e:
             # SECURITY: Fail-closed behavior - validation errors should not assume grounded
-            logger.error(f"Validation failed: {e}", exc_info=True)
+            logger.error("Validation failed: %s", e, exc_info=True)
             return {
                 "is_grounded": False,  # Fail-closed: assume not grounded on error
                 "confidence": 0.0,  # Zero confidence on validation failure
@@ -215,7 +236,7 @@ class AnswerValidator:
             
         except (json.JSONDecodeError, KeyError, ValueError) as e:
             # SECURITY: Fail-closed - parse errors should not assume grounded
-            logger.warning(f"Failed to parse validation response: {e}")
+            logger.warning("Failed to parse validation response: %s", e)
             return {
                 "is_grounded": False,  # Fail-closed: cannot trust unparseable response
                 "confidence": 0.0,  # Zero confidence on parse failure
@@ -273,7 +294,7 @@ class AnswerValidator:
 
         except Exception as e:
             # SECURITY: Fail-closed — any error means we cannot trust the check.
-            logger.error(f"quick_check failed: {e}", exc_info=True)
+            logger.error("quick_check failed: %s", e, exc_info=True)
             return False
 
     async def check_relevance(
@@ -281,20 +302,25 @@ class AnswerValidator:
         query: str,
         answer: str,
         source_titles: Optional[List[str]] = None,
+        source_chunks: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """
         Check if the answer is relevant to the user's query using LLM.
-        
-        This detects cases where wrong documents were retrieved and the answer
-        doesn't actually address what the user asked.
-        
+
+        This is a retrieval-aware check: the judge sees the actual retrieved
+        source chunks, not just titles, so it can decide whether the answer is
+        both on-topic and grounded in the sources.
+
         Args:
             query: Original user query
             answer: Generated answer to check
             source_titles: Optional titles of the retrieved source documents
                 the answer was grounded in; gives the judge context about what
                 the answer is based on.
-            
+            source_chunks: Optional list of retrieved source chunk texts.
+                When provided, these are embedded in the prompt so the judge
+                can verify that the answer is actually supported by the KB.
+
         Returns:
             Dict with is_relevant, confidence, reason
         """
@@ -306,34 +332,52 @@ class AnswerValidator:
                 "reason": "Answer too short to evaluate",
                 "skipped": True
             }
-        
+
         try:
-            sources_section = ""
+            source_parts = []
+            if source_chunks:
+                chunk_text = "\n\n".join(
+                    str(chunk)[:RELEVANCE_SOURCE_SNIPPET_MAX_CHARS]
+                    for chunk in source_chunks[:MAX_RELEVANCE_SOURCE_CHUNKS]
+                    if chunk
+                )
+                if chunk_text:
+                    source_parts.append(
+                        f"Retrieved source chunks the answer should be grounded in:\n\n{chunk_text}"
+                    )
+
             if source_titles:
                 titles = "\n".join(f"- {t[:150]}" for t in source_titles[:MAX_SOURCE_TITLES] if t)
                 if titles:
-                    sources_section = (
-                        f"\nSource documents the answer was grounded in:\n{titles}\n"
-                    )
+                    source_parts.append(f"Source document titles:\n{titles}")
+
+            sources_section = ""
+            if source_parts:
+                sources_section = "\n" + "\n\n".join(source_parts) + "\n"
 
             prompt = RELEVANCE_CHECK_PROMPT.format(
                 query=query[:RELEVANCE_QUERY_MAX_CHARS],
-                answer=answer[:SOURCE_SNIPPET_MAX_CHARS],
+                answer=answer[:ANSWER_VALIDATION_MAX_CHARS],
                 sources_section=sources_section,
             )
-            
+
             result_text = await self.llm.generate_text(
                 prompt,
                 model=self.model_name_lite,
                 temperature=0.1,
                 top_p=0.8,
             )
-            
+
             result = self._parse_relevance_response(result_text)
-            logger.debug(f"Relevance check: relevant={result['is_relevant']}, confidence={result['confidence']}")
-            
+            logger.info(
+                "Relevance check: relevant=%s confidence=%s reason=%s",
+                result["is_relevant"],
+                result["confidence"],
+                result.get("reason", ""),
+            )
+
             return result
-            
+
         except Exception:
             logger.error("Relevance check failed", exc_info=True)
             return {
@@ -361,7 +405,7 @@ class AnswerValidator:
             }
             
         except (json.JSONDecodeError, KeyError, ValueError) as e:
-            logger.warning(f"Failed to parse relevance response: {e}")
+            logger.warning("Failed to parse relevance response: %s", e)
             return {
                 "is_relevant": True,  # Fail-open
                 "confidence": 0.5,

@@ -31,7 +31,7 @@ from __future__ import annotations
 
 import re
 from collections import Counter
-from typing import Any
+from typing import Any, Optional
 
 # ---------------------------------------------------------------------------
 # Universal front-matter / section headings that are not document titles.
@@ -97,7 +97,7 @@ def _truncate_title(text: str, max_len: int = _MAX_TITLE_LEN) -> str:
     return text[: max_len - 3] + "..."
 
 
-def _parse_heading(line: str) -> str | None:
+def _parse_heading(line: str) -> Optional[str]:
     """Extract heading text from a markdown heading or bold-as-title line.
 
     Returns the heading text without the leading # or ** markers, or None
@@ -154,7 +154,7 @@ def _is_copyright_line(line: str) -> bool:
     return any(lower.startswith(prefix) for prefix in _COPYRIGHT_PREFIXES)
 
 
-def _extract_first_heading(markdown: str) -> str | None:
+def _extract_first_heading(markdown: str) -> Optional[str]:
     """Read the first top-level (H1) heading of the markdown."""
     for line in markdown.split("\n")[:20]:
         match = _H1_RE.match(line.strip())
@@ -213,7 +213,7 @@ def _count_heading_occurrences(lines: list[str]) -> Counter[str]:
 def _collect_headings(
     lines: list[str],
     scan_limit: int,
-) -> tuple[list[tuple[int, str]], str | None]:
+) -> Optional[tuple[list[tuple[int, str]], str]]:
     """Collect heading candidates and the first substantial paragraph.
 
     Scans the first ``scan_limit`` lines, skipping code blocks, TOC labels,
@@ -222,7 +222,7 @@ def _collect_headings(
     paragraph after the first heading, if any.
     """
     early_headings: list[tuple[int, str]] = []
-    first_substantial_paragraph: str | None = None
+    first_substantial_paragraph: Optional[str] = None
     in_code_block = False
 
     for i, raw_line in enumerate(lines[:scan_limit]):
@@ -273,7 +273,7 @@ def _find_doc_id_title(
     doc_id: str,
     heading_counts: Counter[str],
     lines: list[str],
-) -> str | None:
+) -> Optional[str]:
     """Find a title using the known document ID.
 
     Looks for the first early heading that contains the doc_id, then scans the
@@ -334,7 +334,7 @@ def _select_best_headings(
 def _combine_identifier(
     first: str,
     candidate_headings: list[tuple[int, str]],
-    first_substantial_paragraph: str | None,
+    first_substantial_paragraph: Optional[str],
 ) -> str:
     """Build a fuller title from a short identifier + subtitle or paragraph."""
     for _, subsequent in candidate_headings[1:]:
@@ -356,7 +356,7 @@ def _combine_identifier(
     return first
 
 
-def _extract_content_title(markdown: str, doc_id: str | None = None) -> str | None:
+def _extract_content_title(markdown: str, doc_id: Optional[str] = None) -> Optional[str]:
     """Extract a readable title from the document body.
 
     Uses three domain-agnostic signals:
@@ -404,7 +404,7 @@ def _extract_content_title(markdown: str, doc_id: str | None = None) -> str | No
 
 def _build_display_title(
     metadata: dict[str, Any],
-    content_title: str | None,
+    content_title: Optional[str],
     filename: str,
 ) -> str:
     """Build the best human-readable title from metadata, content, and filename."""

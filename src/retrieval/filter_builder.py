@@ -171,7 +171,12 @@ class QdrantFilterBuilder:
         *allowed_relax_fields* are eligible for dropping. Returns the first non-empty
         result set along with the list of relaxed field names, or None if all retries fail.
         """
-        allowed = allowed_relax_fields or _LOW_PRODUCTIVITY_FILTER_FIELDS
+        if allowed_relax_fields is not None:
+            allowed = allowed_relax_fields
+        elif "document_id" in supported_filters:
+            allowed = set(supported_filters) - {"document_id"}
+        else:
+            allowed = _LOW_PRODUCTIVITY_FILTER_FIELDS
 
         # Sort filter items: low-productivity fields are dropped first.
         filter_items = sorted(

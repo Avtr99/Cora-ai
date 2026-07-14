@@ -468,7 +468,11 @@ async def serve_spa(full_path: str):
     # Fallback to index.html for React routing
     index_path = os.path.join(public_dir, "index.html")
     if os.path.exists(index_path):
-        return FileResponse(index_path)
+        response = FileResponse(index_path)
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+        return response
 
     return ORJSONResponse(content={"error": "Not Found"}, status_code=404)
 

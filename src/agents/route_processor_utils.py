@@ -38,12 +38,13 @@ def clean_source_display_name(source_name: str) -> str:
 
     # URL-decode first so %20 becomes a space before further cleaning.
     decoded = source_name
-    for _ in range(2):
+    for _ in range(8):
         next_decoded = unquote(decoded)
         if next_decoded == decoded:
             break
         decoded = next_decoded
     source_name = decoded
+
 
     # Remove path prefixes
     if "/" in source_name:
@@ -367,6 +368,44 @@ def extract_source_titles(
     return titles
 
 
+def extract_source_chunks(
+    vector_results: Dict[str, Any],
+    max_chunks: int = 10,
+    max_chars_per_chunk: int = 1600,
+) -> List[str]:
+    """Extract the top retrieved source chunk texts from vector results.
+
+    Used as evidence for the retrieval-aware relevance judge. Each chunk is
+    prefixed with its source name (when available) and truncated to keep the
+    relevance prompt within the model's context budget.
+
+    Args:
+        vector_results: Retrieval results with "documents" and "metadatas" lists.
+        max_chunks: Maximum number of chunks to return.
+        max_chars_per_chunk: Maximum characters per chunk.
+
+    Returns:
+        List of formatted source chunk strings (may be empty).
+    """
+    documents = vector_results.get("documents", []) or []
+    metadatas = vector_results.get("metadatas", []) or []
+    chunks: List[str] = []
+    for i, doc in enumerate(documents[:max_chunks]):
+        if not doc:
+            continue
+        text = str(doc)[:max_chars_per_chunk]
+        metadata = metadatas[i] if i < len(metadatas) else {}
+        source_name = ""
+        if isinstance(metadata, dict):
+            source_name = source_name_from_metadata(metadata, fallback="")
+            source_name = clean_source_display_name(source_name)
+        prefix = f"Source {i + 1}"
+        if source_name:
+            prefix += f" ({source_name})"
+        chunks.append(f"{prefix}:\n{text}")
+    return chunks
+
+
 async def check_answer_relevance(
     validator: Any,
     config: Any,
@@ -374,8 +413,9 @@ async def check_answer_relevance(
     answer: str,
     log_tag: str = "KB",
     source_titles: Optional[List[str]] = None,
+    source_chunks: Optional[List[str]] = None,
 ) -> tuple[bool, str]:
-    """Run the LLM relevance check on a generated answer.
+    """Run the retrieval-aware LLM relevance check on a generated answer.
 
     Shared by the sync KB handler, hybrid handler, and streaming non-stream
     fallback. Returns ``(is_irrelevant, reason)``: when ``is_irrelevant`` is
@@ -383,36 +423,58 @@ async def check_answer_relevance(
     conclusive when the validator's confidence is at or above
     ``config.web_supplement_relevance_confidence_threshold``.
 
+    The relevance check can be disabled with ``config.enable_web_supplement_relevance_check``
+    without affecting the separate grounding-validation step.
+
     Args:
         validator: Object implementing ``check_relevance(query, answer)``.
         config: OrchestratorConfig (or compatible) with the confidence
-            threshold attribute.
+            threshold and enable flags.
         query: Original user query.
         answer: Generated answer text to validate.
         log_tag: Short label for log messages (e.g. "KB", "Hybrid", "Streaming").
         source_titles: Optional titles of the retrieved documents the answer
             was grounded in, passed to the validator for extra context.
+        source_chunks: Optional list of retrieved source chunk texts. When
+            provided, these are passed to the validator so the judge can verify
+            that the answer is supported by the KB.
 
     Returns:
         ``(True, reason)`` if the answer is irrelevant with high confidence,
         ``(False, "")`` otherwise (including when the validator is missing,
-        returns a non-dict, or raises).
+        the check is disabled, returns a non-dict, or raises).
     """
+    if not getattr(config, "enable_web_supplement_relevance_check", True):
+        logger.debug("Web supplement relevance check disabled by config")
+        return False, ""
+
     if not validator:
         return False, ""
 
     try:
+        kwargs: Dict[str, Any] = {}
+        if source_titles:
+            kwargs["source_titles"] = source_titles
+        if source_chunks:
+            kwargs["source_chunks"] = source_chunks
+
         try:
-            relevance_result = await validator.check_relevance(
-                query, answer, source_titles=source_titles,
-            )
+            relevance_result = await validator.check_relevance(query, answer, **kwargs)
         except TypeError:
-            # Validator implementation without source_titles support.
-            relevance_result = await validator.check_relevance(query, answer)
+            # Validator implementation does not accept source_chunks; try source_titles only.
+            kwargs.pop("source_chunks", None)
+            try:
+                relevance_result = await validator.check_relevance(query, answer, **kwargs)
+            except TypeError:
+                # Validator implementation does not accept source_titles either.
+                kwargs.pop("source_titles", None)
+                relevance_result = await validator.check_relevance(query, answer, **kwargs)
+
         if not isinstance(relevance_result, dict):
             logger.debug(
                 "Skipping relevance check (%s): non-dict response type %s",
-                log_tag, type(relevance_result).__name__,
+                log_tag,
+                type(relevance_result).__name__,
             )
             return False, ""
 
@@ -420,12 +482,18 @@ async def check_answer_relevance(
         threshold = float(
             getattr(config, "web_supplement_relevance_confidence_threshold", 0.8)
         )
-        if not relevance_result.get("is_relevant", True) and confidence >= threshold:
-            reason = relevance_result.get("reason", "Answer not relevant")
-            logger.info(
-                "%s answer failed relevance check (confidence=%.2f): %s",
-                log_tag, confidence, reason,
-            )
+        is_relevant = bool(relevance_result.get("is_relevant", True))
+        reason = relevance_result.get("reason", "Answer not relevant")
+        logger.info(
+            "%s relevance check: is_relevant=%s confidence=%.2f threshold=%.2f reason=%s",
+            log_tag,
+            is_relevant,
+            confidence,
+            threshold,
+            reason,
+        )
+        if not is_relevant and confidence >= threshold:
+            logger.info("%s answer failed relevance check: %s", log_tag, reason)
             return True, reason
     except Exception as e:
         logger.warning("Relevance check error (%s): %s", log_tag, e)

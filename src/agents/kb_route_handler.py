@@ -20,6 +20,7 @@ from .reasoning_formatter import AgentStep
 from .route_processor_utils import (
     check_answer_relevance,
     clean_source_display_name,
+    extract_source_chunks,
     extract_source_titles,
     kb_top_relevance,
     remaining_budget_ms,
@@ -351,9 +352,11 @@ class KBRouteHandler:
 
         if self.validator and self.config.enable_web_search:
             source_titles = extract_source_titles(vector_results) if vector_results else None
+            source_chunks = extract_source_chunks(vector_results) if vector_results else None
             is_irrelevant, reason = await check_answer_relevance(
                 self.validator, self.config, original_query, answer, log_tag="KB",
                 source_titles=source_titles,
+                source_chunks=source_chunks,
             )
             if is_irrelevant:
                 return True, reason

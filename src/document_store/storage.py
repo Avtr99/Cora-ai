@@ -5,7 +5,7 @@ import json
 import re
 import uuid
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Optional
 
 from fastapi import UploadFile
 
@@ -148,7 +148,7 @@ def allowed_extensions() -> set[str]:
     }
 
 
-def normalize_tags(raw_tags: Iterable[str] | None) -> list[str]:
+def normalize_tags(raw_tags: Optional[Iterable[str]]) -> list[str]:
     if raw_tags is None:
         return []
     tags: list[str] = []
@@ -162,7 +162,7 @@ def normalize_tags(raw_tags: Iterable[str] | None) -> list[str]:
     return tags[:20]
 
 
-def parse_tags(raw: str | None) -> list[str]:
+def parse_tags(raw: Optional[str]) -> list[str]:
     if not raw:
         return []
     try:
@@ -174,13 +174,13 @@ def parse_tags(raw: str | None) -> list[str]:
     return normalize_tags(part for part in raw.split(","))
 
 
-def safe_original_filename(filename: str | None) -> str:
+def safe_original_filename(filename: Optional[str]) -> str:
     fallback = "document"
     cleaned = _SAFE_FILENAME_CHARS.sub("_", (filename or fallback).strip()).strip("._")
     return cleaned or fallback
 
 
-def _validate_upload_mime(extension: str, first_chunk: bytes, declared_mime: str | None) -> None:
+def _validate_upload_mime(extension: str, first_chunk: bytes, declared_mime: Optional[str]) -> None:
     """Check that the uploaded file's magic bytes match its declared extension.
 
     ponytail: Uses python-magic if available; on import failure, skips validation
@@ -228,7 +228,7 @@ async def save_upload(file: UploadFile, conversion_mode: ConversionMode, tags: l
 
     digest = hashlib.sha256()
     size = 0
-    first_chunk: bytes | None = None
+    first_chunk: Optional[bytes] = None
     try:
         with original_path.open("wb") as handle:
             while True:
@@ -351,18 +351,18 @@ def insert_document(record: DocumentRecord) -> None:
 def update_document(
     record_id: str,
     *,
-    status: DocumentStatus | None = None,
-    converted_path: str | None = None,
-    chunk_count: int | None = None,
-    page_count: int | None = None,
-    warnings: list[str] | None = None,
-    error: str | None = None,
-    title: str | None = None,
-    registry: str | None = None,
-    category: str | None = None,
-    publisher: str | None = None,
-    document_id: str | None = None,
-    version_number: str | None = None,
+    status: Optional[DocumentStatus] = None,
+    converted_path: Optional[str] = None,
+    chunk_count: Optional[int] = None,
+    page_count: Optional[int] = None,
+    warnings: Optional[list[str]] = None,
+    error: Optional[str] = None,
+    title: Optional[str] = None,
+    registry: Optional[str] = None,
+    category: Optional[str] = None,
+    publisher: Optional[str] = None,
+    document_id: Optional[str] = None,
+    version_number: Optional[str] = None,
 ) -> DocumentRecord:
     """Update a document record.
 
@@ -441,7 +441,7 @@ def update_document(
     return record
 
 
-def get_document(document_id: str) -> DocumentRecord | None:
+def get_document(document_id: str) -> Optional[DocumentRecord]:
     conn = get_connection()
     try:
         row = conn.execute(
@@ -453,7 +453,7 @@ def get_document(document_id: str) -> DocumentRecord | None:
         conn.close()
 
 
-def get_document_including_deleted(document_id: str) -> DocumentRecord | None:
+def get_document_including_deleted(document_id: str) -> Optional[DocumentRecord]:
     """Return a document record regardless of status, or None if it does not exist."""
     conn = get_connection()
     try:
@@ -466,7 +466,7 @@ def get_document_including_deleted(document_id: str) -> DocumentRecord | None:
         conn.close()
 
 
-def find_by_sha256(sha256: str) -> DocumentRecord | None:
+def find_by_sha256(sha256: str) -> Optional[DocumentRecord]:
     """Return the first non-deleted document with the given SHA-256 hash, or None."""
     conn = get_connection()
     try:
@@ -479,7 +479,7 @@ def find_by_sha256(sha256: str) -> DocumentRecord | None:
         conn.close()
 
 
-def list_documents(status: str | None = None, extension: str | None = None, tag: str | None = None) -> list[DocumentRecord]:
+def list_documents(status: Optional[str] = None, extension: Optional[str] = None, tag: Optional[str] = None) -> list[DocumentRecord]:
     clauses = ["status != 'deleted'"]
     values: list[object] = []
     if status:
@@ -503,7 +503,7 @@ def list_documents(status: str | None = None, extension: str | None = None, tag:
         conn.close()
 
 
-def create_job(document_id: str, action: str, message: str | None = None) -> DocumentJob:
+def create_job(document_id: str, action: str, message: Optional[str] = None) -> DocumentJob:
     job = DocumentJob(
         id=f"job_{uuid.uuid4().hex[:16]}",
         document_id=document_id,
@@ -523,7 +523,7 @@ def create_job(document_id: str, action: str, message: str | None = None) -> Doc
     return job
 
 
-def update_job(job_id: str, status: JobStatus, message: str | None = None, error: str | None = None) -> None:
+def update_job(job_id: str, status: JobStatus, message: Optional[str] = None, error: Optional[str] = None) -> None:
     conn = get_connection()
     try:
         conn.execute(
@@ -539,7 +539,7 @@ def update_job(job_id: str, status: JobStatus, message: str | None = None, error
         conn.close()
 
 
-def get_job(job_id: str) -> DocumentJob | None:
+def get_job(job_id: str) -> Optional[DocumentJob]:
     conn = get_connection()
     try:
         row = conn.execute("SELECT * FROM document_store_jobs WHERE id = ?", (job_id,)).fetchone()

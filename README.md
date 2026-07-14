@@ -11,6 +11,10 @@
 [![SDG 13](https://img.shields.io/badge/SDG%2013-Climate%20Action-3F7E44)](https://sdgs.un.org/goals/goal13)
 [![SDG 4](https://img.shields.io/badge/SDG%204-Quality%20Education-C5192D)](https://sdgs.un.org/goals/goal4)
 
+<p align="center">
+  <img src="frontend/public/cora_socials.png" alt="Cora AI — explore the Voluntary Carbon Market" width="100%">
+</p>
+
 **An educational AI assistant for the Voluntary Carbon Market (VCM).**
 
 Cora simplifies complex topics on methodologies, pricing, and policies to reduce the
@@ -34,12 +38,13 @@ needed, owns its data, and can be adapted to any document domain beyond the VCM.
 If you are an AI agent (Claude Code, Cursor, Devin, etc.) working in this repo, start here:
 
 > Read this README and `.env.example` for full configuration. Setup: copy `.env.example`
-> → `.env` and fill in keys; start the stack with `docker-compose up -d --build` (includes
+> → `.env` and fill in keys; start the stack with `docker compose up -d --build` (includes
 > Qdrant) or run `python -m src.api.main` after starting Qdrant on `localhost:6333`. Build
 > the frontend with `cd frontend && npm run build`. Run tests with `pytest`, lint with
 > `ruff check src/`. Access settings via the `get_settings()` singleton — never read env
-> vars directly. All providers (LLM, embeddings, reranker, search) are pluggable; do not
-> introduce hard cloud dependencies.
+> vars directly. Configure the LLM provider in the `/setup` UI or by setting `GEMINI_API_KEY`,
+> `OPENAI_API_KEY`, or `OPENROUTER_API_KEY`. All providers (LLM, embeddings, reranker, search)
+> are pluggable; do not introduce hard cloud dependencies.
 
 ---
 
@@ -87,40 +92,45 @@ fits your budget, latency, and sovereignty requirements — from all-cloud to fu
 
 | Layer | Default | Alternatives | Config |
 |---|---|---|---|
-| **LLM** (answers, routing, rewriting) | Google Gemini (`gemini-2.5-flash`) | OpenAI `gpt-4.1-mini`, OpenRouter (any model), Ollama (local), any OpenAI-compatible endpoint (vLLM, LM Studio). Model name is configurable via `LLM_MODEL_MAIN` / `GEMINI_MODEL_MAIN`. | `LLM_PROVIDER`, `LLM_BASE_URL`, `LLM_MODEL_MAIN` |
+| **LLM** (answers, routing, rewriting) | Google Gemini (`gemini-2.5-flash`) | OpenAI `gpt-4.1-mini`, OpenRouter (any model), Ollama / vLLM / LM Studio (local). Override Gemini models with `GEMINI_MODEL_MAIN` / `GEMINI_MODEL_LITE`; set local/base URL and model through the `/setup` UI. | `GEMINI_API_KEY`, `OPENAI_API_KEY`, `OPENROUTER_API_KEY` |
 | **Embeddings** | Voyage AI (`voyage-4-lite`, 1024d) | Cohere `embed-v4.0`, OpenAI `text-embedding-3-small`, Ollama (`bge-large-en-v1.5`, `nomic-embed-text`, …). The Voyage 4 series (`voyage-4-large`, `voyage-4`, `voyage-4-lite`, `voyage-4-nano`) shares one embedding space, so you can mix models without re-indexing. | `EMBEDDING_PROVIDER`, `EMBEDDING_MODEL`, `EMBEDDING_DIM` |
 | **Reranker** | Voyage AI (`rerank-2.5`) | Cohere rerank models, `none` (skip — fully offline) | `RERANK_PROVIDER`, `RERANK_MODEL` |
-| **Web search** | Tavily | `none` (answer only from local documents) | `SEARCH_PROVIDER` |
-| **Vector store** | Qdrant (local Docker) | Any Qdrant instance (local or remote) | `QDRANT_URL` |
-| **PDF conversion** | Docling classical pipeline (local, CPU) | `llm_api` AI service (Gemini / GPT-4.1-mini / local vLLM) | `DOCUMENT_DEFAULT_CONVERSION_MODE` |
+| **Web search** | Tavily | `none` (answer only from local documents) | `SEARCH_PROVIDER`, `ENABLE_WEB_SEARCH` |
+| **Vector store** | Qdrant (local Docker) | Any Qdrant instance (local or remote) | `QDRANT_URL`, `QDRANT_COLLECTION_NAME` |
+| **PDF conversion** | Docling classical pipeline (local, CPU) | `llm_api` AI service (Gemini / GPT-4.1-mini / local vLLM). Set per document via API (`conversion_mode: standard | llm_api`). | `DOCUMENT_DOCLING_*`, `DOCUMENT_LLM_*` |
 
 ### Example configurations
 
 **Gemini + Voyage + Tavily (default, lowest friction):**
 ```env
-LLM_PROVIDER=gemini
 GEMINI_API_KEY=...
 VOYAGE_API_KEY=...
 TAVILY_API_KEY=...
 ```
 
-**OpenAI GPT-4.1-mini via OpenRouter (multi-provider routing):**
+**OpenAI GPT-4.1-mini:**
 ```env
-LLM_PROVIDER=openai_compatible
-LLM_BASE_URL=https://openrouter.ai/api/v1
-LLM_API_KEY=...
-LLM_MODEL_MAIN=openai/gpt-4.1-mini
+OPENAI_API_KEY=...
+VOYAGE_API_KEY=...
+TAVILY_API_KEY=...
 ```
-OpenRouter exposes hundreds of models behind one OpenAI-compatible endpoint. Browse the full
-catalog at https://openrouter.ai/models — the model slug is the provider-prefixed ID shown
-there (e.g. `openai/gpt-4.1-mini`). Model availability changes frequently, so pick a current
-slug from the catalog rather than relying on a fixed example.
+When `OPENAI_API_KEY` is set, the backend defaults to the official OpenAI endpoint and the
+`gpt-4.1-mini` model. You can override the endpoint or model via **Settings → AI Model** in the UI.
+
+**OpenRouter (multi-provider routing):**
+```env
+OPENROUTER_API_KEY=...
+VOYAGE_API_KEY=...
+TAVILY_API_KEY=...
+```
+OpenRouter is auto-detected and defaults to `google/gemini-2.5-flash`. You can switch to any
+OpenRouter model through **Settings → AI Model** in the UI. Browse the full catalog at
+https://openrouter.ai/models — the model slug is the provider-prefixed ID shown there
+(e.g. `openai/gpt-4.1-mini`). Model availability changes frequently, so pick a current slug
+from the catalog rather than relying on a fixed example.
 
 **Fully offline (no API keys, no data leaves the machine):**
 ```env
-LLM_PROVIDER=openai_compatible
-LLM_BASE_URL=http://localhost:11434/v1      # Ollama
-LLM_MODEL_MAIN=llama3.1
 EMBEDDING_PROVIDER=ollama
 OLLAMA_BASE_URL=http://localhost:11434
 EMBEDDING_MODEL=bge-large-en-v1.5
@@ -128,14 +138,15 @@ EMBEDDING_DIM=1024
 RERANK_PROVIDER=none
 SEARCH_PROVIDER=none
 ```
+For the LLM, configure Ollama in the **Settings → AI Model** UI (no API key needed).
 
 > **Note:** Changing `EMBEDDING_PROVIDER` or `EMBEDDING_DIM` requires clearing and
 > re-ingesting all documents, because the Qdrant collection vector size is fixed at creation.
 
-The LLM provider can also be configured at runtime through the in-app **Setup wizard**
-(`/setup`), which writes to SQLite and takes precedence over `.env`. If both Gemini and an
-OpenAI-compatible key are configured, Cora automatically falls back to the alternate provider
-on 429 / quota errors — no manual intervention required.
+The LLM provider is selected at runtime through the in-app **Setup wizard** (`/setup`), which
+writes to SQLite and takes precedence over `.env`. If multiple providers are configured
+(e.g. `GEMINI_API_KEY` + `OPENAI_API_KEY`), Cora automatically falls back to the alternate
+provider on 429 / quota errors — no manual intervention required.
 
 ### Recommended setup
 
@@ -147,7 +158,7 @@ stack and adjust only when you hit a limit or need offline operation.
 | **General Q&A on text-based VCM PDFs** (methodologies, standards, project docs) | Gemini 2.5 Flash + Voyage `voyage-4-lite` embeddings + Voyage `rerank-2.5` + `standard` Docling ingestion | Gemini 2.5 Flash is the deliberate default — strong quality at low cost with reliable rate limits; Voyage gives strong retrieval quality at low cost; Docling's classical pipeline handles text + tables locally and free. |
 | **Complex layouts** (scanned pages, dense charts, formulas, image-heavy reports) | Same as above, but ingest with `llm_api` mode (Gemini 2.5 Flash or GPT-4.1-mini) | The AI conversion service recovers structure that classical OCR misses, at ~$0.002/page. | (Paid API Key recommended)
 | **Strict data sovereignty / no external calls** | Ollama LLM + Ollama `bge-large-en-v1.5` embeddings + `RERANK_PROVIDER=none` + `SEARCH_PROVIDER=none` + `standard` Docling ingestion | Nothing leaves the machine. Requires a machine with enough RAM for the chosen model. |
-| **Multi-model routing / cost optimization** | OpenRouter as the LLM provider | One API key, one endpoint, hundreds of models — switch models by changing `LLM_MODEL_MAIN` only. |
+| **Multi-model routing / cost optimization** | OpenRouter as the LLM provider | One API key, one endpoint, hundreds of models — switch models in the AI Model settings. |
 
 **Gemini free tier note:** Google AI Studio offers a free tier for Gemini models, but its
 rate limits are too low for RAG workloads — document ingestion and multi-turn querying will
@@ -184,6 +195,9 @@ AI Studio or use openrouter or switch to a local Ollama LLM for a no-cost, no-ra
   long-running queries.
 - **Citations & provenance.** Every KB answer links back to the source chunk; an HTML
   sanitizer (`nh3`) keeps rendered citations safe.
+- **Transparent reasoning chain.** Every response includes `reasoning_steps`, `route`,
+  `route_confidence`, `confidence`, and `sources`, so users can see exactly how the
+  answer was produced and which data source was used.
 - **Relevance defense chain.** A four-layer filter (rerank floor → pre-generation gate →
   prompt instruction → post-generation LLM check) prevents confident-but-wrong answers.
 
@@ -400,12 +414,13 @@ every option. The most important ones:
 
 | Variable | Why you need it |
 |---|---|
-| `LLM_PROVIDER` | `gemini` (default) or `openai_compatible`. |
-| `GEMINI_API_KEY` | Required when `LLM_PROVIDER=gemini`. |
-| `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL_MAIN` | Required when `LLM_PROVIDER=openai_compatible`. |
-| `EMBEDDING_PROVIDER` | `voyage` (default), `cohere`, `ollama`, or `openai`. |
+| `GEMINI_API_KEY` | Use Google Gemini (default). Models configurable via `GEMINI_MODEL_MAIN` / `GEMINI_MODEL_LITE`. |
+| `OPENAI_API_KEY` | Use the OpenAI API. Defaults to `gpt-4.1-mini`; override model/base URL in the AI Model settings. |
+| `OPENROUTER_API_KEY` | Use OpenRouter. Defaults to `google/gemini-2.5-flash`; switch models in the AI Model settings. |
+| `EMBEDDING_PROVIDER` | `voyage` (default), `cohere`, `openai`, or `ollama` (local). |
 | `RERANK_PROVIDER` | `voyage` (default), `cohere`, or `none`. |
-| `SEARCH_PROVIDER` | `tavily` (default) or `none`. |
+| `SEARCH_PROVIDER` | `tavily` (default) or `none`. Also set `ENABLE_WEB_SEARCH=false` to disable web search entirely. |
+| `QDRANT_COLLECTION_NAME` | Name of the Qdrant collection. Default is `cora_dense_only`. |
 | `SECRET_KEY` | Signs conversation history and anonymizes memory user IDs. **Auto-generated on first run** and persisted to SQLite — no setup needed. Set it in `.env` only if you want your own key. |
 
 ### KB relevance thresholds (tunable, with per-collection overrides)

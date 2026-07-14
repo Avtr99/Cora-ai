@@ -3,6 +3,7 @@ Request/Response logging middleware with structured logging and request ID track
 Uses loguru for structured logging output.
 """
 import asyncio
+import logging
 import time
 import uuid
 from typing import Callable, Optional
@@ -13,6 +14,32 @@ from starlette.responses import Response
 from loguru import logger
 import sys
 from contextvars import ContextVar
+
+
+class InterceptHandler(logging.Handler):
+    """Intercept stdlib logging records and forward them to loguru.
+
+    This ensures modules that still use the standard ``logging`` module have
+    their output visible alongside the structured loguru logs.
+    """
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            level = logger.level(record.levelname).name
+        except ValueError:
+            level = record.levelno
+
+        # Patch the loguru record with the original stdlib caller location so
+        # the module/function/line in the output point to the actual source
+        # file instead of the stdlib logging internals.
+        def _patch(record_dict: dict) -> None:
+            record_dict["module"] = record.module
+            record_dict["function"] = record.funcName
+            record_dict["line"] = record.lineno
+
+        logger.patch(_patch).opt(exception=record.exc_info).log(
+            level, record.getMessage()
+        )
 
 # Context variable for request ID (accessible throughout request lifecycle)
 request_id_ctx: ContextVar[Optional[str]] = ContextVar("request_id", default=None)
@@ -101,6 +128,12 @@ def configure_logging(
     
     # Bind default request_id
     logger.configure(extra={"request_id": "-"})
+
+    # Route standard-library logging through loguru so the many stdlib loggers
+    # in the codebase (agents, retrieval, etc.) are visible.
+    root = logging.getLogger()
+    root.handlers = [InterceptHandler()]
+    root.setLevel(getattr(logging, log_level.upper(), logging.INFO))
 
 
 class LoggingMiddleware(BaseHTTPMiddleware):

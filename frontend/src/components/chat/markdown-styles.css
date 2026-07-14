@@ -55,15 +55,15 @@
 }
 
 .markdown-content h1 {
-  font-size: 1.25rem;
-}
-
-.markdown-content h2 {
   font-size: 1.125rem;
 }
 
-.markdown-content h3 {
+.markdown-content h2 {
   font-size: 1rem;
+}
+
+.markdown-content h3 {
+  font-size: 0.875rem;
   font-family: 'Inter', sans-serif;
   font-weight: 500;
 }

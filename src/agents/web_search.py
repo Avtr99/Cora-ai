@@ -241,7 +241,7 @@ You are a helpful assistant with access to web search results.
             self._cache_result(cache_key, result)
             return result
         except Exception as e:
-            logger.error(f"Web search failed: {e}")
+            logger.error("Web search failed: %s", e)
             return {"answer": "Web search is currently unavailable. Please try again or check that the Tavily API key is configured.", "sources": [], "truncated": True, "error": str(e)}
             
     async def search_with_kb_context(self, query: str, kb_context: str, kb_sources: List[str], timeout_ms: int | None = None) -> Dict[str, Any]:
@@ -328,7 +328,7 @@ You are an expert VCM assistant with access to web search results.
                 "timed_out": True,
             }
         except Exception as e:
-            logger.error(f"Web search with KB context failed: {e}")
+            logger.error("Web search with KB context failed: %s", e)
             return {
                 "answer": kb_fallback_snippet,
                 "sources": _kb_sources_to_dicts(kb_sources),

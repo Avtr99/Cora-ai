@@ -190,3 +190,19 @@ async def test_query_rewriter_without_chat_history(rewriter, mock_llm):
 
     assert result["rewritten_query"] == "What is the Voluntary Carbon Market?"
     assert "Voluntary Carbon Market" in result["rewritten_query"]
+
+
+@pytest.mark.asyncio
+async def test_rewriter_preserves_vcm_methodology_identifier(rewriter, mock_llm):
+    """The LLM must not 'correct' VMR0007 to VM0007 or otherwise alter the prefix."""
+    mock_llm.generate_text.return_value = (
+        '{"rewritten_query": "Verra methodology VM0007 baseline emissions calculation quantification", '
+        '"sub_queries": [], '
+        '"detected_intent": "methodology_research", '
+        '"corrections_made": []}'
+    )
+
+    result = await rewriter.rewrite("In VMR0007 how are baseline emissions calculated?")
+
+    assert "VMR0007" in result["rewritten_query"]
+    assert "Preserved exact VCM identifier(s) from original query" in result["corrections_made"]
