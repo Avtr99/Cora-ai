@@ -121,4 +121,11 @@ This Privacy Policy may be updated as the project evolves. Changes will be poste
 
 ## 10. Contact
 
-If you have questions about this Privacy Policy or how data is handled, please contact the operator of the Cora AI instance you are using. For questions about the project itself, refer to the project repository or contact `hello@cora-ai.org`.
+If you have questions about this Privacy Policy or how data is handled, please contact the operator of the Cora AI instance you are using:
+
+- **Controller name:** [CONTROLLER_NAME]
+- **Controller address:** [CONTROLLER_ADDRESS]
+- **Controller email:** [CONTROLLER_EMAIL]
+- **Controller phone (optional):** [CONTROLLER_PHONE]
+
+For questions about the project itself, refer to the project repository or contact `hello@cora-ai.org`.
