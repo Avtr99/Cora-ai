@@ -82,7 +82,7 @@ Cora AI implements the following security measures:
 - **Local storage:** All data remains on the operator's machine by default. No external databases or cloud services are required.
 - **PII redaction:** Automatic detection and redaction of personal identifiers before storage in conversation memory.
 - **HMAC-hashed user IDs:** User identifiers are hashed before being stored in the memory collection, pseudonymizing them and reducing direct linkability to individuals.
-- **API key isolation:** All API keys are stored in a local `.env` file that is gitignored and never committed to version control.
+- **API key isolation:** API keys are stored either in the gitignored local `.env` file or in the SQLite database used by the setup wizard. In both cases, operators should protect the file and any backups, and keys are never committed to version control.
 - **Optional API authentication:** The operator can enable API key authentication to restrict access to the service.
 - **Input sanitization:** HTML content in responses is sanitized via `nh3`. This does not protect against SQL, command, prompt, or other input-injection types.
 

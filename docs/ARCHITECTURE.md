@@ -206,10 +206,10 @@ All external dependencies are swappable via env vars. The default stack uses hos
 | Key | Required? | When |
 |---|---|---|
 | `GEMINI_API_KEY` | Only if the active LLM provider is Gemini | Default stack |
-| `OPENAI_API_KEY` | Only if the active LLM provider is OpenAI-compatible (OpenAI, Ollama, vLLM, etc.) | Optional |
+| `OPENAI_API_KEY` | Only if the active LLM provider is OpenAI-compatible. Required when the configured endpoint requires authentication; optional for local or unauthenticated endpoints (Ollama, vLLM, LM Studio, etc.) | Optional |
 | `OPENROUTER_API_KEY` | Only if the active LLM provider is OpenRouter | Optional |
 | `VOYAGE_API_KEY` | Only if `EMBEDDING_PROVIDER=voyage` or `RERANK_PROVIDER=voyage` | Default stack |
-| `TAVILY_API_KEY` | Only if `SEARCH_PROVIDER=tavily` and `ENABLE_WEB_SEARCH=true` | Default stack |
+| `TAVILY_API_KEY` | Required when `ENABLE_WEB_SEARCH=true` and `SEARCH_PROVIDER=tavily` or `SEARCH_PROVIDER=none` (the `none` setting falls back to Tavily when web search is enabled) | Default stack |
 | `COHERE_API_KEY` | Only if using Cohere for embed/rerank | Optional |
 | `SECRET_KEY` | **Auto-generated** | Signs conversation-history HMAC and pseudonymizes memory user IDs. Auto-generated on first run and persisted to SQLite. Set in `.env` only for multi-instance deployments that need to share signed history. |
 | `JWT_SECRET_KEY` | Only if auth endpoints are used | Optional |
@@ -262,7 +262,7 @@ POST /v1/documents (conversion_mode: standard | llm_api)
   - **OCR adds no value on born-digital VCM PDFs** (identical output with or without), but is kept on as a safety net for scanned pages.
   - **Formula enrichment VLM (CodeFormulaV2)** is not viable: 610MB model + PyTorch, crashes after 10 pages on machines with <4GB free RAM, and produces garbage LaTeX. Formulas are recovered as flattened text via `_recover_flattened_formulas` in `converter.py` instead.
   - **Total disk footprint:** 1,236MB (536MB packages + 700MB models). Full results: `results/docling_benchmark_full/COMPARISON.md`.
-- **`llm_api` provider requirements:** Sends one API call per PDF page, so a paid API key is required. If 429 errors occur, upgrade to a paid plan or use `standard` mode. See README.md for the provider comparison table.
+- **`llm_api` provider requirements:** Sends one API call per PDF page. Requires either a paid API key or a self-hosted OpenAI-compatible endpoint; self-hosted deployments do not require payment. If 429 errors occur with a paid service, upgrade to a paid plan or use `standard` mode. See README.md for the provider comparison table.
 - **Concurrency:** `DOCUMENT_LLM_CONVERSION_CONCURRENCY` controls parallel page processing (default 5). Reduces conversion time significantly for large PDFs.
 - **Retry:** `tenacity` exponential backoff on the direct HTTP call for 429/5xx resilience (backoff 5s/10s/20s/40s, `DOCUMENT_LLM_CONVERSION_MAX_RETRIES`).
 - **Qdrant upsert batching:** `QDRANT_UPSERT_BATCH_SIZE` (default 1000) caps the number of points per Qdrant upsert request. This avoids oversized payloads and memory spikes when indexing documents that produce many chunks (e.g., 1000+ page PDFs).
