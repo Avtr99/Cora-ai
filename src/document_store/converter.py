@@ -566,7 +566,7 @@ async def _convert_pdf_with_llm_api(path: Path) -> ConversionResult:
 
     for idx, result in enumerate(results):
         if isinstance(result, Exception):
-            logger.warning("llm_api conversion failed on page %d (%s)", idx + 1, type(result).__name__)
+            logger.warning("llm_api conversion failed on page {} ({})", idx + 1, type(result).__name__)
             warnings.append(f"Page {idx + 1}: AI conversion failed ({type(result).__name__}). Text may be missing.")
         elif result and result.strip():
             pages.append(result.strip())

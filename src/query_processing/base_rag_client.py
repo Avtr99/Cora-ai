@@ -169,9 +169,9 @@ class BaseRAGClient:
                 result,
                 ttl_seconds=getattr(settings, "CACHE_TTL_SECONDS", 86400),
             )
-            logger.debug("Persisted query result to SQLite cache: %s", query[:50])
+            logger.debug("Persisted query result to SQLite cache: {}", query[:50])
         except Exception as e:
-            logger.warning("Failed to persist query result to SQLite cache: %s", e)
+            logger.warning("Failed to persist query result to SQLite cache: {}", e)
 
     async def search_and_process(self, query: str, vector_results: Dict[str, Any]) -> Dict[str, Any]:
         """Full RAG pipeline: build prompt, generate answer, extract citations.

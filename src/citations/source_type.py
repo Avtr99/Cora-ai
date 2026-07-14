@@ -19,7 +19,7 @@ class SourceTypeResolver:
         # Treat the provider-specific "web_search" label the same as "web".
         # An explicit type from the source provider wins over URL-extension heuristics.
         if explicit_type in {"knowledge_base", "web", "web_search"}:
-            # ponytail: map provider-specific "web_search" to canonical "web".
+            # Map provider-specific "web_search" to canonical "web".
             return "web" if explicit_type == "web_search" else explicit_type
 
         for candidate in (
