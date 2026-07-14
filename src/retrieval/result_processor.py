@@ -13,6 +13,9 @@ from typing import Any, Dict, List
 
 logger = logging.getLogger(__name__)
 
+# Separators used to split methodology codes from descriptive filename titles.
+FILENAME_SEPARATOR_RE = re.compile(r"[-_.\s]+")
+
 METHODOLOGY_CODE_PATTERN = re.compile(
     r'\b(VM\d{4}|VMD\d{4}|ACM\d{4}|AMS-[IVX]+\.[A-Z]|CDM-[A-Z]+\d*|GS-[A-Z]+\d*|VT\d{4})\b',
     re.IGNORECASE
@@ -200,17 +203,20 @@ def boost_methodology_matches(
         """True when the basename without extension starts with the code.
 
         File names in the KB are long, hyphenated titles like
-        ``VM0048-Reducing-Emissions-...v1.0.pdf``. The first token is the
-        methodology code, so an exact match is too strict and lets the
-        primary document lose to a module such as VMD0055.
+        ``VM0048-Reducing-Emissions-...v1.0.pdf``. The leading methodology
+        code may itself contain hyphens (e.g. ``AMS-III.D`` or ``CDM-AM0010``),
+        so we compare the leading token sequence against the code instead of
+        splitting on the first separator.
         """
         if not source_path or not code:
             return False
         base = os.path.basename(source_path)
         name, _ = os.path.splitext(base)
-        # Split on common separators so ``VM0048-Reducing-...`` matches ``VM0048``.
-        first_token = re.split(r"[-_.\s]+", name)[0]
-        return first_token.upper() == code.upper()
+        code_tokens = FILENAME_SEPARATOR_RE.split(code.upper())
+        name_tokens = FILENAME_SEPARATOR_RE.split(name.upper())
+        if len(name_tokens) < len(code_tokens):
+            return False
+        return code_tokens == name_tokens[:len(code_tokens)]
 
     ranked: List[tuple] = []  # (index, tier, score)
     for i, doc in enumerate(results["documents"]):

@@ -498,6 +498,6 @@ def get_docling_converter():
             logger.warning("Docling is not installed; standard PDF mode unavailable.")
             return None
         except Exception as e:
-            logger.error("Failed to initialize Docling converter: %s", e, exc_info=True)
+            logger.error("Failed to initialize Docling converter: {}", e, exc_info=True)
             return None
     return _docling_converter

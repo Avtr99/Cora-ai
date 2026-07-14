@@ -14,11 +14,13 @@ before/after proof of restoration impact.
 
 The case-study pages display the caption and attribution together as one line, e.g.:
 
-> Humbo project area, Jun 2026. Boundary is approximate, based on the monitoring-report GPS coordinates. Captured with Copernicus Sentinel-2.
+> Humbo project area, Jun 2026. Boundary is approximate, based on the monitoring-report GPS coordinates. Contains modified Copernicus Sentinel data 2026, processed by Cora AI.
 
-The shared satellite attribution line is simplified to:
+The shared satellite attribution line is:
 
-> Captured with Copernicus Sentinel-2.
+> Contains modified Copernicus Sentinel data <year>, processed by Cora AI.
+>
+> Replace `<year>` with the year of the Sentinel-2 scene (e.g. 2026).
 
 ## Generated files
 

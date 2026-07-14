@@ -24,6 +24,10 @@ export function decodeSourceLabel(label: string): string {
   }
 }
 
+function cleanKbLabel(label: string): string {
+  return decodeSourceLabel(label.replace(/^data[\\/]/, '').trim()).replace(/\.(?:pdf|docx?|txt|md|html?)$/i, '');
+}
+
 interface CitationDetailShape {
   source_name?: unknown;
   source_type?: unknown;
@@ -139,8 +143,7 @@ const FILE_EXT_BLACKLIST = new Set([
       // Backend now automatically URL-decodes, strips file extensions, and
       // removes search-engine prefixes (e.g. [PDF]). We only do minimal path
       // cleaning for display purposes.
-      const sourceName = decodeSourceLabel(toStringValue(d.source_name).replace(/^data[\\/]/, '').trim())
-        .replace(/\.(?:pdf|docx?|txt|md|html?)$/i, '');
+      const sourceName = cleanKbLabel(toStringValue(d.source_name));
       const sourceType = toStringValue(d.source_type).toLowerCase();
       const explicitUrl = toStringValue(d.url);
       const snippetText = toStringValue(d.snippet);
@@ -202,10 +205,7 @@ const FILE_EXT_BLACKLIST = new Set([
         if (import.meta.env.DEV) {
           console.log('[parseCitationSources] Processing source:', sourceText, 'isWeb:', isWeb);
         }
-        const label = isWeb
-          ? extractDomain(sourceText)
-          : decodeSourceLabel(sourceText).replace(/^data[\\/]/, '').trim()
-            .replace(/\.(?:pdf|docx?|txt|md|html?)$/i, '');
+        const label = isWeb ? extractDomain(sourceText) : cleanKbLabel(sourceText);
 
         let url: string | undefined;
         if (isWeb) {
@@ -227,11 +227,7 @@ const FILE_EXT_BLACKLIST = new Set([
 
       if (typeof source === 'object' && source !== null) {
         const src = source as Record<string, unknown>;
-        const sourceName = decodeSourceLabel(
-          toStringValue(src.source_name ?? src.name ?? src.title ?? src.label)
-            .replace(/^data[\\/]/, '')
-            .trim()
-        ).replace(/\.(?:pdf|docx?|txt|md|html?)$/i, '');
+        const sourceName = cleanKbLabel(toStringValue(src.source_name ?? src.name ?? src.title ?? src.label));
         const sourceType = toStringValue(src.source_type ?? src.type).toLowerCase();
         const explicitUrl = toStringValue(src.url ?? src.link ?? src.href);
         const safeUrl = explicitUrl ? sanitizeUrl(explicitUrl) || undefined : undefined;
@@ -338,7 +334,7 @@ function processCitationPart(
     // Backend now automatically URL-decodes and strips file extensions,
     // but double/triple encoding or older payloads can still arrive with
     // %20 / + in the label.
-    const cleaned = decodeSourceLabel(normalizedPart.replace(/^data[\\/]/, '').trim());
+    const cleaned = cleanKbLabel(normalizedPart);
     const key = `kb:${cleaned.toLowerCase()}`;
     if (cleaned && !seen.has(key)) {
       seen.add(key);
@@ -360,7 +356,7 @@ function processCitationPart(
   } else if (normalizedPart.length > 0 && normalizedPart !== '[object Object]') {
     // Backend now automatically URL-decodes source names, but double/triple
     // encoding or older payloads can still arrive with %20 / + in the label.
-    const decoded = decodeSourceLabel(normalizedPart);
+    const decoded = cleanKbLabel(normalizedPart);
     const key = `kb:${decoded.toLowerCase()}`;
     if (!seen.has(key)) {
       seen.add(key);

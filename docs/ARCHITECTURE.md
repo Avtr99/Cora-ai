@@ -12,7 +12,7 @@
 |---|---|
 | **Local-first** | All persistent state lives on the host filesystem (SQLite + local Qdrant). No managed cloud databases, no cloud vector stores, no cloud analytics. |
 | **Single-process deployable** | One FastAPI process serves the API, the React SPA, and the async job queue. Qdrant runs as a sibling container (or a local binary). |
-| **Pluggable providers** | Embeddings, reranker, and web search are swappable via env vars. Defaults use hosted APIs (Voyage/Tavily/Gemini), but `ollama` + `none` enable a fully offline stack. |
+| **Pluggable providers** | Embeddings, reranker, and web search are swappable via env vars. Defaults use hosted APIs (Voyage/Tavily/Gemini), but `ollama` + `RERANK_PROVIDER=none` + `ENABLE_WEB_SEARCH=false` enable a fully offline stack. |
 | **No vendor lock-in for state** | The only required external API key for the default stack is `GEMINI_API_KEY`. Everything else can be replaced with a local provider or disabled. |
 | **Read-only at query time** | Ingestion is an offline, out-of-process step. The running container never writes to Qdrant collections during query serving. |
 
