@@ -6,6 +6,8 @@ import { caseStudies } from "@/data/caseStudies";
 import { IconWrapper } from "@/components/icons/IconWrapper";
 import ChevronLeftIcon from "@/assets/icons/chevron-left.svg?react";
 import { CASE_STUDY } from "@/lib/colors";
+import { SDG_BG_CLASS } from "@/lib/sdg";
+import type { SDG } from "@/data/caseStudyTypes";
 
 interface CaseStudyCardProps {
   id: string;
@@ -21,7 +23,7 @@ interface CaseStudyCardProps {
   mainImageSrcSet?: string;
   rating: string;
   ratingAgency: string;
-  sdgs: Array<{ number: number; bgColor: string }>;
+  sdgs: SDG[];
 }
 
 const CaseStudyCard: React.FC<CaseStudyCardProps> = ({
@@ -106,10 +108,9 @@ const CaseStudyCard: React.FC<CaseStudyCardProps> = ({
               {sdgs.map((sdg) => (
                 <div
                   key={sdg.number}
-                  className="w-[28px] h-[28px] rounded-full flex items-center justify-center text-white text-xs font-bold text-center leading-none"
-                  style={{ backgroundColor: sdg.bgColor }}
-                  title={`SDG ${sdg.number}`}
-                  aria-label={`SDG ${sdg.number}`}
+                  className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold text-center leading-none ${SDG_BG_CLASS[sdg.number] ?? 'bg-neutral-500'}`}
+                  title={`SDG ${sdg.number}: ${sdg.title}`}
+                  aria-label={`SDG ${sdg.number}: ${sdg.title}`}
                 >
                   {sdg.number}
                 </div>

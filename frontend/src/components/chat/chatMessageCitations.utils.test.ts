@@ -123,6 +123,22 @@ describe('parseCitationSources', () => {
     ] as CitationSource[]);
   });
 
+  it('decodes the VM0048 citation filename returned by KB retrieval', () => {
+    const result = parseCitationSources({
+      details: [{
+        source_name: 'vm0048%20reducing%20emissions%20from%20deforestation%20and%20forest%20degradation%20v1.0-1-1.pdf',
+        source_type: 'knowledge_base',
+      }],
+    });
+
+    expect(result[0]).toEqual({
+      label: 'vm0048 reducing emissions from deforestation and forest degradation v1.0-1-1',
+      type: 'knowledge_base',
+    });
+    expect(result[0].label).not.toContain('%20');
+  });
+
+
   it('decodes URL-encoded source names from the fallback sources array', () => {
     const result = parseCitationSources({
       sources: ['vm0047%20arr%20v1.0', 'https://example.com/article'],

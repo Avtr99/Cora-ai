@@ -344,7 +344,7 @@ class RouterAgent:
             )
             return self._parse_response(result_text)
         except Exception as e:
-            logger.warning(f"LLM routing failed: {e}. Defaulting to hybrid.")
+            logger.warning("LLM routing failed: %s. Defaulting to hybrid.", e)
             return (RouteDecision.HYBRID, 0.5, "LLM routing failed; defaulting to hybrid")
 
     def _parse_response(self, response_text: str) -> tuple:
@@ -360,7 +360,7 @@ class RouterAgent:
         # Extract JSON from possible markdown code block
         json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
         if not json_match:
-            logger.warning(f"Router returned no JSON. Response: {response_text[:200]}")
+            logger.warning("Router returned no JSON. Response: %s", response_text[:200])
             return (RouteDecision.HYBRID, 0.5, "No JSON in router response; defaulting to hybrid")
 
         try:
@@ -370,10 +370,10 @@ class RouterAgent:
             reasoning = data.get("reasoning", "No reasoning provided")
 
             if route not in [decision.value for decision in RouteDecision]:
-                logger.warning(f"Invalid route '{route}'; defaulting to hybrid")
+                logger.warning("Invalid route '%s'; defaulting to hybrid", route)
                 return (RouteDecision.HYBRID, confidence, f"Invalid route: {reasoning}")
 
             return (RouteDecision(route), confidence, reasoning)
         except Exception as e:
-            logger.warning(f"Failed to parse router response: {e}. Response: {response_text[:200]}")
+            logger.warning("Failed to parse router response: %s. Response: %s", e, response_text[:200])
             return (RouteDecision.HYBRID, 0.5, "Failed to parse router response; defaulting to hybrid")

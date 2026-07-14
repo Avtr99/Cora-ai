@@ -277,7 +277,7 @@ class RoutingHandler:
                 }
             ))
             query_hash = hashlib.sha256(query.encode()).hexdigest()[:16]
-            logger.debug(f"Route cache hit for query hash: {query_hash}")
+            logger.debug("Route cache hit for query hash: %s", query_hash)
 
         # Define callback for successful completion
         def on_complete(result: Dict[str, Any]) -> None:

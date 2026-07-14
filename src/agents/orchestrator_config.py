@@ -29,6 +29,7 @@ class OrchestratorConfig:
 
     # Web search
     enable_web_search: bool = True
+    enable_web_supplement_relevance_check: bool = True
     web_supplement_relevance_confidence_threshold: float = 0.8
 
     # Validation

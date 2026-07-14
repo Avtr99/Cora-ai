@@ -197,12 +197,20 @@ def boost_methodology_matches(
         return results
 
     def _filename_is_code(source_path: str, code: str) -> bool:
-        """True when the basename without extension equals the code."""
-        if not source_path:
+        """True when the basename without extension starts with the code.
+
+        File names in the KB are long, hyphenated titles like
+        ``VM0048-Reducing-Emissions-...v1.0.pdf``. The first token is the
+        methodology code, so an exact match is too strict and lets the
+        primary document lose to a module such as VMD0055.
+        """
+        if not source_path or not code:
             return False
         base = os.path.basename(source_path)
         name, _ = os.path.splitext(base)
-        return name.upper() == code.upper()
+        # Split on common separators so ``VM0048-Reducing-...`` matches ``VM0048``.
+        first_token = re.split(r"[-_.\s]+", name)[0]
+        return first_token.upper() == code.upper()
 
     ranked: List[tuple] = []  # (index, tier, score)
     for i, doc in enumerate(results["documents"]):

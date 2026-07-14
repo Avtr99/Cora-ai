@@ -73,6 +73,13 @@ class Settings(BaseSettings):
     EMBEDDING_PROVIDER: str = "voyage"
     EMBEDDING_MODEL: str = "voyage-4-lite"  # Override per-provider (e.g. "embed-english-v3", "bge-large-en-v1.5")
     EMBEDDING_DIM: int = 1024  # Must match Qdrant collection vector size
+    # Max texts sent to the embedding provider in a single request. The default
+    # is chosen to stay within Voyage's real-time endpoint ceiling of ~120K
+    # tokens/request: with CHUNK_SIZE=1500 chars (~300-375 tokens per chunk),
+    # 256 chunks is ~80-96K tokens. It also fits under the 1,000-example
+    # per-request cap. Tune up or down based on your provider's documented
+    # limits and observed latency.
+    EMBEDDING_BATCH_SIZE: int = 256
     OLLAMA_BASE_URL: str = "http://localhost:11434"  # For EMBEDDING_PROVIDER=ollama
 
     # Reranker Provider Settings (pluggable)
@@ -88,20 +95,17 @@ class Settings(BaseSettings):
     QDRANT_URL: Optional[str] = None  # Required for vector store, validated on use
     QDRANT_COLLECTION_NAME: str = "cora_dense_only"
     QDRANT_TIMEOUT: int = 120
+    # Max points per Qdrant upsert request. Keeps payload size reasonable for
+    # documents that produce many chunks (e.g., 1000+ page PDFs). Qdrant is
+    # local, but very large single requests can still hit gRPC/HTTP message
+    # limits or memory spikes.
+    QDRANT_UPSERT_BATCH_SIZE: int = 1000
 
     # Qdrant Payload Filter Settings
     # Comma-separated list of metadata fields allowed for filtering queries
     # Fields must match actual payload structure in Qdrant
     # Core fields (always available): source, doc_type, registry, document_id
     # CSV columns are auto-discovered during ingestion if QDRANT_AUTO_INDEX_CSV_COLUMNS=true
-    # Note: VCM domain is wide with diverse data sources, so comprehensive field list is maintained
-    QDRANT_ALLOWED_FILTER_FIELDS: str = (
-        "source,file_type,doc_type,category,registry,standard,publisher,policy_framework,"
-        "document_id,version_number,title,methodology_codes,"
-        "country,status,program_name,date,methodology_name,reference_id,"
-        "chunk_index,source_chunk_index,block_index,json_index"
-    )
-    
     # Note: VCM domain is wide with diverse data sources, so comprehensive field list is maintained
     QDRANT_ALLOWED_FILTER_FIELDS: str = (
         "source,file_type,doc_type,category,registry,standard,publisher,policy_framework,"
@@ -182,6 +186,9 @@ class Settings(BaseSettings):
     ENABLE_ROUTING: bool = True
     ENABLE_WEB_SEARCH: bool = True  # Enabled: Required for queries outside KB
     ENABLE_VALIDATION: bool = False  # Optional: Enable for critical use cases (adds latency)
+    # Disable the post-generation web-supplement relevance check while keeping
+    # the separate grounding-validation step controlled by ENABLE_VALIDATION.
+    ENABLE_WEB_SUPPLEMENT_RELEVANCE_CHECK: bool = True
     WEB_SUPPLEMENT_RELEVANCE_CONFIDENCE_THRESHOLD: float = 0.8  # Require high confidence before relevance-triggered web supplementation
     
     # Sub-query Fusion Retrieval
@@ -289,6 +296,13 @@ class Settings(BaseSettings):
     # Power users can point llm_api at a local vLLM server (e.g. PaddleOCR-VL-1.6)
     # by setting OPENAI_BASE_URL=http://localhost:8001/v1 — a config change, not a code mode.
 
+    # --- Ingestion concurrency ---
+    # Cap how many documents are converted/indexed simultaneously. Docling
+    # standard parsing is CPU- and memory-heavy, and embeddings are network-bound;
+    # running all uploads in parallel thrashes the machine and can hit API rate
+    # limits. A small cap (2) keeps queries responsive while saturating hardware.
+    DOCUMENT_INGESTION_CONCURRENCY: int = 2
+
     # --- Docling standard (classical, non-VLM) PDF conversion ---
     # `standard` mode routes PDFs through Docling's classical pipeline: layout
     # model + OCR + table structure. No VLM is loaded — formula enrichment
@@ -305,9 +319,11 @@ class Settings(BaseSettings):
     DOCUMENT_DOCLING_TABLE_MODE: str = "fast"
     # Formula/code/picture enrichment all load VLMs — OFF by default (no VLM).
     DOCUMENT_DOCLING_DO_FORMULAS: bool = False
-    # Bounds memory on huge PDFs. Matches the upload max by default.
-    DOCUMENT_DOCLING_MAX_PAGES: int = 200
     DOCUMENT_DOCLING_MAX_FILE_BYTES: int = 50 * 1024 * 1024
+    # Per-document time budget for Standard-mode Docling parsing (seconds).
+    # Docling stops and returns PARTIAL_SUCCESS when this is exceeded; we then
+    # surface it as a clear timeout error instead of indexing an incomplete doc.
+    DOCUMENT_DOCLING_TIMEOUT: float = 1800.0
     # Local directory of pre-downloaded Docling model artifacts. When set, Docling
     # loads models from here instead of fetching on first use. In Docker this
     # points at /app/models/docling (prebaked into the image during build).
@@ -331,6 +347,8 @@ class Settings(BaseSettings):
         "ASYNC_QUERY_WORKERS", "ASYNC_QUERY_QUEUE_MAX_SIZE", "ASYNC_QUERY_JOB_TTL_SECONDS",
         "CONVERSATIONAL_INTENT_CACHE_SIZE", "CONVERSATIONAL_INTENT_MAX_TOKENS",
         "CONVERSATIONAL_MAX_OUTPUT_TOKENS", "SUBQUERY_CANDIDATES",
+        "DOCUMENT_INGESTION_CONCURRENCY", "EMBEDDING_BATCH_SIZE",
+        "QDRANT_UPSERT_BATCH_SIZE",
     )
     @classmethod
     def validate_positive_int(cls, v: int, info) -> int:
@@ -345,6 +363,14 @@ class Settings(BaseSettings):
         """Prevent whitespace-only prompts that would degrade VLM conversion quality."""
         if not v or not v.strip():
             raise ValueError("DOCUMENT_LLM_CONVERSION_PROMPT must not be empty or whitespace-only")
+        return v
+
+    @field_validator("DOCUMENT_DOCLING_TIMEOUT")
+    @classmethod
+    def validate_positive_timeout(cls, v: float, info) -> float:
+        """Ensure the Docling timeout is a positive number."""
+        if v <= 0:
+            raise ValueError(f"{info.field_name} must be a positive number")
         return v
 
     _validated_filter_fields: Optional[List[str]] = None

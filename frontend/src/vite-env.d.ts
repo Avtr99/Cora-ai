@@ -12,3 +12,6 @@ declare module '*.svg' {
   const content: string;
   export default content;
 }
+
+// App version injected at build time from package.json
+declare const __APP_VERSION__: string;

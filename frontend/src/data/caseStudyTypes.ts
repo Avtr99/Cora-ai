@@ -1,8 +1,6 @@
 export interface SDG {
   number: number;
   title: string;
-  bgColor: string;
-  minWidth: number;
 }
 
 export interface Strength {
@@ -29,6 +27,21 @@ export interface Statistics {
   permanenceRisk: PermanenceRisk;
 }
 
+export interface BeforeAfterImage {
+  before: string;
+  after: string;
+  beforeLabel?: string;
+  afterLabel?: string;
+  caption?: string;
+  attribution?: string;
+}
+
+export interface OverviewMapImage {
+  image: string;
+  caption?: string;
+  attribution?: string;
+}
+
 export interface CaseStudyData {
   id: string;
   title: string;
@@ -40,6 +53,7 @@ export interface CaseStudyData {
   lensLabel: string;
   mainImage: string;
   mainImageSrcSet?: string;
+  mainImageCaption?: string;
   strengths: Strength[];
   sdgs: SDG[];
   rating: string;
@@ -58,6 +72,10 @@ export interface CaseStudyData {
   mapSource?: string;
   projectImages?: string[];
   galleryImages?: string[];
+  /** Locator/overview map shown in the project details section. */
+  overviewMap?: OverviewMapImage;
+  /** Side-by-side before/after satellite images (e.g., per village). */
+  beforeAfterImages?: BeforeAfterImage[];
   statistics: Statistics;
   benefits: Benefit[];
   /** Keywords for matching queries to relevant project recommendations */

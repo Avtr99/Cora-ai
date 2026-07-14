@@ -60,6 +60,7 @@ class RelevanceCheckerProtocol(Protocol):
         query: str,
         answer: str,
         source_titles: Optional[List[str]] = None,
+        source_chunks: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """Check whether an answer is relevant to the query."""
         ...

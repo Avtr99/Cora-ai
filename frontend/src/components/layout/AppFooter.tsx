@@ -6,7 +6,7 @@ import React from 'react';
 export const AppFooter: React.FC = () => (
   <footer className="mt-12 pt-6 pb-6 border-t border-border-ui">
     <p className="font-inter text-xs leading-[18px] text-text-muted text-center">
-      Research project developed in Germany
+      Research project developed in Germany · v{__APP_VERSION__}
     </p>
   </footer>
 );

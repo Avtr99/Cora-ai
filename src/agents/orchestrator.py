@@ -139,7 +139,9 @@ class RAGOrchestrator:
         if search_provider_name == "tavily":
             search_provider = TavilySearchProvider()
         else:
-            logger.warning(f"Unknown search provider: {search_provider_name}. Falling back to Tavily.")
+            logger.warning(
+                "Unknown search provider: %s. Falling back to Tavily.", search_provider_name
+            )
             search_provider = TavilySearchProvider()
 
         self.web_search = WebSearchAgent(llm_client, model_name, search_provider=search_provider)
@@ -635,7 +637,7 @@ class RAGOrchestrator:
             return result
             
         except Exception as e:
-            logger.error(f"Orchestrator error: {e}", exc_info=True)  # Full trace for debugging
+            logger.error("Orchestrator error: %s", e, exc_info=True)  # Full trace for debugging
             return {
                 "answer": "I encountered an error processing your query. Please try again.",
                 "sources": [],

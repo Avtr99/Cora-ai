@@ -74,13 +74,36 @@ class TestSourceTypeClassification:
                 {"title": "Web Result", "url": "https://example.com", "snippet": "Web content", "type": "web"}
             ]
         }
-        
+
         citations = self.manager.extract_citations_from_web_results(web_results)
-        
+
         assert len(citations) == 2
         assert citations[0].source_type == "knowledge_base"
         assert citations[1].source_type == "web"
-    
+
+    def test_web_search_pdf_source_kept_as_web(self):
+        """Web search results with explicit 'web_search' type and a .pdf URL must stay web.
+
+        Tavily often returns titles like '[PDF] VCS Standard' with URLs ending in .pdf.
+        Without this guard the URL extension heuristic misclassifies them as knowledge_base.
+        """
+        web_results = {
+            "sources": [
+                {
+                    "title": "[PDF] VCS Standard",
+                    "url": "https://example.com/docs/VCS-Standard-v4.4.pdf",
+                    "snippet": "PDF content",
+                    "type": "web_search",
+                }
+            ]
+        }
+
+        citations = self.manager.extract_citations_from_web_results(web_results)
+
+        assert len(citations) == 1
+        assert citations[0].source_type == "web"
+        assert citations[0].url == "https://example.com/docs/VCS-Standard-v4.4.pdf"
+
     def test_string_sources_default_to_web(self):
         """String sources (legacy format) should default to 'web' type."""
         web_results = {

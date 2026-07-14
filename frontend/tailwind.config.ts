@@ -1,6 +1,6 @@
 import type { Config } from "tailwindcss";
 import tailwindcssAnimate from "tailwindcss-animate";
-import { BRAND, SEMANTIC, CHART, KPI, GAUGE } from './src/lib/colors';
+import { BRAND, SEMANTIC, CHART, KPI, GAUGE, SDG_COLORS } from './src/lib/colors';
 
 export default {
 	content: [
@@ -142,6 +142,8 @@ export default {
 						buttonHover: SEMANTIC.info.buttonHover,
 					},
 				},
+				// SDG badge colors
+				sdg: SDG_COLORS,
 				// Data-visualization colors
 				chart: {
 					household:   CHART.household,

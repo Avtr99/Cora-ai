@@ -13,11 +13,56 @@ import logging
 import re
 import datetime
 import html
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 
 from ..query_processing.filter_extractor import get_allowed_filter_fields
 
 logger = logging.getLogger(__name__)
+
+# Pattern for VCM alphanumeric identifiers that must be preserved verbatim.
+# Covers Verra codes (VM, VMD, VMR, VCS) and CDM/Gold Standard style codes.
+_VCM_IDENTIFIER_RE = re.compile(
+    r"\b(?:VMR|VMD|VM|VCS|ACM|AMS|CCQI)\d+(?:\.\d+)*\b",
+    re.IGNORECASE,
+)
+
+
+def _preserve_vcm_identifiers(original_query: str, rewritten_query: str) -> Tuple[str, bool]:
+    """Restore exact VCM methodology/requirement identifiers if the LLM altered them.
+
+    The LLM sometimes "corrects" identifiers like VMR0007 to VM0007 because it
+    is more familiar with the VM prefix. This guard ensures that any VM/VMD/VMR/
+    VCS/ACM/AMS/CCQI identifier present in the original query appears verbatim in
+    the rewritten query.
+    """
+    identifiers = _VCM_IDENTIFIER_RE.findall(original_query)
+    if not identifiers:
+        return rewritten_query, False
+
+    modified = rewritten_query
+    preserved_any = False
+    for ident in identifiers:
+        if re.search(rf"\b{re.escape(ident)}\b", modified, re.IGNORECASE):
+            continue
+
+        digits_match = re.search(r"\d+(?:\.\d+)*$", ident)
+        if not digits_match:
+            continue
+
+        digits = digits_match.group(0)
+        corrupted_re = re.compile(
+            rf"\b(?:VMR|VMD|VM|VCS|ACM|AMS|CCQI){re.escape(digits)}\b",
+            re.IGNORECASE,
+        )
+        corrupted = corrupted_re.search(modified)
+        if corrupted:
+            modified = modified[:corrupted.start()] + ident + modified[corrupted.end():]
+        else:
+            modified = f"{modified} {ident}".strip()
+        preserved_any = True
+
+    return modified, preserved_any
+
 
 # VCM-specific acronym expansions for context
 VCM_ACRONYMS = {
@@ -72,7 +117,7 @@ Your goal is to transform ambiguous user inputs into precise, semantic vector se
         <term id="CDM">Clean Development Mechanism</term>
         <term id="MRV">Monitoring, Reporting and Verification</term>
         <term id="ICVCM">Integrity Council for the Voluntary Carbon Market</term>
-        <term id="VM0048/VM0007">Verra Methodology codes</term>
+        <term id="VM/VMD/VMR/VCS">Verra methodology (VM), module (VMD), requirement (VMR), and project (VCS) codes</term>
         <term id="ARR">Afforestation, Reforestation and Revegetation</term>
         <term id="IFM">Improved Forest Management</term>
         <term id="CCP">Core Carbon Principles</term>
@@ -101,7 +146,7 @@ Your goal is to transform ambiguous user inputs into precise, semantic vector se
         **Coreference Resolution**: Analyze the <chat_history> to identify what pronouns like "it", "he", or "that" refer to. Replace them with specific nouns in the query.
     </step_1>
     <step_2>
-        **Semantic Expansion**: Fix typos and expand VCM acronyms using the <knowledge_base>. Ensure the query is optimized for vector similarity search (natural language).
+        **Semantic Expansion**: Fix typos and expand VCM acronyms using the <knowledge_base>. Ensure the query is optimized for vector similarity search (natural language). Preserve exact VCM identifiers such as VM0048, VMD0055, VMR0007, VCS1234, ACM0001 — do not change their prefix or digits.
     </step_2>
     <step_3>
         **Metadata Extraction**: Identify specific filtering criteria (registry, methodology, project, policy, developer).
@@ -315,12 +360,14 @@ class QueryRewriterAgent:
 
             # Parse JSON response
             result = self._parse_response(result_text, query)
-            logger.debug(f"Query rewritten: '{query}' -> '{result['rewritten_query']}'")
+            logger.debug(
+                "Query rewritten: '%s' -> '%s'", query, result["rewritten_query"]
+            )
             
             return result
             
         except Exception as e:
-            logger.warning(f"Query rewrite failed: {e}. Using original query.")
+            logger.warning("Query rewrite failed: %s. Using original query.", e)
             return {
                 "rewritten_query": query,
                 "sub_queries": [],
@@ -358,11 +405,21 @@ class QueryRewriterAgent:
                 result["detected_intent"] = "unknown"
             if "corrections_made" not in result:
                 result["corrections_made"] = []
-                
+
+            # Guard against the LLM altering or dropping exact VCM identifiers.
+            preserved_query, preserved = _preserve_vcm_identifiers(
+                original_query, result["rewritten_query"]
+            )
+            if preserved:
+                result["rewritten_query"] = preserved_query
+                result["corrections_made"].append(
+                    "Preserved exact VCM identifier(s) from original query"
+                )
+
             return result
             
         except json.JSONDecodeError:
-            logger.warning(f"Failed to parse rewrite response as JSON: {response_text[:100]}")
+            logger.warning("Failed to parse rewrite response as JSON: %s", response_text[:100])
             return {
                 "rewritten_query": original_query,
                 "sub_queries": [],

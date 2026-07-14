@@ -11,18 +11,27 @@ KB has no relevant documents and web search is disabled.
 
 ### Settings status endpoint
 
-`GET /api/v1/settings/status` in `src/api/settings_routes.py` exposes the fields
-used by the frontend to decide whether the chat is usable:
+`GET /api/v1/settings/status` is implemented in the `src/api/settings_routes/`
+package (main logic in `src/api/settings_routes/status.py`). It exposes the
+fields used by the frontend to decide whether the chat is usable:
 
-- `chat_ready` — `True` when the backend is reachable, the LLM is configured, and
-  the KB is ready.
-- `kb_ready` — `True` when the embedding provider is configured, Qdrant is
-  reachable, and the configured collection has points.
-- `search_ready` — `True` when the configured search provider is set up (e.g.
-  Tavily API key present, or a custom search endpoint configured).
-- `backend_reachable` — `True` when the health endpoint responds.
-- `web_search_configured` / `web_search_enabled` — web search configuration
-  status.
+- `chat_ready` — `True` when the LLM is configured and either the KB has indexed
+  documents or web search is enabled (`LLM configured AND (kb_ready OR search_ready)`).
+- `kb_ready` — `True` when the configured Qdrant collection has indexed
+  documents (`points_count > 0`).
+- `search_ready` — `True` when a web search provider other than `none` is
+  configured (e.g. Tavily API key present).
+- `ready` — `True` when all required providers (LLM, embeddings, reranker,
+  search) are configured.
+- `llm` / `embeddings` / `reranker` / `search` — per-provider status objects
+  (`provider`, `has_api_key`, `model`, `is_configured`, `warning`).
+- `qdrant` — Qdrant collection info (collection name, vector dimension, points
+  count) or an error object if Qdrant is unreachable.
+- `warnings` — List of configuration warnings (missing keys, dimension mismatch,
+  unreachable Qdrant, etc.).
+
+Backend reachability is determined separately by the frontend via the
+`/health` endpoint, not by `/settings/status`.
 
 ### Empty KB response flag
 
@@ -30,6 +39,15 @@ used by the frontend to decide whether the chat is usable:
 knowledge base route retrieves zero documents and web search is disabled.
 Both `src/agents/orchestrator.py` and `src/agents/streaming_orchestrator.py`
 propagate this flag into the response metadata as `metadata.kb_empty`.
+
+### Streaming KB quality checks
+
+`KBStreamingHandler.process_stream()` supports token-emitting and token-suppressed
+execution. With `tokens=false`, it evaluates the completed answer rather than the
+unused token buffer. Explicit non-answers are web-supplemented, while substantive
+answers are passed to the retrieval-aware relevance validator with the retrieved
+source chunks. Web supplementation occurs only for an explicit non-answer or a
+high-confidence irrelevant verdict; relevant KB answers remain KB-only.
 
 ## Frontend
 
@@ -114,7 +132,7 @@ Run the relevant suites:
 # Backend
 cd "d:/Cora ai"
 pytest tests/test_api.py tests/test_citation_manager.py
-ruff check src/api/settings_routes.py src/agents/kb_route_handler.py src/agents/orchestrator.py src/agents/streaming_orchestrator.py
+ruff check src/api/settings_routes/ src/agents/kb_route_handler.py src/agents/orchestrator.py src/agents/streaming_orchestrator.py
 
 # Frontend
 cd "d:/Cora ai/frontend"
@@ -125,7 +143,7 @@ npm run build
 
 ## Files Changed
 
-- `src/api/settings_routes.py`
+- `src/api/settings_routes/` (package: `status.py`, `llm.py`, `embeddings.py`, `search.py`, `reranker.py`, etc.)
 - `src/agents/kb_route_handler.py`
 - `src/agents/orchestrator.py`
 - `src/agents/streaming_orchestrator.py`
@@ -237,6 +255,38 @@ This is called in three places:
 - `src/agents/orchestrator.py` (sync orchestrator)
 - `src/agents/streaming_orchestrator.py` (streaming orchestrator, final result event only)
 - `src/agents/hybrid_route_handler.py` (hybrid route, after `grounded_citations`)
+
+## Case Study Satellite Images Layout
+
+The mangrove case-study page was reorganized to present the satellite section
+as informational imagery, not as proof of impact. The shared attribution line
+was simplified to 'Captured with Copernicus Sentinel-2'.
+
+### What changed
+
+- **Section title:** Renamed from `Satellite Evidence` to `Satellite images` so
+  it reads as supporting visual context rather than a claim of evidence.
+- **Project overview moved down:** The `About` paragraph and key project metadata
+  (location, duration, methodology, project type) now sit beside the project
+  boundary map, instead of appearing as a separate top section.
+- **Boundary map resized:** The overview map is now a compact locator thumbnail
+  (up to 220px wide on desktop). Clicking it opens the full-resolution image in a
+  same-window lightbox modal that fits the image within the viewport without
+  scrolling.
+- **Comparison cards uniformed:** The before/after sliders now use a consistent
+  `4:3` aspect ratio and equal-height rows (`auto-rows-fr`), so the three
+  village-tract comparisons align.
+- **Slider handle reduced:** The comparison handle is now smaller, subtler, and
+  still keyboard-accessible. The existing `react-compare-slider` library remains
+  responsible for drag, keyboard, and screen-reader behaviour.
+- **Captions aligned:** Figcaption areas use a small minimum height on larger
+  screens so the card bottoms line up even when captions wrap.
+
+### Files Changed
+
+- `frontend/src/pages/CaseStudyPage.tsx`
+- `frontend/src/components/case-study/BeforeAfterSlider.tsx`
+- `frontend/src/components/case-study/ProjectDetails.tsx`
 
 ### Frontend cleanup
 

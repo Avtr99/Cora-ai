@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-07-14
+
 ### Added
 
 - Open-source release of Cora AI, a local-first RAG assistant for the Voluntary Carbon Market.
@@ -20,6 +22,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Curated VCM citation metadata surfaced in API responses (`registry`, `category`, `document_id`, `version_number`, `publisher`).
 - Registry pattern configuration split into focused modules (`_registries`, `_governance`, `_categories`) with `is_registry` flag.
 - Image placeholder stripping (`<!-- image -->`) in standard Docling conversions to reduce garbage chunks.
+- `frontend/.release-it.json` — release-it configuration for automated versioning and changelog generation.
+- New legal and governance docs: `docs/AI_SYSTEM_CARD.md`, `docs/ATTRIBUTION.md`, `docs/PRIVACY.md`, and `docs/TERMS.md`.
+- New ingestion helpers: `src/document_store/ingestion_pool.py` and `src/document_store/logging_utils.py` for staged ingestion and structured timing logs.
+- `scripts/generate_satellite_images.py` for case-study satellite imagery generation.
+- Expanded test coverage for answer relevance (`tests/test_relevance_check.py`) and document-store ingestion edge cases (`tests/test_document_store.py`).
 
 ### Infrastructure
 
@@ -62,3 +69,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Resolved merge conflict in `.pre-commit-config.yaml` — kept `scripts/evaluation/` exclusion (production scripts under `scripts/docker/` are still linted).
 - Restored working tree to `origin/main` baseline while preserving new work: kept monolithic `src/config.py`, async SQLite cache singleton, and main's lifespan/orchestrator initialization; removed unused config-split mixins and dead `_MIN_CHUNK_CHARS` constant.
 - Expanded `.gitignore` with frontend test/coverage and cache patterns.
+- Removed duplicate `QDRANT_ALLOWED_FILTER_FIELDS` definition in `src/config.py`; the single remaining definition is used by the retrieval filter-field validator and schema discovery.
+
+### Changed
+
+- Refined ingestion pipeline in `src/document_store/indexer.py` with debounced cache invalidation and a shared `QdrantVectorStore` singleton to reduce connection churn during bulk indexing.
+- `src/document_store/jobs.py` now emits per-stage ingestion timing logs and recovers documents/jobs left in-flight at startup.
+- Post-generation relevance validation in `src/agents/validator.py` now receives source document titles and retrieved source chunks for stronger grounding checks.
+- `src/agents/route_processor_utils.py` extracts, deduplicates, and cleans source display names (including percent-decoded filenames).
+- Streaming handler (`src/agents/streaming_handler.py`) supports token-suppressed mode with retrieval-aware relevance validation and explicit non-answer fallback logic.
+- Query rewriter (`src/agents/query_rewriter.py`) preserves exact VCM methodology identifiers and improves acronym/registry filter extraction.
+- Tavily search provider (`src/agents/tavily_search.py`) strips common web-search prefix markers (`[PDF]`, `[DOC]`, `[web]`) from result titles.
+- Fusion retrieval (`src/agents/fusion_retrieval.py`) relaxes secondary filters and falls back to unfiltered search when strict filter combinations return no results.
+- Expanded frontend case-study experience: new satellite imagery, SDG alignment (`frontend/src/lib/sdg.ts`), `BeforeAfterSlider` component, and refreshed `CaseStudyPage`, `CaseStudiesPage`, `ProjectDetails`, and `CaseStudyStrengths`.
+- Updated README, NOTICE, ARCHITECTURE, ROADMAP, and `documentation.md` to reflect chat readiness, settings status, and V1 capabilities.
+
+### Removed
+
+- `tests/test_rag_evaluation.py` one-time RAGAS/evaluation pytest harness removed (RAGAS evaluation remains available via `scripts/evaluation/evaluate_rag.py`).
+- `scripts/evaluation/run_full_evaluation.py` deprecated evaluation runner removed.
+- Cleaned up one-off untracked test files: `test_cache_invalidation_debounce.py`, `test_indexer_vector_store_singleton.py`, `test_ingestion_timing_logs.py`, and `test_tavily_search.py`.
+- Removed stale `__pycache__` artifacts from previously deleted test files.
+- Removed outdated Humbo and Mangrove frontend image assets in favor of optimized case-study imagery.

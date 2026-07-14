@@ -1,23 +1,26 @@
 import type { CaseStudyData } from './caseStudyTypes';
 
-// Mangrove images
-import mangroveImage from '@/assets/mangrove-restoration-image.webp';
-import mangroveImage640 from '@/assets/mangrove-restoration-image-640.webp';
-import mangroveImage960 from '@/assets/mangrove-restoration-image-960.webp';
-import mangroveMap from '@/assets/mangrove-restoration-project-boundary.webp';
-import mangroveMap480 from '@/assets/mangrove-restoration-map-480.webp';
-import mangroveMap768 from '@/assets/mangrove-restoration-map-768.webp';
+// Mangrove field photo (CC0 / public domain)
+import mangroveFieldPhoto from '@/assets/case-studies/mangrove/Mangrove_Rakhine_Myanmar_2_landscape.webp';
+import mangroveFieldPhoto640 from '@/assets/case-studies/mangrove/Mangrove_Rakhine_Myanmar_2_landscape-640.webp';
 
-// Humbo images
-import humboMain from '@/assets/case-studies/humbo/humbo-main.webp';
-import humboMain640 from '@/assets/case-studies/humbo/humbo-main-640.webp';
-import humboMain960 from '@/assets/case-studies/humbo/humbo-main-960.webp';
-import humboArea from '@/assets/case-studies/humbo/humbo-area.webp';
-import humboArea640 from '@/assets/case-studies/humbo/humbo-area-640.webp';
-import humboArea960 from '@/assets/case-studies/humbo/humbo-area-960.webp';
-import humboSign from '@/assets/case-studies/humbo/humbo-sign.webp';
-import humboMap from '@/assets/case-studies/humbo/humbo-map.png';
-import humboProjectBoundary from '@/assets/case-studies/humbo/humbo-project-boundary.webp';
+// Mangrove satellite images
+import mangroveOverviewBoundaryAfter from '@/assets/case-studies/mangrove/satellite/myanmar-mangrove-overview-recent-2025-12-05-boundary.webp';
+import magyiBefore from '@/assets/case-studies/mangrove/satellite/magyi-older-2017-12-17.webp';
+import magyiAfter from '@/assets/case-studies/mangrove/satellite/magyi-recent-2025-12-15.webp';
+import thabawkanBefore from '@/assets/case-studies/mangrove/satellite/thabawkan-older-2017-01-26.webp';
+import thabawkanAfter from '@/assets/case-studies/mangrove/satellite/thabawkan-recent-2025-12-05.webp';
+import thaegoneBefore from '@/assets/case-studies/mangrove/satellite/thaegone-older-2017-01-26.webp';
+import thaegoneAfter from '@/assets/case-studies/mangrove/satellite/thaegone-recent-2025-12-05.webp';
+
+// Humbo field photo (Pexels License, Abiy Fikru)
+import humboFieldPhoto from '@/assets/case-studies/humbo/pexels-abiy-fikru-176179-27534668.webp';
+import humboFieldPhoto640 from '@/assets/case-studies/humbo/pexels-abiy-fikru-176179-27534668-640.webp';
+
+// Humbo satellite images
+import humboBefore from '@/assets/case-studies/humbo/satellite/humbo-ethiopia-older-2017-12-30.webp';
+import humboAfter from '@/assets/case-studies/humbo/satellite/humbo-ethiopia-recent-2026-06-06.webp';
+import humboBoundaryAfter from '@/assets/case-studies/humbo/satellite/humbo-ethiopia-recent-2026-06-06-boundary.webp';
 
 export const caseStudies: CaseStudyData[] = [
   {
@@ -29,8 +32,9 @@ export const caseStudies: CaseStudyData[] = [
     registryUrl: 'https://registry.verra.org/app/projectDetail/VCS/1764',
     tags: ['REFORESTATION', 'CARBON CREDITS'],
     lensLabel: 'Understanding high quality credits',
-    mainImage: mangroveImage,
-    mainImageSrcSet: `${mangroveImage640} 640w, ${mangroveImage960} 960w, ${mangroveImage} 1025w`,
+    mainImage: mangroveFieldPhoto,
+    mainImageSrcSet: `${mangroveFieldPhoto640} 640w, ${mangroveFieldPhoto} 960w`,
+    mainImageCaption: 'Photo by scottedmunds / iNaturalist. CC0 / public domain.',
     strengths: [
       { text: 'Strong biodiversity' },
       { text: 'Verified carbon sink' },
@@ -38,9 +42,9 @@ export const caseStudies: CaseStudyData[] = [
       { text: 'Run by skilled, local experts, with development and livelihood in biodiversity' }
     ],
     sdgs: [
-      { number: 8, title: 'Decent Work and Economic Growth', bgColor: '#A21942', minWidth: 60 },
-      { number: 13, title: 'Climate Action', bgColor: '#3F7E44', minWidth: 55 },
-      { number: 14, title: 'Life Below Water', bgColor: '#0A97D9', minWidth: 55 }
+      { number: 8, title: 'Decent Work and Economic Growth' },
+      { number: 13, title: 'Climate Action' },
+      { number: 14, title: 'Life Below Water' }
     ],
     rating: 'AA',
     ratingAgency: 'BeZero',
@@ -52,10 +56,34 @@ export const caseStudies: CaseStudyData[] = [
     methodology: 'AR-AMS004',
     about: 'Restoring the degraded mangrove landscape covering 2,065 ha. It involves planting about 9.1 million mangrove trees in the Magu, Thabaung, and Thaegone village tracts.',
     summary: 'Restoring 2,065 ha of degraded mangrove landscape. 9.1 million trees planted across 16 villages in Myanmar\'s Ayeyarwady Region.',
-    mapImage: mangroveMap,
-    mapImageSrcSet: `${mangroveMap480} 480w, ${mangroveMap768} 768w, ${mangroveMap} 1463w`,
-    mapImageSizes: '(max-width: 767px) calc(100vw - 48px), (min-width: 768px) and (max-width: 1023px) calc(100vw - 148px), 660px',
-    mapSource: 'WIF foundation',
+    overviewMap: {
+      image: mangroveOverviewBoundaryAfter,
+      caption: 'Project area overview: the restored mangrove boundary (white) is visible across all three village tracts.',
+      attribution: 'Captured with Copernicus Sentinel-2.'
+    },
+    beforeAfterImages: [
+      {
+        before: magyiBefore,
+        after: magyiAfter,
+        beforeLabel: 'Dec 2017',
+        afterLabel: 'Dec 2025',
+        caption: 'Magyi village tract: mangrove restoration since 2015.',
+      },
+      {
+        before: thabawkanBefore,
+        after: thabawkanAfter,
+        beforeLabel: 'Jan 2017',
+        afterLabel: 'Dec 2025',
+        caption: 'Thabawkan village tract: 2018–2019 planting areas.',
+      },
+      {
+        before: thaegoneBefore,
+        after: thaegoneAfter,
+        beforeLabel: 'Jan 2017',
+        afterLabel: 'Dec 2025',
+        caption: 'Thaegone village tract: 2018–2019 planting areas.',
+      },
+    ],
     statistics: {
       carbonSequestered: '44,345',
       bufferPool: '32,882',
@@ -103,19 +131,20 @@ export const caseStudies: CaseStudyData[] = [
     registryUrl: 'https://registry.goldstandard.org/projects/details/1922',
     tags: ['REFORESTATION', 'CARBON CREDITS'],
     lensLabel: 'Co-benefits & community ownership',
-    mainImage: humboMain,
-    mainImageSrcSet: `${humboMain640} 640w, ${humboMain960} 960w, ${humboMain} 1400w`,
+    mainImage: humboFieldPhoto,
+    mainImageSrcSet: `${humboFieldPhoto640} 640w, ${humboFieldPhoto} 1280w`,
+    mainImageCaption: 'Photo by Abiy Fikru on Pexels.',
     strengths: [
       { text: 'Verified carbon removal through assisted natural regeneration of 2,724 hectares' },
       { text: 'Strong community ownership via seven cooperative societies with legal land title' },
       { text: 'Farmer Managed Natural Regeneration (FMNR), low-cost, proven restoration technique' }
     ],
     sdgs: [
-      { number: 1, title: 'No Poverty', bgColor: '#E5243B', minWidth: 55 },
-      { number: 5, title: 'Gender Equality', bgColor: '#FF3A21', minWidth: 55 },
-      { number: 8, title: 'Decent Work and Economic Growth', bgColor: '#A21942', minWidth: 60 },
-      { number: 13, title: 'Climate Action', bgColor: '#3F7E44', minWidth: 55 },
-      { number: 15, title: 'Life on Land', bgColor: '#56C02B', minWidth: 55 }
+      { number: 1, title: 'No Poverty' },
+      { number: 5, title: 'Gender Equality' },
+      { number: 8, title: 'Decent Work and Economic Growth' },
+      { number: 13, title: 'Climate Action' },
+      { number: 15, title: 'Life on Land' }
     ],
     rating: 'AA',
     ratingAgency: 'BeZero',
@@ -127,8 +156,20 @@ export const caseStudies: CaseStudyData[] = [
     methodology: 'AR-AM0003: Afforestation and reforestation of degraded land through tree planting, assisted natural regeneration and control of animal grazing',
     about: 'The reforestation activity involves the restoration of indigenous tree species in a mountainous region of South Western Ethiopia. The project zone covers approximately 2,724 hectares across 5 strata. It contributes to climate change mitigation by creating GHG sinks through assisted natural regeneration of degraded lands, using Farmer Managed Natural Regeneration (FMNR) techniques managed by seven community cooperative societies.',
     summary: '2,724 ha of indigenous forest restored via Farmer Managed Natural Regeneration. Seven community cooperatives with legal land ownership, creating 195 jobs.',
-    galleryImages: [humboArea, humboSign],
-    projectImages: [humboMap, humboProjectBoundary],
+    overviewMap: {
+      image: humboBoundaryAfter,
+      caption: 'Humbo project area, Jun 2026. Boundary is approximate, based on the monitoring-report GPS coordinates.',
+      attribution: 'Captured with Copernicus Sentinel-2.'
+    },
+    beforeAfterImages: [
+      {
+        before: humboBefore,
+        after: humboAfter,
+        beforeLabel: 'Dec 2017',
+        afterLabel: 'Jun 2026',
+        caption: 'Humbo project area: before (2017) and after (2026) assisted natural regeneration.',
+      },
+    ],
     statistics: {
       carbonSequestered: '13,572',
       bufferPool: '29,343',

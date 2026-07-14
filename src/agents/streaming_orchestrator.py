@@ -431,7 +431,7 @@ class StreamingRAGOrchestrator(RAGOrchestrator):
             yield {"type": "final", "result": final_result}
 
         except Exception as e:
-            logger.error(f"Streaming orchestrator error: {e}", exc_info=True)
+            logger.error("Streaming orchestrator error: %s", e, exc_info=True)
             yield {"type": "final", "result": {
                 "answer": "I encountered an error processing your query. Please try again.",
                 "sources": [],

@@ -6,7 +6,7 @@ import json
 import re
 import unicodedata
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from loguru import logger
 
@@ -26,9 +26,9 @@ class ConversionResult:
     def __init__(
         self,
         markdown: str,
-        page_count: int | None = None,
-        warnings: list[str] | None = None,
-        metadata: dict[str, Any] | None = None,
+        page_count: Optional[int] = None,
+        warnings: Optional[list[str]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> None:
         self.markdown = markdown
         self.page_count = page_count
@@ -269,10 +269,12 @@ def _convert_pdf_with_docling_standard(path: Path) -> ConversionResult:
     download on the first conversion if not pre-cached under
     ``DOCLING_ARTIFACTS_PATH``.
 
-    ``max_num_pages`` and ``max_file_size`` bound memory on huge PDFs. For
-    table-heavy or complex-layout documents where Markdown table fidelity is
-    poor, ``llm_api`` mode is the higher-accuracy escape hatch.
+    The 50MB upload limit and ``DOCUMENT_DOCLING_TIMEOUT`` bound resource use on
+    huge PDFs. For table-heavy or complex-layout documents where Markdown table
+    fidelity is poor, ``llm_api`` mode is the higher-accuracy escape hatch.
     """
+    from docling.datamodel.base_models import ConversionStatus, FailureCategory
+
     from ..api.lifespan import get_docling_converter
 
     converter = get_docling_converter()
@@ -285,9 +287,32 @@ def _convert_pdf_with_docling_standard(path: Path) -> ConversionResult:
     settings = get_settings()
     result = converter.convert(
         source=str(path),
-        max_num_pages=settings.DOCUMENT_DOCLING_MAX_PAGES,
         max_file_size=settings.DOCUMENT_DOCLING_MAX_FILE_BYTES,
     )
+
+    if result.status == ConversionStatus.PARTIAL_SUCCESS:
+        timeout_detail = next(
+            (
+                err.error_message
+                for err in result.errors
+                if err.category == FailureCategory.TIMEOUT
+            ),
+            None,
+        )
+        if timeout_detail:
+            raise ValueError(
+                f"Standard mode timed out while converting this PDF: {timeout_detail}. "
+                "Reduce the page count, increase the timeout in Settings "
+                "(DOCUMENT_DOCLING_TIMEOUT), or switch to LLM API mode."
+            )
+        details = "; ".join(
+            err.error_message for err in result.errors if err.error_message
+        )
+        raise ValueError(
+            f"Standard mode could only convert this PDF partially: {details}. "
+            "Check the server logs or switch to LLM API mode."
+        )
+
     doc = result.document
     markdown = _recover_flattened_formulas(doc, doc.export_to_markdown())
     page_count = len(list(doc.pages))

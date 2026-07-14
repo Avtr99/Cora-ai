@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Literal
+from typing import Any, Literal, Optional
 
 DocumentStatus = Literal[
     "queued",
@@ -30,22 +30,22 @@ class DocumentRecord:
     status: DocumentStatus
     conversion_mode: ConversionMode
     original_path: str
-    converted_path: str | None = None
+    converted_path: Optional[str] = None
     chunk_count: int = 0
-    page_count: int | None = None
+    page_count: Optional[int] = None
     tags: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
-    error: str | None = None
+    error: Optional[str] = None
     # VCM metadata extracted once during conversion and persisted.
     # Read by the indexer (chunk metadata) and the RAG citation pipeline.
-    title: str | None = None
-    registry: str | None = None
-    category: str | None = None
-    publisher: str | None = None
-    document_id: str | None = None
-    version_number: str | None = None
-    created_at: str | None = None
-    updated_at: str | None = None
+    title: Optional[str] = None
+    registry: Optional[str] = None
+    category: Optional[str] = None
+    publisher: Optional[str] = None
+    document_id: Optional[str] = None
+    version_number: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
 
     def to_api(self) -> dict[str, Any]:
         return {
@@ -81,10 +81,10 @@ class DocumentJob:
     document_id: str
     action: str
     status: JobStatus
-    message: str | None = None
-    error: str | None = None
-    created_at: str | None = None
-    updated_at: str | None = None
+    message: Optional[str] = None
+    error: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
 
     def to_api(self) -> dict[str, Any]:
         return {

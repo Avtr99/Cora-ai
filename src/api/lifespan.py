@@ -102,6 +102,7 @@ async def initialize_components():
                     settings, "KB_MIN_TOP_RELEVANCE_SCORE"
                 ),
                 enable_web_search=settings.ENABLE_WEB_SEARCH,
+                enable_web_supplement_relevance_check=settings.ENABLE_WEB_SUPPLEMENT_RELEVANCE_CHECK,
                 web_supplement_relevance_confidence_threshold=getattr(
                     settings,
                     "WEB_SUPPLEMENT_RELEVANCE_CONFIDENCE_THRESHOLD",
@@ -342,6 +343,7 @@ async def hot_swap_llm_client() -> dict:
                         settings, "KB_MIN_TOP_RELEVANCE_SCORE"
                     ),
                     enable_web_search=settings.ENABLE_WEB_SEARCH,
+                    enable_web_supplement_relevance_check=settings.ENABLE_WEB_SUPPLEMENT_RELEVANCE_CHECK,
                     web_supplement_relevance_confidence_threshold=getattr(
                         settings,
                         "WEB_SUPPLEMENT_RELEVANCE_CONFIDENCE_THRESHOLD",
@@ -424,6 +426,7 @@ def _build_docling_converter():
         do_table_structure=settings.DOCUMENT_DOCLING_DO_TABLES,
         do_formula_enrichment=settings.DOCUMENT_DOCLING_DO_FORMULAS,
         enable_remote_services=False,
+        document_timeout=settings.DOCUMENT_DOCLING_TIMEOUT,
     )
 
     # OCR engine is swappable via setting. RapidOCR is our default (lightweight,

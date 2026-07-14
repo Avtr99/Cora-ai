@@ -15,6 +15,7 @@ from .route_processor_utils import (
     check_answer_relevance,
     clean_source_display_name,
     emit_text_as_token_events,
+    extract_source_chunks,
     extract_source_titles,
     kb_top_relevance,
     remaining_budget_ms,
@@ -201,6 +202,7 @@ class KBStreamingHandler:
             logger.warning("answer_generator does not implement search_and_process_stream; using fallback")
             try:
                 result = await self.answer_generator.search_and_process(original_query, vector_results)
+                result = result or {}
             except Exception as e:
                 duration = (time.time() - gen_start) * 1000
                 logger.error("Answer generation failed in streaming path: %s", e, exc_info=True)
@@ -231,7 +233,7 @@ class KBStreamingHandler:
                 logger.info("Streaming KB (non-stream fallback) returned non-answer; supplementing with web")
                 remaining = remaining_budget_ms(timeout_budget_ms, step_start)
                 web_result = await web_supplement_callback(
-                    query,
+                    original_query,
                     result,
                     vector_results,
                     steps,
@@ -254,20 +256,24 @@ class KBStreamingHandler:
             if (
                 self.validator
                 and web_enabled
-                and web_route_callback
+                and web_supplement_callback
+                and getattr(self.config, "enable_web_supplement_relevance_check", True)
                 and not _is_explicit_non_answer(answer_text)
             ):
                 is_irrelevant, reason = await check_answer_relevance(
                     self.validator, self.config,
                     original_query, answer_text, log_tag="Streaming",
                     source_titles=extract_source_titles(vector_results),
+                    source_chunks=extract_source_chunks(vector_results),
                 )
                 if is_irrelevant:
                     remaining = remaining_budget_ms(timeout_budget_ms, step_start)
-                    web_result = await web_route_callback(
-                        query,
+                    web_result = await web_supplement_callback(
+                        original_query,
+                        result,
+                        vector_results,
                         steps,
-                        original_query=original_query,
+                        supplement_reason=reason,
                         timeout_budget_ms=remaining,
                     )
                     async for ev in _emit_tokens(web_result.get("answer", "")):
@@ -275,6 +281,26 @@ class KBStreamingHandler:
                     yield {"type": "final", "result": web_result}
                     return
 
+            # Ensure citation objects are present before finalization. The
+            # non-streaming RAG client returns source names but not Citation
+            # objects; without them the finalization callback cannot align
+            # inline markers with source badges.
+            if result and not result.get("_citations_finalized"):
+                result.setdefault(
+                    "citations",
+                    self.citation_manager.extract_citations_from_vector_results(
+                        vector_results,
+                        max_citations=5,
+                    ),
+                )
+
+            if finalize_citations_callback:
+                try:
+                    finalize_citations_callback(result, original_query)
+                except Exception as e:
+                    logger.warning("Citation finalization failed in streaming handler: %s", e)
+
+            answer_text = result.get("answer", "")
             gen_duration = (time.time() - gen_start) * 1000
             answer_summary = answer_text[:150] if answer_text else ""
             steps.append(AgentStep(
@@ -355,11 +381,16 @@ class KBStreamingHandler:
         # ``is_non_answer("")`` returns True (empty = non-answer), falsely
         # triggering web supplementation on every real answer that was already
         # streamed to the client.
-        if not gate_open and _is_explicit_non_answer(buffered) and web_enabled and web_supplement_callback:
+        non_answer_detected = (
+            not gate_open and _is_explicit_non_answer(buffered)
+            if emit_tokens
+            else _is_explicit_non_answer(answer_text)
+        )
+        if non_answer_detected and web_enabled and web_supplement_callback:
             logger.info("Streaming KB returned non-answer fallback; supplementing with web search")
             remaining = remaining_budget_ms(timeout_budget_ms, step_start)
             web_result = await web_supplement_callback(
-                query,
+                original_query,
                 result or {},
                 vector_results,
                 steps,
@@ -371,16 +402,59 @@ class KBStreamingHandler:
             yield {"type": "final", "result": web_result}
             return
 
-        if emit_tokens and buffered and not gate_open:
-            yield {"type": "token", "chunk": buffered}
+        if (
+            not emit_tokens
+            and self.validator
+            and web_enabled
+            and web_supplement_callback
+            and getattr(self.config, "enable_web_supplement_relevance_check", True)
+        ):
+            is_irrelevant, reason = await check_answer_relevance(
+                self.validator,
+                self.config,
+                original_query,
+                answer_text,
+                log_tag="Streaming",
+                source_titles=extract_source_titles(vector_results),
+                source_chunks=extract_source_chunks(vector_results),
+            )
+            if is_irrelevant:
+                remaining = remaining_budget_ms(timeout_budget_ms, step_start)
+                web_result = await web_supplement_callback(
+                    original_query,
+                    result or {},
+                    vector_results,
+                    steps,
+                    supplement_reason=reason,
+                    timeout_budget_ms=remaining,
+                )
+                yield {"type": "final", "result": web_result}
+                return
 
-        # Finalize and emit citations
+        # Finalize and emit citations. The streaming RAG wrapper returns source
+        # names but not Citation objects; extract them so the finalization
+        # callback can align inline markers with source badges.
         final_result = result or {}
+        if final_result and not final_result.get("_citations_finalized"):
+            final_result.setdefault(
+                "citations",
+                self.citation_manager.extract_citations_from_vector_results(
+                    vector_results,
+                    max_citations=5,
+                ),
+            )
+
         if finalize_citations_callback:
             try:
                 finalize_citations_callback(final_result, original_query)
             except Exception as e:
                 logger.warning("Citation finalization failed in streaming handler: %s", e)
+
+        if emit_tokens and not gate_open:
+            final_answer = final_result.get("answer") or buffered
+            if final_answer:
+                async for ev in _emit_tokens(final_answer):
+                    yield ev
 
         yield {"type": "final", "result": final_result}
 

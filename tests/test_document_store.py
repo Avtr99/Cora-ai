@@ -6,6 +6,12 @@ from unittest import mock
 import pytest
 from fastapi import UploadFile
 
+try:
+    from docling.exceptions import ConversionError
+except Exception:  # docling may not be installed in all test environments
+    class ConversionError(RuntimeError):  # type: ignore[no-redef]
+        """Fallback for environments without Docling."""
+
 
 @pytest.fixture()
 def document_store_env(tmp_path, monkeypatch):
@@ -363,23 +369,120 @@ def test_classify_conversion_error_httpx_429(document_store_env):
 
 
 def test_classify_conversion_error_httpx_timeout(document_store_env):
-    """Timeout → 'Conversion timed out' message."""
+    """Timeout in standard mode → suggest LLM API, not Standard mode."""
     import httpx
 
     from src.document_store.jobs import _classify_conversion_error
 
     msg = _classify_conversion_error(httpx.ReadTimeout("timed out"))
     assert "timed out" in msg.lower()
+    assert "llm_api" in msg.lower()
+    assert "standard mode" not in msg.lower()
+
+
+def test_classify_conversion_error_httpx_timeout_llm_api_suggests_standard(document_store_env):
+    """Timeout in llm_api mode → still suggest Standard mode."""
+    import httpx
+
+    from src.document_store.jobs import _classify_conversion_error
+
+    msg = _classify_conversion_error(httpx.ReadTimeout("timed out"), conversion_mode="llm_api")
+    assert "timed out" in msg.lower()
     assert "standard mode" in msg.lower()
+    assert "llm_api" not in msg.lower()
+
+
+def test_classify_conversion_error_llm_api_fallback_suggests_standard(document_store_env):
+    """Unknown exceptions in llm_api mode → suggest Standard mode."""
+    from src.document_store.jobs import _classify_conversion_error
+
+    msg = _classify_conversion_error(RuntimeError("something weird happened"), conversion_mode="llm_api")
+    assert "RuntimeError" in msg
+    assert "standard mode" in msg.lower()
+    assert "llm_api" not in msg.lower()
+
+
+def test_classify_conversion_error_docling_file_size_limit(document_store_env):
+    """Docling ConversionError for max_file_size → clear file-size message with numbers."""
+    from src.document_store.jobs import _classify_conversion_error
+
+    exc = ConversionError(
+        "Conversion failed for: doc.pdf with status: failure. "
+        "Errors: Input size 123456789 exceeds max_file_size limit 50000000 bytes."
+    )
+    msg = _classify_conversion_error(exc)
+    assert "123,456,789" in msg
+    assert "50,000,000" in msg
+    assert "Standard mode" in msg
+    assert "file size" in msg.lower() or "too large" in msg.lower()
+    assert "DOCUMENT_DOCLING_MAX_FILE_BYTES" in msg
+
+
+def test_classify_conversion_error_docling_timeout(document_store_env):
+    """Docling ConversionError for timeout → actionable timeout message."""
+    from src.document_store.jobs import _classify_conversion_error
+
+    exc = ConversionError(
+        "Conversion failed for: doc.pdf with status: partial_success. "
+        "Errors: Document processing timeout: exceeded 120.000s limit after 125.000s. "
+        "Processed 50/100 pages."
+    )
+    msg = _classify_conversion_error(exc)
+    assert "took too long" in msg.lower()
+    assert "LLM API" in msg
+    assert "Standard mode" in msg
+
+
+def test_classify_conversion_error_docling_backend_failure(document_store_env):
+    """Docling ConversionError for backend parse failure → corrupted/unsupported hint."""
+    from src.document_store.jobs import _classify_conversion_error
+
+    exc = ConversionError(
+        "Conversion failed for: doc.pdf with status: failure. "
+        "Errors: The document backend could not parse the input."
+    )
+    msg = _classify_conversion_error(exc)
+    assert "couldn't read this pdf" in msg.lower() or "could not read" in msg.lower()
+    assert "corrupted" in msg.lower() or "password-protected" in msg.lower()
+    assert "LLM API" in msg
+
+
+def test_classify_conversion_error_docling_source_unavailable(document_store_env):
+    """Docling ConversionError for missing source → re-upload hint."""
+    from src.document_store.jobs import _classify_conversion_error
+
+    exc = ConversionError(
+        "Conversion failed for: doc.pdf with status: failure. "
+        "Errors: File doc.pdf not found or cannot be opened."
+    )
+    msg = _classify_conversion_error(exc)
+    assert "couldn't be opened" in msg.lower() or "could not be opened" in msg.lower()
+    assert "re-upload" in msg.lower()
+
+
+def test_classify_conversion_error_docling_generic_extracts_detail(document_store_env):
+    """Generic Docling ConversionError extracts the Errors: detail, not the wrapper."""
+    from src.document_store.jobs import _classify_conversion_error
+
+    exc = ConversionError(
+        "Conversion failed for: doc.pdf with status: failure. "
+        "Errors: Some obscure Docling pipeline failure."
+    )
+    msg = _classify_conversion_error(exc)
+    assert "Some obscure Docling pipeline failure" in msg
+    assert "Conversion failed for:" not in msg
+    assert "server logs" in msg.lower()
+    assert "LLM API" in msg
 
 
 def test_classify_conversion_error_generic_fallback(document_store_env):
-    """Unknown exceptions → include exception type name for log grepability."""
+    """Unknown exceptions in standard mode → include exception type, don't suggest standard mode."""
     from src.document_store.jobs import _classify_conversion_error
 
     msg = _classify_conversion_error(RuntimeError("something weird happened"))
     assert "RuntimeError" in msg
-    assert "server logs" in msg.lower() or "standard mode" in msg.lower()
+    assert "server logs" in msg.lower()
+    assert "standard mode" not in msg.lower()
 
 
 def test_classify_conversion_error_pymupdf_file_data_error(document_store_env):
@@ -471,6 +574,13 @@ class _FakeDoclingResult:
 
     def __init__(self, markdown: str, num_pages: int) -> None:
         self.document = _FakeDoclingDocument(markdown, num_pages)
+        self.errors = []
+        try:
+            from docling.datamodel.base_models import ConversionStatus
+
+            self.status = ConversionStatus.SUCCESS
+        except ImportError:
+            self.status = "success"
 
 
 class _FakeDoclingConverter:
@@ -493,7 +603,7 @@ class _FakeDoclingConverter:
 
 def test_convert_pdf_with_docling_standard_extracts_text(document_store_env, tmp_path):
     """_convert_pdf_with_docling_standard returns markdown + page_count from the
-    Docling singleton, and forwards the max_num_pages/max_file_size bounds."""
+    Docling singleton, and forwards the max_file_size bound."""
     from src.document_store.converter import _convert_pdf_with_docling_standard
 
     pdf_path = tmp_path / "born_digital.pdf"
@@ -505,8 +615,8 @@ def test_convert_pdf_with_docling_standard_extracts_text(document_store_env, tmp
 
     assert result.page_count == 2
     assert "Page 1 text" in result.markdown
-    # The memory bounds from settings are forwarded to convert().
-    assert fake.convert_calls[0]["max_num_pages"] is not None
+    # No hard page cap is passed; the file size bound is forwarded.
+    assert fake.convert_calls[0]["max_num_pages"] is None
     assert fake.convert_calls[0]["max_file_size"] is not None
     assert fake.convert_calls[0]["source"] == str(pdf_path)
 
@@ -538,6 +648,46 @@ def test_convert_pdf_with_docling_standard_missing_deps_raises(document_store_en
     with mock.patch("src.api.lifespan.get_docling_converter", return_value=None):
         with pytest.raises(ImportError, match="Docling standard parsing dependencies"):
             _convert_pdf_with_docling_standard(pdf_path)
+
+
+def test_convert_pdf_with_docling_standard_partial_timeout(document_store_env, tmp_path):
+    """Docling PARTIAL_SUCCESS due to timeout raises a clear ValueError."""
+    from docling.datamodel.base_models import ConversionStatus, FailureCategory
+
+    from src.document_store.converter import _convert_pdf_with_docling_standard
+
+    class _FakeTimeoutConverter:
+        def __init__(self) -> None:
+            self.convert_calls: list[dict] = []
+
+        def convert(self, source=None, max_file_size=None, **kwargs):
+            self.convert_calls.append({"source": source, "max_file_size": max_file_size})
+            result = mock.MagicMock()
+            result.status = ConversionStatus.PARTIAL_SUCCESS
+            timeout_error = mock.MagicMock()
+            timeout_error.error_message = (
+                "Document processing timeout: exceeded 1800.000s limit after "
+                "1810.000s. Processed 50/100 pages."
+            )
+            timeout_error.category = FailureCategory.TIMEOUT
+            result.errors = [timeout_error]
+            result.document.export_to_markdown.return_value = "Partial content."
+            return result
+
+    pdf_path = tmp_path / "big.pdf"
+    _make_born_digital_pdf(pdf_path, pages=1)
+
+    fake = _FakeTimeoutConverter()
+    with mock.patch("src.api.lifespan.get_docling_converter", return_value=fake):
+        with pytest.raises(ValueError, match="timed out") as exc_info:
+            _convert_pdf_with_docling_standard(pdf_path)
+
+    msg = str(exc_info.value)
+    assert "Processed 50/100 pages" in msg
+    assert "DOCUMENT_DOCLING_TIMEOUT" in msg
+    assert "LLM API" in msg
+    assert fake.convert_calls[0]["max_file_size"] is not None
+    assert fake.convert_calls[0].get("max_num_pages") is None
 
 
 def _make_scanned_like_pdf(path: Path, pages: int = 3) -> None:

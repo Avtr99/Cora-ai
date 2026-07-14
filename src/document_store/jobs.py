@@ -1,12 +1,23 @@
 from __future__ import annotations
 
+from typing import Optional
+
+import re
+import time
 from pathlib import Path
 
 from loguru import logger
 
+try:
+    from docling.exceptions import ConversionError as _DoclingConversionError
+except Exception:  # pragma: no cover - docling may not be installed in all environments
+    _DoclingConversionError = None
+
 from ..config import get_settings
 from .converter import convert_document, write_converted_markdown
 from .indexer import delete_document_chunks, index_document
+from .ingestion_pool import _get_ingestion_sem
+from .logging_utils import _log_ingestion_stage
 from .models import DocumentRecord
 from .storage import (
     get_document,
@@ -22,7 +33,7 @@ from .storage import (
 _docling_models_warmed = False
 
 
-def _docling_models_cached() -> bool | None:
+def _docling_models_cached() -> Optional[bool]:
     """Heuristic: are Docling model artifacts already on disk?
 
     Returns True if ``DOCLING_ARTIFACTS_PATH`` is set and non-empty, False if it is
@@ -56,7 +67,7 @@ def _maybe_emit_docling_download_notice(job_id: str, record: DocumentRecord) -> 
     )
 
 
-def _refresh_record(document_id: str, job_id: str) -> DocumentRecord | None:
+def _refresh_record(document_id: str, job_id: str) -> Optional[DocumentRecord]:
     """Reload a document record; mark the job failed if the document is gone."""
     record = get_document(document_id)
     if record is None:
@@ -69,20 +80,95 @@ def _refresh_record(document_id: str, job_id: str) -> DocumentRecord | None:
     return record
 
 
-def _classify_conversion_error(exc: Exception) -> str:
+def _extract_docling_error_detail(exc_str: str) -> str:
+    """Return the user-relevant portion of a Docling ConversionError message.
+
+    Docling wraps failures as:
+      "Conversion failed for: <file> with status: <status>. Errors: <details>"
+    The useful part for the user is after ``Errors:``.
+    """
+    if "Errors:" in exc_str:
+        return exc_str.split("Errors:", 1)[1].strip()
+    return exc_str
+
+
+def _classify_docling_conversion_error(exc: Exception) -> str:
+    """User-friendly, actionable message for a Docling ConversionError.
+
+    The frontend labels the modes as ``Standard`` and ``LLM API``, so error text
+    uses those exact names. Where possible we extract concrete numbers from the
+    Docling message so the user sees *why* instead of a generic failure.
+    """
+    exc_str = str(exc)
+    detail = _extract_docling_error_detail(exc_str)
+    low = detail.lower()
+
+    # File size limit (defense in depth behind the upload limit)
+    if "max_file_size" in low:
+        match = re.search(
+            r"size (\d+).*?exceeds.*?max_file_size.*?(\d+)",
+            low,
+        )
+        if match:
+            size, limit = match.groups()
+            return (
+                f"This PDF file is too large ({int(size):,} bytes; limit is "
+                f"{int(limit):,} bytes) for Standard mode. Reduce the file size "
+                "or increase the limit in Settings (DOCUMENT_DOCLING_MAX_FILE_BYTES)."
+            )
+        return (
+            "This PDF file is too large for Standard mode. Reduce the file size or "
+            "increase the limit in Settings (DOCUMENT_DOCLING_MAX_FILE_BYTES)."
+        )
+
+    # Timeout
+    if "timeout" in low:
+        return (
+            "Standard mode took too long to convert this PDF. Try a smaller PDF, "
+            "reduce the page count, increase DOCUMENT_DOCLING_TIMEOUT, or switch to LLM API mode."
+        )
+
+    # Backend parse failure (corrupted, password-protected, unsupported)
+    if "could not parse the input" in low:
+        return (
+            "Standard mode couldn't read this PDF. It may be corrupted, "
+            "password-protected, or in an unsupported format. Try re-saving it as a "
+            "new PDF or switch to LLM API mode."
+        )
+
+    # Source unavailable (file moved/deleted)
+    if "not found or cannot be opened" in low:
+        return (
+            "The PDF file couldn't be opened. It may have been moved or deleted. "
+            "Please re-upload it."
+        )
+
+    # Generic fallback: surface the detail, not the full wrapper sentence.
+    return (
+        f"Standard mode couldn't convert this PDF: {detail}. "
+        "Check the server logs or switch to LLM API mode."
+    )
+
+
+def _classify_conversion_error(exc: Exception, conversion_mode: str = "standard") -> str:
     """Translate a raw exception into a user-actionable error message.
 
     The raw exception is still logged via logger.exception; this function only
     controls what the user sees in the document's error field and the UI.
+
+    ``conversion_mode`` lets us avoid telling a user to "try Standard mode" when
+    they are already in Standard mode.
     """
     exc_str = str(exc)
     exc_type = type(exc).__name__
+    is_standard = conversion_mode == "standard"
+    is_llm_api = conversion_mode == "llm_api"
 
     # MemoryError — the host ran out of RAM during conversion
     if isinstance(exc, MemoryError):
         return (
             "Server ran out of memory while converting this PDF. "
-            "Try a smaller file, reduce DOCUMENT_DOCLING_MAX_PAGES, "
+            "Try a smaller file, lower DOCUMENT_DOCLING_TIMEOUT, "
             "or use llm_api mode for large/scanned documents."
         )
 
@@ -95,7 +181,8 @@ def _classify_conversion_error(exc: Exception) -> str:
             return "PyMuPDF is missing. Server is missing dependencies for PDF conversion. Reinstall with `pip install -r requirements.txt`."
         return "Server is missing dependencies for this conversion mode. Reinstall with `pip install -r requirements.txt`."
 
-    # ValueError — already user-friendly messages from the converter
+    # ValueError — already user-friendly messages from the converter (e.g.
+    # PARTIAL_SUCCESS timeout handling in _convert_pdf_with_docling_standard).
     if isinstance(exc, ValueError):
         return exc_str
 
@@ -114,6 +201,8 @@ def _classify_conversion_error(exc: Exception) -> str:
             return f"The AI provider returned an error (HTTP {status}). Check the server logs for details."
 
         if isinstance(exc, httpx.TimeoutException):
+            if is_standard:
+                return "Conversion timed out. Try a smaller PDF or use llm_api mode."
             return "Conversion timed out. Try a smaller PDF or use Standard mode instead."
 
         if isinstance(exc, (httpx.ConnectError, httpx.NetworkError)):
@@ -132,12 +221,27 @@ def _classify_conversion_error(exc: Exception) -> str:
     except ImportError:
         pass
 
+    # Docling ConversionError — surface the actual message so the user sees the
+    # real reason (file size, backend failure, timeout, etc.) instead of a
+    # generic "try Standard mode" when already in Standard mode.
+    if _DoclingConversionError is not None and isinstance(exc, _DoclingConversionError):
+        return _classify_docling_conversion_error(exc)
+
     # Fallback: include the exception type so the user has something to grep
-    # the logs with, but don't dump a raw traceback fragment.
-    return f"Conversion failed ({exc_type}). Check the server logs or try Standard mode."
+    # the logs with, but don't suggest the mode they're already using.
+    if is_standard:
+        return f"Conversion failed ({exc_type}). Check the server logs."
+    if is_llm_api:
+        return f"Conversion failed ({exc_type}). Check the server logs or try Standard mode."
+    return f"Conversion failed ({exc_type}). Check the server logs."
 
 
 async def process_document_job(document_id: str, job_id: str) -> None:
+    async with _get_ingestion_sem():
+        await _process_document_job_inner(document_id, job_id)
+
+
+async def _process_document_job_inner(document_id: str, job_id: str) -> None:
     global _docling_models_warmed
     update_job(job_id, "processing", "Reading document")
     record = _refresh_record(document_id, job_id)
@@ -146,14 +250,23 @@ async def process_document_job(document_id: str, job_id: str) -> None:
     try:
         update_document(document_id, status="reading", error=None)
         _maybe_emit_docling_download_notice(job_id, record)
+
+        start = time.perf_counter()
         result = await convert_document(record)
+        _log_ingestion_stage("job", "conversion", document_id, job_id, time.perf_counter() - start)
         _docling_models_warmed = True
+
         record = _refresh_record(document_id, job_id)
         if record is None:
             return
+
+        start = time.perf_counter()
         write_converted_markdown(record, result)
+        _log_ingestion_stage("job", "markdown_writing", document_id, job_id, time.perf_counter() - start)
+
         # Persist the VCM metadata extracted during conversion so the indexer
         # and RAG pipeline read from a single source of truth.
+        start = time.perf_counter()
         meta = result.metadata
         record = update_document(
             document_id,
@@ -164,17 +277,26 @@ async def process_document_job(document_id: str, job_id: str) -> None:
             document_id=meta.get("document_id"),
             version_number=meta.get("version_number"),
         )
+        _log_ingestion_stage("job", "metadata_extraction", document_id, job_id, time.perf_counter() - start)
+
         update_job(job_id, "processing", "Adding document to Cora")
-        chunk_count = await index_document(record)
+        start = time.perf_counter()
+        chunk_count = await index_document(record, job_id=job_id)
+        _log_ingestion_stage("job", "indexing", document_id, job_id, time.perf_counter() - start, chunk_count)
         update_job(job_id, "completed", f"Ready to use. {chunk_count} text sections added.")
     except Exception as exc:
         logger.exception("Document processing failed for %s", document_id)
-        user_error = _classify_conversion_error(exc)
+        user_error = _classify_conversion_error(exc, record.conversion_mode if record else "standard")
         update_document(document_id, status="failed", error=user_error)
         update_job(job_id, "failed", error=user_error)
 
 
 async def reindex_document_job(document_id: str, job_id: str) -> None:
+    async with _get_ingestion_sem():
+        await _reindex_document_job_inner(document_id, job_id)
+
+
+async def _reindex_document_job_inner(document_id: str, job_id: str) -> None:
     global _docling_models_warmed
     update_job(job_id, "processing", "Refreshing document for Cora")
     record = _refresh_record(document_id, job_id)
@@ -183,13 +305,21 @@ async def reindex_document_job(document_id: str, job_id: str) -> None:
     try:
         if not record.converted_path or not Path(record.converted_path).exists():
             _maybe_emit_docling_download_notice(job_id, record)
+            start = time.perf_counter()
             result = await convert_document(record)
+            _log_ingestion_stage("job", "conversion", document_id, job_id, time.perf_counter() - start)
             _docling_models_warmed = True
+
             record = _refresh_record(document_id, job_id)
             if record is None:
                 return
+
+            start = time.perf_counter()
             write_converted_markdown(record, result)
+            _log_ingestion_stage("job", "markdown_writing", document_id, job_id, time.perf_counter() - start)
+
             # Persist freshly extracted VCM metadata.
+            start = time.perf_counter()
             meta = result.metadata
             record = update_document(
                 document_id,
@@ -200,17 +330,20 @@ async def reindex_document_job(document_id: str, job_id: str) -> None:
                 document_id=meta.get("document_id"),
                 version_number=meta.get("version_number"),
             )
+            _log_ingestion_stage("job", "metadata_extraction", document_id, job_id, time.perf_counter() - start)
         else:
             # Even on reindex without reconversion, re-read metadata from the
             # record so the indexer gets the persisted values.
             record = _refresh_record(document_id, job_id)
             if record is None:
                 return
-        chunk_count = await index_document(record)
+        start = time.perf_counter()
+        chunk_count = await index_document(record, job_id=job_id)
+        _log_ingestion_stage("job", "indexing", document_id, job_id, time.perf_counter() - start, chunk_count)
         update_job(job_id, "completed", f"Document refreshed. {chunk_count} text sections added.")
     except Exception as exc:
         logger.exception("Document re-index failed for %s", document_id)
-        user_error = _classify_conversion_error(exc)
+        user_error = _classify_conversion_error(exc, record.conversion_mode if record else "standard")
         update_document(document_id, status="failed", error=user_error)
         update_job(job_id, "failed", error=user_error)
 

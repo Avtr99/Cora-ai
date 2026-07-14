@@ -249,7 +249,7 @@ class ConversationalHandler:
             label = (intent_text or "").strip().lower()
             decision = label == "conversational"
         except Exception as exc:
-            logger.warning(f"Intent classification failed; defaulting to RAG: {exc}")
+            logger.warning("Intent classification failed; defaulting to RAG: %s", exc)
             decision = False
 
         async with _get_intent_cache_lock():
@@ -328,7 +328,7 @@ class ConversationalHandler:
             }
             
         except Exception as e:
-            logger.warning(f"Conversational handler failed, will fall through to RAG: {e}")
+            logger.warning("Conversational handler failed, will fall through to RAG: %s", e)
             # Return None to signal fallback to full RAG pipeline
             return None
     

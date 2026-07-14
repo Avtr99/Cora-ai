@@ -8,6 +8,7 @@ deprecated ``api_key``-in-body approach).
 """
 
 import logging
+import re
 from typing import List, Optional
 
 import httpx
@@ -20,6 +21,15 @@ logger = logging.getLogger(__name__)
 # Official endpoint — https://docs.tavily.com/documentation/api-reference/introduction
 _TAVILY_SEARCH_URL = "https://api.tavily.com/search"
 _TAVILY_TIMEOUT = 30.0  # seconds — Tavily advanced can take ~5-10s
+
+# Search engines (including Tavily) prepend file-type markers to result titles for
+# PDF/DOC/WEB links. Strip them before the title is used for citations or LLM context.
+_SEARCH_PREFIX_RE = re.compile(r"^\[(?:PDF|DOC|WEB)\]\s*:?\s*", re.IGNORECASE)
+
+
+def _strip_search_prefix(title: str) -> str:
+    """Remove file-type prefixes like '[PDF] ' or '[PDF]: ' from search titles."""
+    return _SEARCH_PREFIX_RE.sub("", title).strip()
 
 
 class TavilySearchProvider(SearchProvider):
@@ -69,7 +79,7 @@ class TavilySearchProvider(SearchProvider):
             for i, res in enumerate(data.get("results", [])):
                 results.append(SearchResult(
                     id=f"source_{i + 1}",
-                    title=res.get("title", ""),
+                    title=_strip_search_prefix(res.get("title", "")),
                     url=res.get("url", ""),
                     content=res.get("content", ""),
                     score=res.get("score"),

@@ -16,8 +16,11 @@ class SourceTypeResolver:
 
     def resolve(self, source: dict, title: str, url: str) -> str:
         explicit_type = str(source.get("type", "")).strip().lower()
-        if explicit_type in {"knowledge_base", "web"}:
-            return explicit_type
+        # Treat the provider-specific "web_search" label the same as "web".
+        # An explicit type from the source provider wins over URL-extension heuristics.
+        if explicit_type in {"knowledge_base", "web", "web_search"}:
+            # ponytail: map provider-specific "web_search" to canonical "web".
+            return "web" if explicit_type == "web_search" else explicit_type
 
         for candidate in (
             title,
