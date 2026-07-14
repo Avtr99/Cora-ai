@@ -1,1 +1,1 @@
-# API package initialization
+"""API routes and request-handling utilities."""

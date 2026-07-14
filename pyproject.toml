@@ -1,0 +1,12 @@
+[tool.interrogate]
+ignore-init-method = true
+ignore-init-module = false
+ignore-magic = true
+ignore-nested-functions = true
+ignore-nested-classes = true
+ignore-private = true
+ignore-property-decorators = true
+ignore-semiprivate = true
+ignore-setters = true
+fail-under = 80
+exclude = ["tests", "scripts/evaluation"]

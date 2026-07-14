@@ -1,1 +1,1 @@
-# Query processing package initialization
+"""Query processing and LLM client abstractions."""

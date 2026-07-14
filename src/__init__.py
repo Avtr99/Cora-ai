@@ -1,1 +1,1 @@
-# This file makes the src directory a Python package
+"""Cora AI backend package."""

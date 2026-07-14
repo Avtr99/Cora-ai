@@ -1,4 +1,4 @@
-# Retrieval package initialization
+"""Retrieval package — vector search and reranking wrappers."""
 
 from .langchain_retriever import LangChainRetriever, get_langchain_retriever
 
