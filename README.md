@@ -95,7 +95,7 @@ fits your budget, latency, and sovereignty requirements — from all-cloud to fu
 | **LLM** (answers, routing, rewriting) | Google Gemini (`gemini-2.5-flash`) | OpenAI `gpt-4.1-mini`, OpenRouter (any model), Ollama / vLLM / LM Studio (local). Override Gemini models with `GEMINI_MODEL_MAIN` / `GEMINI_MODEL_LITE`; set local/base URL and model through the `/setup` UI. | `GEMINI_API_KEY`, `OPENAI_API_KEY`, `OPENROUTER_API_KEY` |
 | **Embeddings** | Voyage AI (`voyage-4-lite`, 1024d) | Cohere `embed-v4.0`, OpenAI `text-embedding-3-small`, Ollama (`bge-large-en-v1.5`, `nomic-embed-text`, …). The Voyage 4 series (`voyage-4-large`, `voyage-4`, `voyage-4-lite`, `voyage-4-nano`) shares one embedding space, so you can mix models without re-indexing. | `EMBEDDING_PROVIDER`, `EMBEDDING_MODEL`, `EMBEDDING_DIM` |
 | **Reranker** | Voyage AI (`rerank-2.5`) | Cohere rerank models, `none` (skip — fully offline) | `RERANK_PROVIDER`, `RERANK_MODEL` |
-| **Web search** | Tavily | `none` (answer only from local documents) | `SEARCH_PROVIDER`, `ENABLE_WEB_SEARCH` |
+| **Web search** | Tavily | Disable with `ENABLE_WEB_SEARCH=false` | `SEARCH_PROVIDER`, `ENABLE_WEB_SEARCH` |
 | **Vector store** | Qdrant (local Docker) | Any Qdrant instance (local or remote) | `QDRANT_URL`, `QDRANT_COLLECTION_NAME` |
 | **PDF conversion** | Docling classical pipeline (local, CPU) | `llm_api` AI service (Gemini / GPT-4.1-mini / local vLLM). Set per document via API (`conversion_mode: standard | llm_api`). | `DOCUMENT_DOCLING_*`, `DOCUMENT_LLM_*` |
 
@@ -380,7 +380,9 @@ Qdrant for vectors and conversation memory.
 
 - AI service (auto-detected: Gemini 2.5 Flash or GPT-4.1-mini via the OpenAI-compatible
   endpoint). Higher accuracy on complex layouts, charts, images, and formulas.
-- Requires a paid API key; ~$0.002/page. Tunable concurrency and retry settings.
+- Requires either a paid API key or a self-hosted endpoint. Paid usage is ~$0.002/page
+  with tunable concurrency and retry settings; self-hosted usage is free after the
+  endpoint is provisioned.
 - Power users can point it at a local vLLM server (e.g. PaddleOCR-VL-1.6) via
   `OPENAI_BASE_URL` — a config change, not a code mode.
 

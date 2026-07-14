@@ -1,4 +1,4 @@
-# Utils package initialization
+"""Shared security and utility helpers."""
 from .security import (
     validate_path,
     validate_file_path,
