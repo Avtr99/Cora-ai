@@ -97,7 +97,7 @@ fits your budget, latency, and sovereignty requirements — from all-cloud to fu
 | **Reranker** | Voyage AI (`rerank-2.5`) | Cohere rerank models, `none` (skip — fully offline) | `RERANK_PROVIDER`, `RERANK_MODEL` |
 | **Web search** | Tavily | Disable with `ENABLE_WEB_SEARCH=false` | `SEARCH_PROVIDER`, `ENABLE_WEB_SEARCH` |
 | **Vector store** | Qdrant (local Docker) | Any Qdrant instance (local or remote) | `QDRANT_URL`, `QDRANT_COLLECTION_NAME` |
-| **PDF conversion** | Docling classical pipeline (local, CPU) | `llm_api` AI service (Gemini / GPT-4.1-mini / local vLLM). Set per document via API (`conversion_mode: standard | llm_api`). | `DOCUMENT_DOCLING_*`, `DOCUMENT_LLM_*` |
+| **PDF conversion** | Docling classical pipeline (local, CPU) | `llm_api` AI service (Gemini / GPT-4.1-mini / local vLLM). Set per document via API (`conversion_mode: standard / llm_api`). | `DOCUMENT_DOCLING_*`, `DOCUMENT_LLM_*` |
 
 ### Example configurations
 
@@ -137,6 +137,7 @@ EMBEDDING_MODEL=bge-large-en-v1.5
 EMBEDDING_DIM=1024
 RERANK_PROVIDER=none
 SEARCH_PROVIDER=none
+ENABLE_WEB_SEARCH=false
 ```
 For the LLM, configure Ollama in the **Settings → AI Model** UI (no API key needed).
 
@@ -421,7 +422,7 @@ every option. The most important ones:
 | `OPENROUTER_API_KEY` | Use OpenRouter. Defaults to `google/gemini-2.5-flash`; switch models in the AI Model settings. |
 | `EMBEDDING_PROVIDER` | `voyage` (default), `cohere`, `openai`, or `ollama` (local). |
 | `RERANK_PROVIDER` | `voyage` (default), `cohere`, or `none`. |
-| `SEARCH_PROVIDER` | `tavily` (default) or `none`. Also set `ENABLE_WEB_SEARCH=false` to disable web search entirely. |
+| `SEARCH_PROVIDER` | `tavily` (default) or `none`. `none` leaves the provider slot unconfigured; set `ENABLE_WEB_SEARCH=false` to disable web search entirely. |
 | `QDRANT_COLLECTION_NAME` | Name of the Qdrant collection. Default is `cora_dense_only`. |
 | `SECRET_KEY` | Signs conversation history and anonymizes memory user IDs. **Auto-generated on first run** and persisted to SQLite — no setup needed. Set it in `.env` only if you want your own key. |
 
