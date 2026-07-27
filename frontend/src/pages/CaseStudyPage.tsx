@@ -57,7 +57,7 @@ function CaseStudyPage(): JSX.Element {
       {/* Main Page Heading - Visually Hidden but accessible to screen readers */}
       <h1 className="sr-only">Carbon Credit Project Case Study - {caseStudyData.title}</h1>
 
-      <div className="container mx-auto px-4 md:px-16 lg:px-24 pt-16 pb-8 max-w-7xl">
+      <div className="container mx-auto px-4 md:px-16 lg:px-24 pt-16 pb-24 md:pb-16 max-w-7xl">
         {/* Case Study Header */}
         <CaseStudyHeader
           title={caseStudyData.title}
@@ -69,22 +69,20 @@ function CaseStudyPage(): JSX.Element {
         />
 
         {/* Hero Image + Strengths */}
-        <div className="grid grid-cols-1 lg:grid-cols-[600px_1fr] gap-x-6 lg:gap-x-14 gap-y-4 mb-12 items-stretch">
-          <div className="relative rounded-xl overflow-hidden aspect-[3/2] lg:aspect-auto lg:h-full min-h-72 bg-surface-subtle">
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,600px)_1fr] gap-x-6 lg:gap-x-14 gap-y-4 mb-12 items-stretch">
+          <div className="relative rounded-2xl overflow-hidden w-full min-w-0 aspect-[16/9] md:aspect-[3/2] lg:aspect-auto lg:h-full bg-surface-subtle max-h-[62.5vw] md:max-h-[480px] lg:max-h-none">
             <img
               src={caseStudyData.mainImage}
               srcSet={caseStudyData.mainImageSrcSet}
-              sizes="(max-width: 767px) calc(100vw - 48px), (min-width: 768px) and (max-width: 1023px) calc(100vw - 148px), 600px"
+              sizes="(max-width: 767px) calc(100vw - 2rem), (max-width: 1023px) calc(100vw - 8rem), 600px"
               alt={caseStudyData.title}
-              className="w-full h-full object-cover"
+              className="w-full h-full max-w-full object-cover"
               loading="eager"
               decoding="async"
-              width="960"
-              height="640"
               ref={(el) => el?.setAttribute('fetchpriority', 'high')}
             />
           </div>
-          <div className="lg:max-w-[480px]">
+          <div className="min-w-0 lg:max-w-[480px]">
             <CaseStudyStrengths
               strengths={caseStudyData.strengths}
               sdgs={caseStudyData.sdgs}

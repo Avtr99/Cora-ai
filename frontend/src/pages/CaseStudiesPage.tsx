@@ -102,8 +102,8 @@ const CaseStudyCard: React.FC<CaseStudyCardProps> = ({
           </p>
 
           {/* Footer bar */}
-          <div className="mt-auto flex items-center justify-between pt-4 border-t border-surface-subtle">
-            <div className="flex items-center gap-2">
+          <div className="mt-auto flex flex-col gap-4 pt-5 border-t border-surface-subtle md:flex-row md:items-center md:justify-between md:gap-3">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs uppercase tracking-wider text-text-muted font-inter font-semibold">SDGs</span>
               {sdgs.map((sdg) => (
                 <div
@@ -118,7 +118,7 @@ const CaseStudyCard: React.FC<CaseStudyCardProps> = ({
             </div>
             <Link
               to={`/case-study/${id}`}
-              className="inline-flex items-center gap-1.5 text-brand-700 font-poppins text-sm font-semibold hover:text-brand-hover transition-colors duration-200"
+              className="flex md:inline-flex items-center justify-center md:justify-start gap-2 w-full md:w-auto min-h-11 md:min-h-0 px-4 py-3 md:px-0 md:py-0 rounded-lg md:rounded-none border border-border-ui md:border-0 bg-surface-subtle md:bg-transparent text-brand-700 font-poppins text-sm font-semibold hover:bg-surface-base md:hover:bg-transparent hover:text-brand-hover transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
             >
               Read case study
               <span aria-hidden="true" className="text-base">→</span>
@@ -135,7 +135,7 @@ const CaseStudiesPage: React.FC = () => {
     <main className="bg-surface-page min-h-screen">
       <ScrollToTop />
 
-      <div className="container mx-auto px-4 md:px-12 lg:px-24 pt-16 pb-8 max-w-7xl">
+      <div className="container mx-auto px-4 md:px-12 lg:px-24 pt-16 pb-24 md:pb-16 max-w-7xl">
         {/* Page Header */}
         <header className="mb-8 md:mb-12">
           <nav aria-label="Back navigation" className="mb-4 md:mb-8">

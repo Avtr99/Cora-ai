@@ -49,7 +49,7 @@ export const CaseStudyHeader = ({
         </h1>
         
         <div className="flex flex-wrap items-center gap-2">
-          <a href={registryUrl} target="_blank" rel="noopener noreferrer" className="text-text-secondary font-inter text-xs md:text-sm underline whitespace-nowrap">
+          <a href={registryUrl} target="_blank" rel="noopener noreferrer" className="text-text-secondary font-inter text-xs md:text-sm underline whitespace-normal break-words min-w-0">
             {organization} · {organizationId}
           </a>
           

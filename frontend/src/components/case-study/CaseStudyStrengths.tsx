@@ -47,7 +47,7 @@ export const CaseStudyStrengths = ({
   ratingNote
 }: CaseStudyStrengthsProps) => {
   return (
-    <div className="bg-surface-card rounded-2xl p-6 md:p-8 shadow-sm border border-border-ui h-full w-full">
+    <div className="bg-surface-card rounded-2xl p-6 md:p-8 shadow-sm border border-border-ui h-full w-full min-w-0">
       {/* Header with title + rating */}
       <div className="flex items-start justify-between gap-4 mb-5">
         <h2 className="font-inter text-sm font-semibold text-text-primary">Strengths</h2>
@@ -77,7 +77,7 @@ export const CaseStudyStrengths = ({
           ))}
         </div>
 
-        <div className="text-text-primary text-xs font-inter font-semibold leading-none">
+        <div className="text-text-primary text-xs font-inter font-semibold leading-snug break-words">
           {ratingNote}
         </div>
       </div>
