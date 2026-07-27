@@ -46,15 +46,17 @@ export function useComposerFocus({ textareaRef, disabled, onTypeChar }: UseCompo
   // Type anywhere to focus.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.defaultPrevented) return;
       if (disabled) return;
       if (e.repeat || e.isComposing || e.ctrlKey || e.altKey || e.metaKey) return;
 
       const target = e.target;
-      if (target instanceof HTMLElement) {
-        const tag = target.tagName;
-        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-        if (target.isContentEditable || target.closest('[contenteditable="true"]')) return;
-      }
+      if (!(target instanceof HTMLElement)) return;
+
+      const tag = target.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      if (target.isContentEditable || target.closest('[contenteditable="true"]')) return;
+      if (target.closest('button, a[href], [role="button"], [role="menuitem"]')) return;
 
       const key = e.key;
       if (key.length !== 1) return;

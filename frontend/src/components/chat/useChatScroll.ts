@@ -45,6 +45,7 @@ export function useChatScroll({
 }: UseChatScrollOptions = {}): ChatScrollState {
   const containerRef = useRef<HTMLElement | null>(null);
   const rafIdRef = useRef<number | null>(null);
+  const correctionRafRef = useRef<number | null>(null);
   const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const smoothRef = useRef(true);
 
@@ -136,6 +137,10 @@ export function useChatScroll({
         cancelAnimationFrame(rafIdRef.current);
         rafIdRef.current = null;
       }
+      if (correctionRafRef.current !== null) {
+        cancelAnimationFrame(correctionRafRef.current);
+        correctionRafRef.current = null;
+      }
       if (scrollTimeoutRef.current) {
         clearTimeout(scrollTimeoutRef.current);
       }
@@ -155,17 +160,22 @@ export function useChatScroll({
     // Virtualized estimates may grow right after we initiate the smooth scroll.
     // Do a one-time correction shortly after to land exactly at the bottom.
     if (behavior === 'smooth') {
+      if (correctionRafRef.current !== null) {
+        cancelAnimationFrame(correctionRafRef.current);
+      }
+
       const start = performance.now();
       const correct = () => {
+        correctionRafRef.current = null;
         const elapsed = performance.now() - start;
         const currentMax = container.scrollHeight - container.clientHeight;
         if (elapsed < 600 && container.scrollTop < currentMax - BOTTOM_THRESHOLD) {
-          requestAnimationFrame(correct);
+          correctionRafRef.current = requestAnimationFrame(correct);
         } else if (container.scrollTop < currentMax - BOTTOM_THRESHOLD) {
           container.scrollTop = currentMax;
         }
       };
-      requestAnimationFrame(correct);
+      correctionRafRef.current = requestAnimationFrame(correct);
     }
   }, []);
 
