@@ -1,7 +1,7 @@
 import React, { useState, useEffect, lazy, Suspense } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { SearchBar } from "@/components/ui/SearchBar";
-import { ScrollToTop } from "@/components/ui/ScrollToTop";
+import { ChatScrollButton } from "@/components/chat/ChatScrollButton";
 import { useSidebar } from "@/contexts/useSidebar";
 import { useChatContext } from "@/contexts/useChatContext";
 import { useUserContext } from "@/contexts/useUserContext";
@@ -136,19 +136,12 @@ const Index: React.FC = () => {
         {/* Main content area - Explicit scroll container for virtualizer */}
         <motion.section
           ref={scrollContainerRef}
+          data-chat-scroll-container
           className="flex-1 overflow-y-auto relative"
           animate={{ marginLeft: isCollapsed ? 2 : 5 }}
           transition={{ duration: 0.2, ease: "easeOut" }}
           style={{ height: isMobile ? 'calc(100dvh - 60px)' : '100%', paddingBottom: isMobile ? '100px' : '160px' }} /* Extra padding to ensure content doesn't hide behind search bar */
         >
-          {/* Scroll to top button - only show when chat has messages */}
-          {activeChat && activeChat.messages.length > 0 && (
-            <ScrollToTop
-              variant="compact"
-              scrollContainerSelector="[data-chat-scroll-container]"
-            />
-          )}
-
           <div className="grow h-full pt-10 max-md:pt-14 pb-12 px-6 md:px-8 max-md:max-w-full">
             <div className="w-full h-full flex flex-col max-w-5xl max-md:max-w-full mx-auto">
               <AnimatePresence>
@@ -274,7 +267,8 @@ const Index: React.FC = () => {
           }}>
           {/* Match exact width of the main content container to ensure perfect alignment */}
           <div className="w-full px-6 md:px-8">
-            <div className={`w-full ${activeChat && activeChat.messages.length > 0 ? 'md:max-w-2xl md:mx-auto' : 'max-w-5xl mx-auto'}`}>
+            <div className={`relative w-full ${activeChat && activeChat.messages.length > 0 ? 'md:max-w-2xl md:mx-auto' : 'max-w-5xl mx-auto'}`}>
+              <ChatScrollButton hasMessages={activeChat ? activeChat.messages.length > 0 : false} />
               {!isReadinessLoading && <ChatReadinessBanner />}
               <div className={!isReadinessLoading ? 'mt-2' : ''}>
                 <SearchBar

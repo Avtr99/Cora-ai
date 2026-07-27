@@ -9,6 +9,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useChatReadiness } from "@/hooks/useChatReadiness";
 import { TEXT } from "@/lib/colors";
 import { ProviderToggle } from "@/components/ui/ProviderToggle";
+import { useComposerFocus } from "@/hooks/useComposerFocus";
 
 // Static constants moved to module scope to avoid recreation on every render
 const LARGE_MAX_ROWS = 6;
@@ -32,6 +33,25 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onTypingStateChange, varia
   // chat is not ready (no KB docs and no web search). Ongoing generations keep
   // the stop button active.
   const inputDisabled = isLoading || (!isTyping && !chatReady);
+
+  const handleTypeChar = (char: string) => {
+    const ta = textareaRef.current;
+    if (!ta || ta.disabled) return;
+
+    // Read the live DOM value rather than the `message` closure, which can be
+    // stale when multiple keys arrive within the same render tick.
+    const next = ta.value + char;
+    setMessage(next);
+    ta.value = next;
+    ta.focus();
+    ta.selectionStart = ta.selectionEnd = next.length;
+  };
+
+  useComposerFocus({
+    textareaRef,
+    disabled: isTyping || inputDisabled,
+    onTypeChar: handleTypeChar,
+  });
 
   // Notify parent components when typing state changes
   useEffect(() => {
@@ -57,8 +77,6 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onTypingStateChange, varia
       const ta = textareaRef.current;
       ta.style.height = 'auto';
       ta.style.overflowY = 'hidden';
-      // Return focus to composer for quick follow-up
-      ta.focus();
     }
   };
 
@@ -183,6 +201,8 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onTypingStateChange, varia
             placeholder={inputDisabled ? disabledPlaceholder : (isLarge ? "Ask me anything about the VCM" : "Type your message")}
             aria-label="Chat message input"
             title={inputDisabled ? disabledPlaceholder : "Enter to send • Shift+Enter for newline"}
+            enterKeyHint="send"
+            autoCapitalize="sentences"
             disabled={inputDisabled}
             className={`${textareaClasses} flex items-center`}
             style={{

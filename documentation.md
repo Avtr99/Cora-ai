@@ -322,4 +322,17 @@ npm run build
 cd "d:/Cora ai"
 pytest tests/test_citation_renumber.py tests/test_citation_manager.py
 ruff check src/query_processing/citation_verifier.py src/agents/
+
+## `frontend/src/components/chat/useChatScroll.ts`
+
+### `useChatScroll(options?)`
+
+Tracks the scroll position of the chat container (default selector `[data-chat-scroll-container]`) and exposes helpers for jumping to the top or bottom of a conversation.
+
+- Returns `isAtBottom`, `canScroll`, `canScrollToTop`, `isScrolling`, `scrollToBottom`, and `scrollToTop`.
+- Uses `requestAnimationFrame` throttling for the `scroll` listener and `ResizeObserver` / `MutationObserver` to keep state accurate as the chat grows.
+- `isScrolling` is `true` while the user is actively scrolling and stays `true` for `2500ms` after the last scroll or `touchmove` event. This powers the `ChatScrollButton` auto-show/hide behavior and is also triggered by mobile touch dragging.
+- `scrollToBottom` performs a smooth scroll and a one-time corrective frame because virtualized `scrollHeight` can change while rows are being measured.
+
+**Used by:** `ChatScrollButton`, `ChatInterface` (only the `CHAT_CANCEL_AUTOSCROLL` event constant).
 ```

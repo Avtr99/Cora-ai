@@ -3,6 +3,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { useActiveChat } from '@/store/chatStore.simple';
 import { ChatMessageItem } from './ChatMessageItem';
 import { useScrollContainer } from './useScrollContainer';
+import { CHAT_CANCEL_AUTOSCROLL } from './useChatScroll';
 import './chat-interface.css';
 
 // TanStack Virtual default estimate for a single message row (pixels).
@@ -101,6 +102,16 @@ export const ChatInterface: React.FC = () => {
       scrollContainer.removeEventListener('touchmove', handleUserInteraction);
     };
   }, [scrollContainer, parentScrollRef]);
+
+  // 4. Cancel auto-scroll when the user clicks the floating scroll button
+  useEffect(() => {
+    const handleCancelAutoScroll = () => {
+      stickToBottomRef.current = false;
+    };
+
+    window.addEventListener(CHAT_CANCEL_AUTOSCROLL, handleCancelAutoScroll);
+    return () => window.removeEventListener(CHAT_CANCEL_AUTOSCROLL, handleCancelAutoScroll);
+  }, []);
 
   // Empty state
   if (!activeChat || activeChat.messages.length === 0) {
