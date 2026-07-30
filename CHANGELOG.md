@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1](https://github.com/Avtr99/Cora-ai/compare/v1.1.0...v1.1.1) (2026-07-30)
+
+
+### Bug Fixes
+
+* **release:** move release tooling to repo root and sync backend version ([8fb5f05](https://github.com/Avtr99/Cora-ai/commit/8fb5f05308caf724f1586ca5aa53de0713b65745))
+* **release:** stage parent-dir CHANGELOG into the release commit ([96b56db](https://github.com/Avtr99/Cora-ai/commit/96b56dbd376c9e23627598836adaa286b8d10f6a))
+
 # [1.1.0](https://github.com/Avtr99/Cora-ai/compare/v1.0.3...v1.1.0) (2026-07-30)
 
 
