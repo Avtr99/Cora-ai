@@ -154,6 +154,7 @@ class RouteProcessor:
         steps: List["AgentStep"],
         timeout_budget_ms: Optional[int] = None,
         sub_queries: Optional[List[str]] = None,
+        allow_query_only_cache: bool = True,
     ) -> Dict[str, Any]:
         """Process query using knowledge base only.
 
@@ -166,6 +167,9 @@ class RouteProcessor:
             sub_queries: Optional list of focused sub-queries derived from the
                 original query to guide multi-query fusion retrieval; passed
                 through to kb_handler.process for parallel dense search.
+            allow_query_only_cache: When False, skip the unscoped query-only
+                cache fallback. Must be False for follow-up turns, whose text
+                ("what are the risks") is not unique to one conversation.
 
         Returns:
             Dict with answer, sources, citations, and metadata
@@ -180,6 +184,7 @@ class RouteProcessor:
             web_route_callback=self.process_web_route,
             finalize_citations_callback=self._finalize_citations,
             sub_queries=sub_queries,
+            allow_query_only_cache=allow_query_only_cache,
         )
 
     async def process_web_route(

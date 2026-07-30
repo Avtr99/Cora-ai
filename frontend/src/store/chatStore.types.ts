@@ -1,5 +1,5 @@
 import { RecommendationType } from '@/components/chat/RecommendationCard';
-import { CitationResponse, ResponseMetadata, QuizResponse } from '@/services/cora/types';
+import { ChatHistoryMessage, CitationResponse, ResponseMetadata, QuizResponse } from '@/services/cora/types';
 import { AgentReasoningStep } from '@/types/reasoning';
 
 export type { AgentReasoningStep };
@@ -37,6 +37,7 @@ export interface Chat {
   shownRecommendations: string[]; // Track specific recommendation IDs shown, not just topic types
   backendConversationId?: string; // Canonical conversation ID returned by backend
   historySignature?: string; // HMAC signature for history verification (from backend)
+  history?: ChatHistoryMessage[]; // Canonical signed history echoed by the backend (last 10 turns, backend-windowed)
 }
 
 /**

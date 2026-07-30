@@ -30,7 +30,7 @@ from .query_sanitization import (
     sanitize_value,
 )
 
-HISTORY_CONTEXT_MAX_MESSAGES = 10
+HISTORY_CONTEXT_MAX_MESSAGES = 10  # The client's unsigned fallback history cap (FALLBACK_HISTORY_MAX) should be >= this.
 
 
 async def process_query_core(
@@ -97,7 +97,13 @@ async def process_query_core(
 
     if trusted_history and query.conversation_id:
         if signing_secret and query.history_signature:
-            history_list = [{"role": m.role, "content": m.content} for m in trusted_history]
+            # Verify the signed 10-message window, not the entire client payload.
+            # This lets clients forward a larger fallback history while still
+            # matching the HMAC computed over the last 10 turns.
+            history_list = [
+                {"role": m.role, "content": m.content}
+                for m in trusted_history[-HISTORY_CONTEXT_MAX_MESSAGES:]
+            ]
             if verify_history_signature(
                 history_list,
                 query.conversation_id,
@@ -240,11 +246,13 @@ async def process_query_core(
 
     conversation_id = query.conversation_id or str(uuid.uuid4())
 
+    # Sign the exact request text the client sent, not the escaped/sanitized copy
+    # used for prompting. This makes the signature reproducible by the client.
     new_history = []
-    if scoped_history:
-        new_history.extend([{"role": m.role, "content": m.content} for m in scoped_history])
+    if history_window:
+        new_history.extend([{"role": m.role, "content": m.content} for m in history_window])
 
-    new_history.append({"role": "user", "content": safe_query})
+    new_history.append({"role": "user", "content": query.text})
     new_history.append({"role": "assistant", "content": sanitized_answer})
 
     new_history = new_history[-HISTORY_CONTEXT_MAX_MESSAGES:]
@@ -297,5 +305,6 @@ async def process_query_core(
         quiz=sanitized_quiz,
         suggested_prompts=sanitized_suggested_prompts,
         history_signature=history_signature,
+        history=[Message(**m) for m in new_history] if new_history else None,
         truncated=processed_results.get("truncated", False),
     )

@@ -101,6 +101,7 @@ class LLMClient(Protocol):
         self,
         query: str,
         vector_results: Any,
+        resolved_query: Optional[str] = None,
     ) -> dict:
         """Full RAG pipeline: build prompt with context, generate, extract citations.
 
@@ -114,6 +115,9 @@ class LLMClient(Protocol):
         Args:
             query: User query string.
             vector_results: Retrieved documents from the vector store.
+            resolved_query: Optional context-resolved form of the query from the
+                rewriter, so follow-ups whose subject lives in an earlier turn
+                ("what is its effect?") can still be interpreted.
 
         Returns:
             Result dict with answer, sources, citations, metadata.

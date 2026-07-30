@@ -961,7 +961,7 @@ class _DummyAnswerGenerator:
     def __init__(self, result):
         self._result = result
 
-    async def search_and_process(self, query, vector_results):
+    async def search_and_process(self, query, vector_results, resolved_query=None):
         return dict(self._result)
 
     async def check_query_cache(self, query):

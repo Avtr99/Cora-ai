@@ -154,7 +154,7 @@ class HybridRouteHandler:
             remaining_budget = remaining_budget_ms(timeout_budget_ms, step_start)
             hybrid_web_timeout_ms = derive_web_timeout_ms(remaining_budget)
             result = await self.web_search.search_with_kb_context(
-                query=original_query,
+                query=query,
                 kb_context=kb_context,
                 kb_sources=kb_sources,
                 timeout_ms=hybrid_web_timeout_ms,
@@ -163,7 +163,9 @@ class HybridRouteHandler:
                 result["sources"] = normalize_sources(result["sources"])
         elif kb_context:
             # KB only
-            result = await self.answer_generator.search_and_process(original_query, vector_results)
+            result = await self.answer_generator.search_and_process(
+                original_query, vector_results, resolved_query=query
+            )
         else:
             # Web only
             result = {

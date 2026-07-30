@@ -9,13 +9,13 @@ class Message(BaseModel):
     """Conversation message for short-term history window."""
 
     role: Literal["system", "assistant", "user"]
-    content: str
+    content: str = Field(max_length=100_000)
 
 
 class Query(BaseModel):
     """Query request model."""
 
-    text: str = Field(min_length=1, description="The user's query text.")
+    text: str = Field(min_length=1, max_length=8192, description="The user's query text.")
     conversation_id: Optional[str] = Field(
         default=None,
         max_length=64,
@@ -133,6 +133,7 @@ class Response(BaseModel):
     quiz: Optional[QuizResponse] = None
     suggested_prompts: Optional[List[str]] = None
     history_signature: Optional[str] = None
+    history: Optional[List[Message]] = None
     truncated: bool = False
 
 

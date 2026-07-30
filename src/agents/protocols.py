@@ -42,8 +42,21 @@ class FusionRetrieverProtocol(RetrieverProtocol, Protocol):
 class AnswerGeneratorProtocol(Protocol):
     """Protocol for answer generator implementations."""
 
-    async def search_and_process(self, query: str, vector_results: Dict[str, Any]) -> Dict[str, Any]:
-        """Generate an answer from retrieved documents."""
+    async def search_and_process(
+        self,
+        query: str,
+        vector_results: Dict[str, Any],
+        resolved_query: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Generate an answer from retrieved documents.
+
+        Args:
+            query: The original user query text.
+            vector_results: Retrieved documents from the vector store.
+            resolved_query: Optional context-resolved form of the query from the
+                rewriter, so follow-ups whose subject lives in an earlier turn
+                ("what is its effect?") can still be interpreted.
+        """
         ...
 
     async def check_query_cache(self, query: str) -> Optional[Dict[str, Any]]:

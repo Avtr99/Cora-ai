@@ -156,9 +156,9 @@ describe('queryCoraStream', () => {
     expect(result.text).toBe('Streamed answer');
   });
 
-  it('throws on 503 (unlike queryCora which returns a startup message)', async () => {
-    // NOTE: streaming.ts throws on 503, while query.ts returns a startup message.
-    // This is a behavioral inconsistency that callers should be aware of.
+  it('throws on 503 service unavailable', async () => {
+    // NOTE: streaming.ts treats 503 as a hard error; callers should handle
+    // startup/warmup states separately.
     const mockFetch = vi.mocked(globalThis.fetch);
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ message: 'Starting up' }), {

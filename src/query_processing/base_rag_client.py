@@ -173,10 +173,22 @@ class BaseRAGClient:
         except Exception as e:
             logger.warning("Failed to persist query result to SQLite cache: {}", e)
 
-    async def search_and_process(self, query: str, vector_results: Dict[str, Any]) -> Dict[str, Any]:
+    async def search_and_process(
+        self,
+        query: str,
+        vector_results: Dict[str, Any],
+        resolved_query: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """Full RAG pipeline: build prompt, generate answer, extract citations.
 
         Provider-agnostic. Delegates the actual LLM call to ``_generate_for_rag``.
+
+        Args:
+            query: User query string.
+            vector_results: Results from vector store.
+            resolved_query: Optional context-resolved form of the query from the
+                rewriter, so follow-ups whose subject lives in an earlier turn
+                ("what is its effect?") can still be interpreted.
         """
         # Input validation
         if query is None:
@@ -208,7 +220,9 @@ class BaseRAGClient:
 
         try:
             context_text, summaries, sources = self._prepare_context(vector_results)
-            context_fingerprint = self._build_context_fingerprint(context_text, summaries, sources)
+            context_fingerprint = self._build_context_fingerprint(
+                context_text, summaries, sources, resolved_query=resolved_query
+            )
 
             # Context-aware cache check (SQLite)
             cached_result = await query_cache.get_result(
@@ -233,9 +247,12 @@ class BaseRAGClient:
             include_suggested_prompts = should_generate_suggested_prompts(query)
 
             prompt = build_query_prompt(
-                query, context_text, summaries,
+                query,
+                context_text,
+                summaries,
                 include_quiz=include_quiz,
                 include_suggested_prompts=include_suggested_prompts,
+                resolved_query=resolved_query,
             )
 
             # Prepend system instruction (same as GeminiClient._generate_async)
@@ -372,13 +389,22 @@ class BaseRAGClient:
 
     @staticmethod
     def _build_context_fingerprint(
-        context_text: str, summaries: List[str], sources: List[str]
+        context_text: str,
+        summaries: List[str],
+        sources: List[str],
+        resolved_query: Optional[str] = None,
     ) -> str:
-        """Build a stable fingerprint for the retrieval context."""
+        """Build a stable fingerprint for the retrieval context.
+
+        ``resolved_query`` participates in the fingerprint because it is part of
+        the prompt: the same question with a different context resolution is a
+        different generation and must not share a cache entry.
+        """
         payload = {
             "context": context_text,
             "summaries": summaries,
             "sources": sources,
+            "resolved_query": resolved_query or "",
         }
         serialized = json.dumps(payload, ensure_ascii=True, sort_keys=True)
         return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
