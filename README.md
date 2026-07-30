@@ -2,12 +2,15 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 [![CI](https://github.com/Avtr99/Cora-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/Avtr99/Cora-ai/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/Avtr99/Cora-ai/branch/main/graph/badge.svg)](https://codecov.io/gh/Avtr99/Cora-ai)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/Avtr99/Cora-ai/badge)](https://scorecard.dev/viewer/?platform=github.com&org=Avtr99&repo=Cora-ai)
 <!-- OpenSSF Best Practices badge — detected by Scorecard's CII-Best-Practices check.
      Project page: https://www.bestpractices.dev/projects/13501 -->
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/13501/badge)](https://www.bestpractices.dev/projects/13501)
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
 [![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+[![Keep a Changelog](https://img.shields.io/badge/keep%20a%20changelog-1.1.0-ffdd67)](https://keepachangelog.com/en/1.1.0/)
+[![Semantic Versioning](https://img.shields.io/badge/semver-2.0.0-blue)](https://semver.org/spec/v2.0.0.html)
 [![SDG 13](https://img.shields.io/badge/SDG%2013-Climate%20Action-3F7E44)](https://sdgs.un.org/goals/goal13)
 [![SDG 4](https://img.shields.io/badge/SDG%204-Quality%20Education-C5192D)](https://sdgs.un.org/goals/goal4)
 

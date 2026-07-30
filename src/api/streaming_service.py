@@ -33,7 +33,7 @@ from .query_sanitization import (
 )
 from ..utils.security import sign_history, verify_history_signature
 
-HISTORY_CONTEXT_MAX_MESSAGES = 10
+HISTORY_CONTEXT_MAX_MESSAGES = 10  # The client cap should be >= this; the frontend uses FALLBACK_HISTORY_MAX.
 
 
 async def _drain_orchestrator_stream(
@@ -155,7 +155,11 @@ async def process_query_core_stream(
 
     if trusted_history and query.conversation_id:
         if signing_secret and query.history_signature:
-            history_list = [{"role": m.role, "content": m.content} for m in trusted_history]
+            # Verify the signed 10-message window, not the entire client payload.
+            history_list = [
+                {"role": m.role, "content": m.content}
+                for m in trusted_history[-HISTORY_CONTEXT_MAX_MESSAGES:]
+            ]
             if verify_history_signature(
                 history_list,
                 query.conversation_id,
@@ -252,10 +256,12 @@ async def process_query_core_stream(
     safe_sources = [str(s) for s in sanitized_sources if s] or ["knowledge_base"]
 
     conversation_id = query.conversation_id or str(uuid.uuid4())
+    # Sign the exact request text the client sent, not the escaped/sanitized copy
+    # used for prompting. This makes the signature reproducible by the client.
     new_history = []
-    if scoped_history:
-        new_history.extend([{"role": m.role, "content": m.content} for m in scoped_history])
-    new_history.append({"role": "user", "content": safe_query})
+    if history_window:
+        new_history.extend([{"role": m.role, "content": m.content} for m in history_window])
+    new_history.append({"role": "user", "content": query.text})
     new_history.append({"role": "assistant", "content": sanitized_answer})
     new_history = new_history[-HISTORY_CONTEXT_MAX_MESSAGES:]
 
@@ -310,6 +316,7 @@ async def process_query_core_stream(
             final_result.get("suggested_prompts"), output_sanitizer
         ),
         history_signature=history_signature,
+        history=[Message(**m) for m in new_history] if new_history else None,
         truncated=final_result.get("truncated", False),
     )
 

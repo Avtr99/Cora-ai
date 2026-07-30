@@ -40,8 +40,15 @@ jobs:
       - name: Run pre-commit hooks
         uses: pre-commit/action@646c83fcd040023954eafda54b4db0192ce70507 # v3.0.0
 
-      - name: Run tests
-        run: pytest
+      - name: Run tests with coverage
+        run: pytest --cov=src --cov-report=xml --cov-report=term
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@18283e04ce6e62d37312384ff67231eb8fd56d24 # v5.4.3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.xml
+          fail_ci_if_error: false
 
   lint-and-build-frontend:
     runs-on: ubuntu-latest

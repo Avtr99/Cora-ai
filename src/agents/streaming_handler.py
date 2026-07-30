@@ -81,6 +81,7 @@ class KBStreamingHandler:
         finalize_citations_callback: Optional[Any] = None,
         sub_queries: Optional[List[str]] = None,
         emit_tokens: bool = True,
+        allow_query_only_cache: bool = True,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """Stream-process a KB query.
 
@@ -154,19 +155,22 @@ class KBStreamingHandler:
             # This handles the case where KB retrieval returns 0 results but
             # a previous successful answer is cached (e.g. starter prompts or
             # answers from a prior request with different retrieval context).
-            cached_result = await try_serve_cached_answer(
-                self.answer_generator,
-                original_query,
-                steps,
-                logger=logger,
-            )
-            if cached_result is not None:
-                cached_answer = str(cached_result.get("answer", "") or "")
-                yield {"type": "status", "status": "generating"}
-                async for ev in _emit_tokens(cached_answer):
-                    yield ev
-                yield {"type": "final", "result": cached_result}
-                return
+            # Skipped on follow-up turns: this lookup is keyed on query text
+            # alone, with no conversation scope.
+            if allow_query_only_cache:
+                cached_result = await try_serve_cached_answer(
+                    self.answer_generator,
+                    original_query,
+                    steps,
+                    logger=logger,
+                )
+                if cached_result is not None:
+                    cached_answer = str(cached_result.get("answer", "") or "")
+                    yield {"type": "status", "status": "generating"}
+                    async for ev in _emit_tokens(cached_answer):
+                        yield ev
+                    yield {"type": "final", "result": cached_result}
+                    return
 
             if doc_count == 0:
                 reason = "No KB results, using web search"
@@ -201,7 +205,9 @@ class KBStreamingHandler:
         if stream_method is None:
             logger.warning("answer_generator does not implement search_and_process_stream; using fallback")
             try:
-                result = await self.answer_generator.search_and_process(original_query, vector_results)
+                result = await self.answer_generator.search_and_process(
+                    original_query, vector_results, resolved_query=query
+                )
                 result = result or {}
             except Exception as e:
                 duration = (time.time() - gen_start) * 1000
@@ -233,7 +239,7 @@ class KBStreamingHandler:
                 logger.info("Streaming KB (non-stream fallback) returned non-answer; supplementing with web")
                 remaining = remaining_budget_ms(timeout_budget_ms, step_start)
                 web_result = await web_supplement_callback(
-                    original_query,
+                    query,
                     result,
                     vector_results,
                     steps,
@@ -269,7 +275,7 @@ class KBStreamingHandler:
                 if is_irrelevant:
                     remaining = remaining_budget_ms(timeout_budget_ms, step_start)
                     web_result = await web_supplement_callback(
-                        original_query,
+                        query,
                         result,
                         vector_results,
                         steps,
@@ -324,7 +330,7 @@ class KBStreamingHandler:
         buffered = ""
         gate_open = False
         try:
-            async for event in stream_method(original_query, vector_results):
+            async for event in stream_method(original_query, vector_results, resolved_query=query):
                 etype = event.get("type")
                 if etype == "token":
                     if not emit_tokens:
@@ -390,7 +396,7 @@ class KBStreamingHandler:
             logger.info("Streaming KB returned non-answer fallback; supplementing with web search")
             remaining = remaining_budget_ms(timeout_budget_ms, step_start)
             web_result = await web_supplement_callback(
-                original_query,
+                query,
                 result or {},
                 vector_results,
                 steps,
@@ -421,7 +427,7 @@ class KBStreamingHandler:
             if is_irrelevant:
                 remaining = remaining_budget_ms(timeout_budget_ms, step_start)
                 web_result = await web_supplement_callback(
-                    original_query,
+                    query,
                     result or {},
                     vector_results,
                     steps,

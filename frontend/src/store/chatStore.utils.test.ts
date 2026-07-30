@@ -167,15 +167,52 @@ describe('validateAndSanitizeChatHistory', () => {
     expect(result[0].shownRecommendations).toEqual([]);
   });
 
-  it('sanitizes backendConversationId and historySignature', () => {
+  it('preserves backendConversationId and historySignature when history is valid', () => {
     const chatWithBackend = {
       ...validChat,
       backendConversationId: 'backend-123',
       historySignature: 'sig-abc',
+      history: [
+        { role: 'user', content: 'Hello' },
+        { role: 'assistant', content: 'Hi there' },
+      ],
     };
     const result = validateAndSanitizeChatHistory([chatWithBackend]);
     expect(result[0].backendConversationId).toBe('backend-123');
     expect(result[0].historySignature).toBe('sig-abc');
+    expect(result[0].history).toEqual([
+      { role: 'user', content: 'Hello' },
+      { role: 'assistant', content: 'Hi there' },
+    ]);
+  });
+
+  it('drops orphan historySignature when no history is present', () => {
+    const chatWithSignatureOnly = {
+      ...validChat,
+      backendConversationId: 'backend-123',
+      historySignature: 'sig-abc',
+    };
+    const result = validateAndSanitizeChatHistory([chatWithSignatureOnly]);
+    expect(result[0].backendConversationId).toBe('backend-123');
+    expect(result[0].historySignature).toBeUndefined();
+    expect(result[0].history).toBeUndefined();
+  });
+
+  it('drops signed history and signature when any entry is invalid', () => {
+    const chatWithBadHistory = {
+      ...validChat,
+      history: [
+        { role: 'user', content: 'Hello' },
+        { role: 'hacker', content: 'Bad role' },
+        { content: 'No role' },
+        null,
+        'not an object',
+      ],
+      historySignature: 'sig-abc',
+    };
+    const result = validateAndSanitizeChatHistory([chatWithBadHistory]);
+    expect(result[0].history).toBeUndefined();
+    expect(result[0].historySignature).toBeUndefined();
   });
 
   it('handles completely empty array', () => {

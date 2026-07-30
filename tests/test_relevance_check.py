@@ -406,7 +406,7 @@ class _StreamingAnswerGenerator:
     def __init__(self, answer):
         self.answer = answer
 
-    async def search_and_process_stream(self, query, vector_results):
+    async def search_and_process_stream(self, query, vector_results, resolved_query=None):
         yield {"type": "token", "chunk": self.answer}
         yield {
             "type": "final",
@@ -513,7 +513,7 @@ class _NonStreamingAnswerGenerator:
     def __init__(self, answer):
         self.answer = answer
 
-    async def search_and_process(self, query, vector_results):
+    async def search_and_process(self, query, vector_results, resolved_query=None):
         return {
             "answer": self.answer,
             "sources": ["VCS Program Guide v4.4"],

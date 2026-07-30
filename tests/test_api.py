@@ -368,3 +368,112 @@ class TestAPI:
         assert data["kb_ready"] is True
         assert data["search_ready"] is True
         assert data["chat_ready"] is True
+
+
+class TestHistorySignatureRoundTrip:
+    """A client that echoes back exactly what it received must verify.
+
+    Regression: the signature was computed over the length-capped copy of
+    history (sanitize_history_messages truncates messages over the per-message
+    cap), while the client holds the full answer text. RAG answers routinely
+    exceed that cap, so verification failed from turn 3 onward and history was
+    silently discarded on every later turn — no frontend could satisfy it.
+    """
+
+    LONG_ANSWER = "The EU ETS revision proposes an LRF of 3.7%. " + ("detail " * 600)
+
+    @staticmethod
+    def _sanitizers():
+        from unittest.mock import MagicMock
+        from src.api.middleware import ThreatLevel
+
+        def _make_input():
+            sanitizer = MagicMock()
+
+            def _sanitize(text):
+                res = MagicMock()
+                res.threat_level = ThreatLevel.NONE if hasattr(ThreatLevel, "NONE") else ThreatLevel.LOW
+                res.sanitized_text = text
+                res.threats_detected = []
+                return res
+
+            sanitizer.sanitize.side_effect = _sanitize
+            return sanitizer
+
+        out = MagicMock()
+        out.sanitize.side_effect = lambda text: (text, [])
+        return _make_input(), out
+
+    async def _turn(self, text, history, signature, conversation_id, answer):
+        from unittest.mock import AsyncMock, MagicMock, patch
+        from src.api.query_models import Message, Query
+
+        query = Query(
+            text=text,
+            conversation_id=conversation_id,
+            history=[Message(**m) for m in history] if history else None,
+            history_signature=signature,
+            include_debug=True,
+        )
+
+        orchestrator = AsyncMock()
+        orchestrator.process = AsyncMock(return_value={
+            "answer": answer,
+            "sources": ["knowledge_base"],
+            "confidence": 0.9,
+            "metadata": {},
+            "reasoning_steps": [],
+        })
+
+        input_sanitizer, output_sanitizer = self._sanitizers()
+
+        with patch("src.api.query_service.get_input_sanitizer", return_value=input_sanitizer), \
+             patch("src.api.query_service.get_output_sanitizer", return_value=output_sanitizer), \
+             patch("src.api.query_service.get_retriever", return_value=MagicMock()), \
+             patch("src.api.query_service.get_gemini_client", return_value=MagicMock()), \
+             patch("src.api.query_service.get_citation_manager", return_value=None), \
+             patch("src.api.query_service.get_rag_orchestrator", return_value=orchestrator), \
+             patch("src.api.query_service.get_settings", return_value=MagicMock(SECRET_KEY="test-secret", RAG_TIMEOUT_MS=45000)), \
+             patch("src.api.query_service.log_output_redaction"):
+            from src.api.query_service import process_query_core
+
+            return await process_query_core(
+                query,
+                MagicMock(),
+                include_reasoning=True,
+                include_metadata=True,
+                include_duration_ms=True,
+                include_chat_history_in_orchestrator=True,
+            )
+
+    @pytest.mark.asyncio
+    async def test_three_turn_conversation_keeps_history(self):
+        conv_id = "hist-roundtrip-test"
+
+        r1 = await self._turn("What is the EU ETS revision?", None, None, conv_id, self.LONG_ANSWER)
+        assert r1.history_signature
+
+        hist2 = [
+            {"role": "user", "content": "What is the EU ETS revision?"},
+            {"role": "assistant", "content": r1.answer},
+        ]
+        r2 = await self._turn(
+            "what is its effect on the VCM", hist2, r1.history_signature, conv_id, self.LONG_ANSWER
+        )
+        assert r2.metadata is None or not r2.metadata.history_verification_failed
+
+        # Turn 3 is where the truncation bug bit: history now contains a
+        # message longer than the 4000-char sanitizer cap.
+        assert len(r1.answer) > 4000
+        hist3 = hist2 + [
+            {"role": "user", "content": "what is its effect on the VCM"},
+            {"role": "assistant", "content": r2.answer},
+        ]
+        r3 = await self._turn(
+            "what are the risks", hist3, r2.history_signature, conv_id, "Short answer."
+        )
+
+        assert r3.metadata is None or not r3.metadata.history_verification_failed, (
+            "Turn 3 history verification failed: the signature must cover the "
+            "history as the client holds it, not the truncated prompt copy."
+        )

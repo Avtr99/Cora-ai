@@ -265,13 +265,20 @@ def select_rewrite_mode(
     # Detect query type
     query_type = _detect_query_type(query_lower)
     
+    # Any turn after the first may depend on earlier context, so always take the
+    # LLM path once there is history to draw on. quick_expand only expands
+    # acronyms locally: it cannot resolve coreference ("what is its effect") and
+    # it cannot expand ellipsis ("why?", "summarize", "what are the risks").
+    # Detecting these by pronoun matching is unreliable — elliptical follow-ups
+    # contain no pronoun at all, yet embed poorly for vector retrieval, which is
+    # the failure that actually loses conversational context.
+    # This check MUST precede the use_quick_rewrite short-circuit below.
+    if chat_history:
+        return "llm", query_type
+
     # Determine rewrite mode
     if use_quick_rewrite and query_type not in full_rewrite_types:
         return "quick_expand", query_type
-    
-    # Use LLM for complex queries or when chat history requires context resolution
-    if chat_history and _needs_context_resolution(query_lower, chat_history):
-        return "llm", query_type
     
     if query_type in full_rewrite_types:
         return "llm", query_type
@@ -283,10 +290,22 @@ def select_rewrite_mode(
     return "llm", query_type
 
 
-# Pre-compiled pattern for context markers (pronouns needing resolution)
-# Used by _needs_context_resolution to avoid recompiling on each call
-_CONTEXT_MARKERS_PATTERN = re.compile(
-    r'\b(?:it|this|that|these|those|they|them|the\s+same|above|previous)\b',
+# Pronouns and discourse references that cannot be understood on their own.
+# Includes possessives ("its", "their") — omitting them meant
+# "what is its effect on the VCM" was classified as a plain factual query,
+# because \bit\b does not match "its".
+# Excludes gendered personal pronouns (he/him/his/she/her/hers) on first turns
+# with no history: they have no antecedent and cause false-positive "ambiguous"
+# classification for queries that contain those letters.
+_REFERENTIAL_MARKERS = (
+    r'it|its|this|that|these|those|they|them|their|theirs'
+    r'|the\s+same|the\s+former|the\s+latter|above|previous'
+)
+
+# Pre-compiled pattern for referential markers, used by _detect_query_type to
+# classify a query as "ambiguous" (which forces a full LLM rewrite).
+_REFERENTIAL_MARKERS_PATTERN = re.compile(
+    rf'\b(?:{_REFERENTIAL_MARKERS})\b',
     re.IGNORECASE
 )
 
@@ -323,7 +342,7 @@ def _detect_query_type(query_lower: str) -> str:
     
     # Ambiguous pronouns requiring context - word boundary matching
     # Prevents "it" in "item" or "that" in "thatched" from matching
-    if re.search(r"\b(it|this|that|these|those|they|them)\b", query_lower):
+    if _REFERENTIAL_MARKERS_PATTERN.search(query_lower):
         return "ambiguous"
     
     # Complex filter queries - tightened to avoid matching common prepositional phrases
@@ -339,23 +358,6 @@ def _detect_query_type(query_lower: str) -> str:
         return "factual"
     
     return "general"
-
-
-def _needs_context_resolution(
-    query_lower: str,
-    chat_history: List[Dict[str, str]],
-) -> bool:
-    """Check if query needs context resolution from chat history.
-    
-    Uses word-boundary matching to avoid substring false positives
-    (e.g., "it" in "item" or "this" in "thistle" should NOT trigger).
-    """
-    if not chat_history:
-        return False
-    
-    # Check for pronouns or references that need resolution
-    # Word boundary matching prevents "it" matching "item", "theme", "iterative"
-    return bool(_CONTEXT_MARKERS_PATTERN.search(query_lower))
 
 
 def attach_current_date_context(

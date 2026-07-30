@@ -29,6 +29,5 @@ export type {
 } from './cora/types';
 
 export { buildAgentReasoning } from './cora/agentReasoning';
-export { queryCora } from './cora/query';
 export { queryCoraStream } from './cora/streaming';
 export { checkHealth } from './cora/healthCheck';

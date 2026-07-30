@@ -230,7 +230,13 @@ class StreamingRAGOrchestrator(RAGOrchestrator):
             # Runs after the cheap heuristic (so greetings skip the cache) and
             # before the LLM intent classification (so cache hits are served
             # with zero LLM cost).
-            cached_result = await self._try_early_cache_hit(query, steps, start_time)
+            # Skipped for follow-up turns: the query-only cache key carries no
+            # conversation scope, so a generic follow-up ("what are the risks")
+            # would serve an unrelated conversation's answer — and would do so
+            # before rewriting, bypassing coreference resolution entirely.
+            cached_result = None
+            if not chat_history:
+                cached_result = await self._try_early_cache_hit(query, steps, start_time)
             if cached_result is not None:
                 cached_answer = str(cached_result.get("answer", "") or "")
                 logger.debug("Serving from early query cache check in stream")
@@ -310,6 +316,7 @@ class StreamingRAGOrchestrator(RAGOrchestrator):
                     finalize_citations_callback=self.route_processor._finalize_citations,
                     sub_queries=sub_queries,
                     emit_tokens=emit_tokens,
+                    allow_query_only_cache=not chat_history,
                 ):
                     if event.get("type") == "final":
                         final_result = event.get("result", {}) or {}
@@ -426,7 +433,11 @@ class StreamingRAGOrchestrator(RAGOrchestrator):
             # Persist to SQLite cache after the complete reasoning chain is
             # assembled so cache hits are identical to live responses.
             # Fire-and-forget to avoid blocking the final event.
-            self._spawn_cache_persist(query, final_result)
+            # Follow-up answers are not persisted: the query-only key is global,
+            # so caching "what are the risks" would poison every conversation
+            # that later asks the same words about a different subject.
+            if not chat_history:
+                self._spawn_cache_persist(query, final_result)
 
             yield {"type": "final", "result": final_result}
 

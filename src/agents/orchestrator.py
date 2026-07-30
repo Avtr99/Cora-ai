@@ -392,9 +392,14 @@ class RAGOrchestrator:
             # Runs after the cheap conversational heuristic so greetings skip
             # the cache, and before the LLM intent classification so cache hits
             # avoid any LLM cost.
-            cached_result = await self._try_early_cache_hit(query, steps, start_time)
-            if cached_result is not None:
-                return cached_result
+            # Skipped for follow-up turns: the query-only cache key carries no
+            # conversation scope, so a generic follow-up ("what are the risks")
+            # would serve an unrelated conversation's answer — and would do so
+            # before rewriting, bypassing coreference resolution entirely.
+            if not chat_history:
+                cached_result = await self._try_early_cache_hit(query, steps, start_time)
+                if cached_result is not None:
+                    return cached_result
 
             # OPTIMIZATION: Conversational Gate — LLM intent classification.
             # Only paid on a cache miss, for short ambiguous queries the regex
@@ -528,6 +533,7 @@ class RAGOrchestrator:
                     steps,
                     timeout_budget_ms=remaining_budget_ms,
                     sub_queries=sub_queries,
+                    allow_query_only_cache=not chat_history,
                 )
             elif route == RouteDecision.WEB_SEARCH:
                 result = await self.route_processor.process_web_route(
@@ -622,7 +628,11 @@ class RAGOrchestrator:
             # Persist to SQLite cache after the complete reasoning chain is
             # assembled so cache hits are identical to live responses.
             # Fire-and-forget to avoid blocking the response.
-            self._spawn_cache_persist(query, result)
+            # Follow-up answers are not persisted: the query-only key is global,
+            # so caching "what are the risks" would poison every conversation
+            # that later asks the same words about a different subject.
+            if not chat_history:
+                self._spawn_cache_persist(query, result)
 
             logger.info(
                 "Query timing breakdown",

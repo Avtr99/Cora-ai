@@ -57,12 +57,20 @@ class StreamingRAGWrapper:
         self,
         query: str,
         vector_results: Dict[str, Any],
+        resolved_query: Optional[str] = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """Stream-process a query with vector results.
 
         Yields ``{"type": "token", "chunk": "..."}`` events while the answer
         is generated, then a single ``{"type": "final", "result": {...}}`` event
         with the processed result (sources, coverage, metadata).
+
+        Args:
+            query: User query string.
+            vector_results: Retrieved documents from the vector store.
+            resolved_query: Optional context-resolved form of the query from the
+                rewriter, so follow-ups whose subject lives in an earlier turn
+                ("what is its effect?") can still be interpreted.
         """
         if query is None:
             raise ValueError("Query cannot be None")
@@ -91,7 +99,9 @@ class StreamingRAGWrapper:
 
         try:
             context_text, summaries, sources = self._base._prepare_context(vector_results)
-            context_fingerprint = self._base._build_context_fingerprint(context_text, summaries, sources)
+            context_fingerprint = self._base._build_context_fingerprint(
+                context_text, summaries, sources, resolved_query=resolved_query
+            )
 
             # Context-aware cache check (SQLite)
             cached_result = await query_cache.get_result(query, context_fingerprint=context_fingerprint)
@@ -114,6 +124,7 @@ class StreamingRAGWrapper:
                 summaries,
                 include_quiz=False,
                 include_suggested_prompts=False,
+                resolved_query=resolved_query,
             )
 
             accumulated_answer = ""

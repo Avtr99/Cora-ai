@@ -7,6 +7,14 @@ import { RECOMMENDATIONS } from '@/components/chat/recommendations';
 import type { Recommendation, RecommendationType } from '@/components/chat/RecommendationCard';
 
 /**
+ * Backend constants for the signed history contract.
+ * FALLBACK_HISTORY_MAX is a request-size guard for the derive-from-messages
+ * path; it must be >= the backend's HISTORY_CONTEXT_MAX_MESSAGES (currently 10)
+ * so the backend always has enough context to build its verified window.
+ */
+const FALLBACK_HISTORY_MAX = 50;
+
+/**
  * Detect when the backend answered from an empty KB without web search.
  *
  * The backend sets `metadata.kb_empty` when the KB route retrieved zero
@@ -93,6 +101,46 @@ function getUnseenRecommendations(
   return { topics, recommendationIds };
 }
 
+/**
+ * Select the protocol history and signature to send to the backend.
+ * - If the chat has a signed `history`, echo it (with the signature if present).
+ * - If the chat has a signature but no `history` (legacy persisted state),
+ *   drop the signature and start a fresh signed thread.
+ * - Otherwise derive a fallback from display messages, capped at
+ *   FALLBACK_HISTORY_MAX, and send it without a signature.
+ */
+export function buildProtocolHistory(
+  chat: Chat,
+  userMessageId: string
+): { protocolHistory: ChatHistoryMessage[] | undefined; requestHistorySignature: string | undefined } {
+  let protocolHistory: ChatHistoryMessage[] | undefined = chat.history;
+  let requestHistorySignature: string | undefined = chat.historySignature;
+
+  if (!protocolHistory || protocolHistory.length === 0) {
+    if (chat.historySignature) {
+      // Transition: old persisted chat without protocol history
+      protocolHistory = undefined;
+      requestHistorySignature = undefined;
+    } else {
+      // First message or new chat: derive from display messages.
+      // Cap at FALLBACK_HISTORY_MAX so the request body stays bounded; the
+      // backend verifies the last N entries of whatever we send, so this
+      // fallback is only for prompt context.
+      // Note: this path only produces user/assistant pairs. A future backend
+      // that signs system entries would need an explicit system mapping here.
+      protocolHistory = chat.messages
+        .filter(msg => msg.status !== 'pending' && msg.id !== userMessageId)
+        .map(msg => ({
+          role: msg.sender === 'user' ? ('user' as const) : ('assistant' as const),
+          content: msg.content,
+        }))
+        .slice(-FALLBACK_HISTORY_MAX);
+    }
+  }
+
+  return { protocolHistory, requestHistorySignature };
+}
+
 interface UseBotResponseParams {
   setTypingChatIds: React.Dispatch<React.SetStateAction<Set<string>>>;
   getCurrentChat: (chatId: string) => Chat | null;
@@ -129,20 +177,14 @@ export function useBotResponse({
       const detectedTopics = detectTopics(lastUserMessage.content);
       const { topics: unseenTopics, recommendationIds: unseenIds } = getUnseenRecommendations(detectedTopics, chat.shownRecommendations, lastUserMessage.content);
 
-      const messageHistory: ChatHistoryMessage[] = chat.messages
-        // Exclude pending messages and the current user message being sent
-        .filter(msg => msg.status !== 'pending' && msg.id !== userMessageId)
-        .map(msg => ({
-          role: msg.sender === 'user' ? ('user' as const) : ('assistant' as const),
-          content: msg.content,
-        }));
+      const { protocolHistory, requestHistorySignature } = buildProtocolHistory(chat, userMessageId);
 
       if (import.meta.env.DEV) {
         console.log('[ChatContext] Building message history:', {
           totalMessages: chat.messages.length,
           nonPendingMessages: chat.messages.filter(msg => msg.status !== 'pending').length,
-          historyLength: messageHistory.length,
-          historyPreview: messageHistory.slice(-2),
+          historyLength: protocolHistory?.length ?? 0,
+          historyPreview: protocolHistory?.slice(-2),
         });
       }
 
@@ -157,8 +199,8 @@ export function useBotResponse({
       const response = await queryCoraStream(
         lastUserMessage.content,
         requestConversationId,
-        messageHistory,
-        chat.historySignature,
+        protocolHistory,
+        requestHistorySignature,
         {
           onStatus: (event) => {
             const { status, message } = event;
@@ -219,8 +261,9 @@ export function useBotResponse({
           if (import.meta.env.DEV) console.warn('[ChatContext] History verification failed - resetting chat context');
           // Reset verification context so next turn can establish a fresh trusted thread
           const latestChat = getCurrentChat(chatId);
-          if (latestChat && (latestChat.historySignature || latestChat.backendConversationId)) {
+          if (latestChat && (latestChat.historySignature || latestChat.history || latestChat.backendConversationId)) {
             updateChat(chatId, {
+              history: undefined,
               historySignature: undefined,
               backendConversationId: undefined,
             });
@@ -257,10 +300,14 @@ export function useBotResponse({
         const updatedMessages = latestChat.messages.map(m =>
           m.id === placeholderId ? botMessage : m
         );
+        const finalHistory = finalResponse.history
+          ? finalResponse.history.map(h => ({ role: h.role, content: h.content }))
+          : undefined;
         updateChat(chatId, {
           messages: updatedMessages,
           shownRecommendations: [...latestChat.shownRecommendations, ...unseenIds],
           ...(finalResponse.conversationId ? { backendConversationId: finalResponse.conversationId } : {}),
+          ...(finalHistory && finalHistory.length > 0 ? { history: finalHistory } : {}),
           ...(finalResponse.historySignature ? { historySignature: finalResponse.historySignature } : {}),
         });
       }

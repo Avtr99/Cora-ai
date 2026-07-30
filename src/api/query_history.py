@@ -7,12 +7,17 @@ from .query_models import Message
 
 
 def sanitize_history_messages(
-    history: Optional[List[Message]], max_msg_len: int = 2000
+    history: Optional[List[Message]], max_msg_len: int = 4000
 ) -> List[Message]:
     """
     Enforce length limits on history messages.
-    Full threat sanitization is skipped here because history is cryptographically 
+    Full threat sanitization is skipped here because history is cryptographically
     verified in query_service.py and was sanitized upon initial entry.
+
+    Default 4000 chars/message * 10 history messages gives a ~40k char history
+    block. Gemini Flash has a 1M context window, so this is a conservative prompt
+    budget while still avoiding the old 2000-char truncation that cut long
+    assistant answers in half during follow-ups.
     """
     if not history:
         return []
@@ -42,7 +47,7 @@ def format_history_string(messages: List[Message]) -> str:
 
 
 def format_history_context(
-    history: Optional[List[Message]], max_msg_len: int = 2000
+    history: Optional[List[Message]], max_msg_len: int = 4000
 ) -> Tuple[str, List[Message]]:
     """
     Legacy wrapper: Format recent conversation history for short-term context with sanitization.

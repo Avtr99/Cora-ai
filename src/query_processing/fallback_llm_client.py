@@ -138,14 +138,19 @@ class FallbackLLMClient(BaseRAGClient):
         async for chunk in primary_iter:
             yield chunk
 
-    async def search_and_process(self, query: str, vector_results: Any) -> Dict[str, Any]:
+    async def search_and_process(
+        self,
+        query: str,
+        vector_results: Any,
+        resolved_query: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """Run the full RAG pipeline on the primary, falling back on quota errors."""
         try:
-            return await self.primary.search_and_process(query, vector_results)
+            return await self.primary.search_and_process(query, vector_results, resolved_query=resolved_query)
         except Exception as e:
             if _is_quota_error(e):
                 self._warn_fallback()
-                return await self.fallback.search_and_process(query, vector_results)
+                return await self.fallback.search_and_process(query, vector_results, resolved_query=resolved_query)
             raise
 
     def get_status(self) -> Dict[str, Any]:

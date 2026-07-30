@@ -143,7 +143,9 @@ Your goal is to transform ambiguous user inputs into precise, semantic vector se
 
 <instructions>
     <step_1>
-        **Coreference Resolution**: Analyze the <chat_history> to identify what pronouns like "it", "he", or "that" refer to. Replace them with specific nouns in the query.
+        **Coreference Resolution**: Analyze the <chat_history> to identify what pronouns like "it", "its", "their", or "that" refer to. Replace them with specific nouns in the query.
+        - Also resolve **ellipsis**: if the query is a fragment that only makes sense as a follow-up ("why?", "summarize", "any examples", "what are the risks"), restate it as a complete standalone question about the subject of the previous turn.
+        - GUARDRAIL: If the query is already self-contained and names its own subject, leave that subject alone. Do NOT import topics from <chat_history> into a question that did not reference them — a new question on a new topic must be rewritten on its own terms.
     </step_1>
     <step_2>
         **Semantic Expansion**: Fix typos and expand VCM acronyms using the <knowledge_base>. Ensure the query is optimized for vector similarity search (natural language). Preserve exact VCM identifiers such as VM0048, VMD0055, VMR0007, VCS1234, ACM0001 — do not change their prefix or digits.

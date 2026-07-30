@@ -36,6 +36,22 @@ function validateQueryResponse(value: unknown): QueryResponse {
       : [];
   };
 
+  const rawHistory = obj.history;
+  const history: ChatHistoryMessage[] | undefined =
+    Array.isArray(rawHistory) &&
+    rawHistory.every(
+      h =>
+        h &&
+        typeof h === 'object' &&
+        typeof (h as Record<string, unknown>).role === 'string' &&
+        typeof (h as Record<string, unknown>).content === 'string' &&
+        ((h as Record<string, unknown>).role === 'user' ||
+          (h as Record<string, unknown>).role === 'assistant' ||
+          (h as Record<string, unknown>).role === 'system')
+    )
+      ? (rawHistory as ChatHistoryMessage[])
+      : undefined;
+
   return {
     answer: obj.answer,
     confidence: typeof obj.confidence === 'number' ? obj.confidence : 0,
@@ -47,6 +63,7 @@ function validateQueryResponse(value: unknown): QueryResponse {
     metadata: obj.metadata as QueryResponse['metadata'],
     quiz: (obj.quiz as QueryResponse['quiz']) ?? null,
     history_signature: typeof obj.history_signature === 'string' ? obj.history_signature : undefined,
+    history,
     suggested_prompts: ensureArray('suggested_prompts'),
   };
 }
@@ -181,6 +198,7 @@ export async function queryCoraStream(
         metadata: result.metadata,
         quiz: result.quiz,
         historySignature: result.history_signature,
+        history: result.history,
         suggestedPrompts: result.suggested_prompts,
       };
       onResult?.(coraResponse);
@@ -228,6 +246,7 @@ export async function queryCoraStream(
         metadata: result.metadata,
         quiz: result.quiz,
         historySignature: result.history_signature,
+        history: result.history,
         suggestedPrompts: result.suggested_prompts,
       };
     };

@@ -1,5 +1,6 @@
 import { Chat, Message } from './chatStore.types';
 import { RecommendationType } from '@/components/chat/RecommendationCard';
+import { ChatHistoryMessage } from '@/services/cora/types';
 import { sanitizeInput, sanitizeHTML } from '@/lib/security';
 
 // Module-scoped counter for fallback ID generation to prevent collisions
@@ -129,6 +130,39 @@ export const validateAndSanitizeChatHistory = (data: unknown): Chat[] => {
       console.warn('Invalid createdAt, using current time:', chat.createdAt);
     }
 
+    // Preserve the canonical signed history exactly as the backend returned it.
+    // Do NOT sanitize it; the HMAC signature depends on byte-for-byte fidelity.
+    // If any entry is corrupt, drop the entire signed history *and* the signature:
+    // a partial array can no longer match the HMAC and would silently fail verification.
+    let validatedHistory: ChatHistoryMessage[] | undefined;
+    let validatedHistorySignature: string | undefined;
+    if (Array.isArray(chat.history) && chat.history.length > 0) {
+      const candidates: ChatHistoryMessage[] = [];
+      let allValid = true;
+      for (const h of chat.history) {
+        if (
+          h &&
+          typeof h === 'object' &&
+          typeof h.role === 'string' &&
+          typeof h.content === 'string' &&
+          (h.role === 'user' || h.role === 'assistant' || h.role === 'system')
+        ) {
+          candidates.push({ role: h.role, content: h.content });
+        } else {
+          allValid = false;
+          console.warn('Invalid signed history entry; discarding signed history + signature:', h);
+          break;
+        }
+      }
+      if (allValid && candidates.length > 0) {
+        validatedHistory = candidates;
+        validatedHistorySignature =
+          typeof chat.historySignature === 'string' && chat.historySignature
+            ? chat.historySignature
+            : undefined;
+      }
+    }
+
     validatedChats.push({
       id: chat.id,
       title: sanitizeInput(chat.title), // Sanitize title
@@ -141,10 +175,8 @@ export const validateAndSanitizeChatHistory = (data: unknown): Chat[] => {
         typeof chat.backendConversationId === 'string' && chat.backendConversationId
           ? sanitizeInput(chat.backendConversationId)
           : undefined,
-      historySignature:
-        typeof chat.historySignature === 'string' && chat.historySignature
-          ? chat.historySignature
-          : undefined,
+      historySignature: validatedHistorySignature,
+      history: validatedHistory,
     });
   }
 

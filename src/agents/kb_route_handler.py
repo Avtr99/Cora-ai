@@ -123,10 +123,11 @@ class KBRouteHandler:
         web_route_callback: Optional[Any] = None,
         finalize_citations_callback: Optional[Any] = None,
         sub_queries: Optional[List[str]] = None,
+        allow_query_only_cache: bool = True,
     ) -> Dict[str, Any]:
         """
         Process query using knowledge base only.
-        
+
         Args:
             query: Rewritten query
             original_query: Original user query
@@ -137,7 +138,10 @@ class KBRouteHandler:
             web_route_callback: Callback for web route fallback
             finalize_citations_callback: Callback for citation finalization
             sub_queries: Optional sub-queries from rewriter for fusion retrieval
-            
+            allow_query_only_cache: When False, skip the unscoped query-only
+                cache fallback. Must be False for follow-up turns, whose text
+                ("what are the risks") is not unique to one conversation.
+
         Returns:
             Result dict with answer, sources, citations
         """
@@ -211,14 +215,17 @@ class KBRouteHandler:
             # This handles the case where KB retrieval returns 0 results but
             # a previous successful answer is cached (e.g. starter prompts or
             # answers from a prior request with different retrieval context).
-            cached_result = await try_serve_cached_answer(
-                self.answer_generator,
-                original_query,
-                steps,
-                logger=logger,
-            )
-            if cached_result is not None:
-                return cached_result
+            # Skipped on follow-up turns: this lookup is keyed on query text
+            # alone, with no conversation scope.
+            if allow_query_only_cache:
+                cached_result = await try_serve_cached_answer(
+                    self.answer_generator,
+                    original_query,
+                    steps,
+                    logger=logger,
+                )
+                if cached_result is not None:
+                    return cached_result
 
             if doc_count == 0:
                 reason = "No KB results, using web search"
@@ -244,7 +251,9 @@ class KBRouteHandler:
         # Generate answer
         gen_start = time.time()
         try:
-            result = await self.answer_generator.search_and_process(original_query, vector_results)
+            result = await self.answer_generator.search_and_process(
+                original_query, vector_results, resolved_query=query
+            )
         except Exception as e:
             duration = (time.time() - gen_start) * 1000
             logger.error("Answer generation failed: %s", e, exc_info=True)
@@ -300,7 +309,7 @@ class KBRouteHandler:
             logger.info("Supplementing with web search: %s", supplement_reason)
             remaining = remaining_budget_ms(timeout_budget_ms, step_start)
             return await web_supplement_callback(
-                original_query,
+                query,
                 result,
                 vector_results,
                 steps,

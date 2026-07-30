@@ -95,6 +95,7 @@ export interface QueryResponse {
   metadata?: ResponseMetadata;
   quiz: QuizResponse | null;
   history_signature?: string; // HMAC signature for history verification
+  history?: ChatHistoryMessage[]; // Canonical signed history to echo on next turn (backend-windowed, bounded)
   suggested_prompts?: string[];
 }
 
@@ -109,6 +110,7 @@ export interface CoraResponse {
   metadata?: ResponseMetadata;
   quiz?: QuizResponse;
   historySignature?: string; // HMAC signature for history verification
+  history?: ChatHistoryMessage[]; // Canonical signed history to echo on next turn (backend-windowed, bounded)
   suggestedPrompts?: string[];
 }
 
