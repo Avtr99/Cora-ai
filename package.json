@@ -1,0 +1,15 @@
+{
+  "name": "cora-ai",
+  "private": true,
+  "version": "1.1.0",
+  "description": "Cora AI — multi-agent RAG backend for the Voluntary Carbon Market",
+  "scripts": {
+    "release": "release-it",
+    "release:minor": "release-it minor",
+    "release:major": "release-it major"
+  },
+  "devDependencies": {
+    "@release-it/conventional-changelog": "^11.0.1",
+    "release-it": "^20.2.1"
+  }
+}

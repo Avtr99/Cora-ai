@@ -10,6 +10,7 @@ from enum import Enum
 from loguru import logger
 
 from ..config import get_settings
+from ..version import __version__
 
 
 class HealthStatus(str, Enum):
@@ -260,7 +261,7 @@ async def run_health_checks(include_dependencies: bool = True) -> Dict[str, Any]
     result = {
         "status": HealthStatus.HEALTHY.value,
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "version": "1.0.0"
+        "version": __version__
     }
     
     if include_dependencies:

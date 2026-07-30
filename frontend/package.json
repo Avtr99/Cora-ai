@@ -10,9 +10,6 @@
     "lint": "eslint .",
     "test": "vitest",
     "preview": "vite preview",
-    "release": "release-it",
-    "release:minor": "release-it minor",
-    "release:major": "release-it major",
     "update-projects": "node scripts/convert-projects.mjs"
   },
   "dependencies": {
@@ -53,7 +50,6 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.9.0",
-    "@release-it/conventional-changelog": "^11.0.1",
     "@tanstack/react-query-devtools": "^5.90.2",
     "@types/d3-geo": "^3.1.0",
     "@types/node": "^22.5.5",
@@ -70,7 +66,6 @@
     "globals": "^15.9.0",
     "happy-dom": "^20.10.2",
     "postcss": "^8.5.23",
-    "release-it": "^20.2.1",
     "tailwindcss": "^3.4.11",
     "tailwindcss-animate": "^1.0.7",
     "typescript": "^5.5.3",

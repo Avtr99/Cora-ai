@@ -43,6 +43,7 @@ from .lifespan import lifespan
 from .async_query_jobs import get_async_query_job_manager
 from .public_routes import router as public_router
 from ..config import get_settings
+from ..version import __version__
 from .query_routes import Query as QueryModel, Response as QueryResponse, process_query_core
 from .streaming_service import process_query_core_stream
 
@@ -58,7 +59,7 @@ configure_logging(log_level=settings.LOG_LEVEL, json_logs=settings.LOG_JSON_FORM
 app = FastAPI(
     title="VCM Assistant API",
     description="RAG-powered Voluntary Carbon Market Assistant API",
-    version="1.0.0",
+    version=__version__,
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",
@@ -337,7 +338,7 @@ async def ready():
 async def v1_metrics():
     """Get API v1 performance metrics."""
     return {
-        "version": "1.0.0",
+        "version": __version__,
         "performance": get_metrics(),
         "circuit_breakers": get_all_circuit_stats(),
         "timestamp": datetime.now(timezone.utc).isoformat()
