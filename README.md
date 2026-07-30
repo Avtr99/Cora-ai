@@ -2,7 +2,6 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 [![CI](https://github.com/Avtr99/Cora-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/Avtr99/Cora-ai/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/Avtr99/Cora-ai/branch/main/graph/badge.svg)](https://codecov.io/gh/Avtr99/Cora-ai)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/Avtr99/Cora-ai/badge)](https://scorecard.dev/viewer/?platform=github.com&org=Avtr99&repo=Cora-ai)
 <!-- OpenSSF Best Practices badge — detected by Scorecard's CII-Best-Practices check.
      Project page: https://www.bestpractices.dev/projects/13501 -->
