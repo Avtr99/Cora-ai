@@ -1,0 +1,76 @@
+# OSV-Scanner ignore list for requirements*.txt files in this directory.
+#
+# osv-scanner scans requirements.txt files that use bounded version ranges
+# (e.g. >=3.29.4,<4.0) and checks the LOWEST satisfiable version for
+# vulnerabilities, not the actual resolved version from the lockfiles.
+# All ignores below are false positives — the actual pinned versions in the
+# *.lock files are already above the fix versions.
+#
+# Verified against requirements-core.lock, requirements-ingestion.lock, and
+# requirements-ci.lock (regenerated 2026-07-30 with uv pip compile --upgrade).
+
+# --- False positives: osv-scanner not respecting version floors ---
+
+# idna: osv-scanner checks 3.9.0; actual pinned version is 3.18 (fix: 3.15)
+[[IgnoredVulns]]
+id = "PYSEC-2026-215"
+reason = "False positive — requirements.txt pins idna transitively via a floor that resolves to 3.18 in the lockfiles (requirements-core.lock, requirements-ci.lock). 3.18 > fix version 3.15. osv-scanner checks the lowest satisfiable version (3.9.0) instead of the actual resolved version."
+
+[[IgnoredVulns]]
+id = "GHSA-65pc-fj4g-8rjx"
+reason = "False positive — alias of PYSEC-2026-215. Actual idna version is 3.18 (from lockfiles), above the fix version 3.15."
+
+# filelock: osv-scanner checks 3.9.1/3.19.1; actual pinned version is 3.32.2 (fix: 3.20.3)
+[[IgnoredVulns]]
+id = "PYSEC-2026-1374"
+reason = "False positive — requirements.txt has filelock>=3.29.4,<4.0, which resolves to 3.32.2 in the lockfiles. 3.32.2 > fix version 3.20.3. osv-scanner checks 3.9.1 instead of the actual resolved version."
+
+[[IgnoredVulns]]
+id = "GHSA-qmgc-5h2g-mvrw"
+reason = "False positive — alias of PYSEC-2026-1374. Actual filelock version is 3.32.2, above the fix version 3.20.3."
+
+[[IgnoredVulns]]
+id = "PYSEC-2026-1375"
+reason = "False positive — requirements.txt has filelock>=3.29.4,<4.0, which resolves to 3.32.2 in the lockfiles. 3.32.2 > fix version 3.20.1. osv-scanner checks 3.19.1 instead of the actual resolved version."
+
+[[IgnoredVulns]]
+id = "GHSA-w853-jp5j-5j7f"
+reason = "False positive — alias of PYSEC-2026-1375. Actual filelock version is 3.32.2, above the fix version 3.20.1."
+
+# langchain-openai: osv-scanner checks 1.1.9; actual pinned version is 1.4.1 (fix: 1.1.14)
+[[IgnoredVulns]]
+id = "PYSEC-2026-76"
+reason = "False positive — requirements-core.txt has langchain-openai>=1.3.2,<2.0, which resolves to 1.4.1 in the lockfiles. 1.4.1 > fix version 1.1.14. osv-scanner checks 1.1.9 instead of the actual resolved version."
+
+[[IgnoredVulns]]
+id = "GHSA-r7w7-9xr2-qq2r"
+reason = "False positive — alias of PYSEC-2026-76. Actual langchain-openai version is 1.4.1, above the fix version 1.1.14."
+
+# scipy: osv-scanner checks 1.6.1; actual pinned version is 1.17.1 (fix: 1.10.0)
+[[IgnoredVulns]]
+id = "PYSEC-2023-102"
+reason = "False positive — scipy is a transitive dep (via docling/rapidfuzz) that resolves to 1.17.1 in the lockfiles. 1.17.1 > fix version 1.10.0. osv-scanner checks 1.6.1 instead of the actual resolved version."
+
+[[IgnoredVulns]]
+id = "PYSEC-2023-114"
+reason = "False positive — scipy is a transitive dep that resolves to 1.17.1 in the lockfiles. 1.17.1 > fix version 1.8.0. osv-scanner checks 1.6.1 instead of the actual resolved version."
+
+# --- True positives with no fix available (dev-only, not shipped to production) ---
+
+# ragas: dev-only (RAGAS evaluation), no fix released
+[[IgnoredVulns]]
+id = "PYSEC-2026-3046"
+reason = "No fix available — ragas 0.4.3 is the latest release. Dev-only dependency (RAGAS evaluation in scripts/evaluation/), not shipped to production. Used only in CI/local evaluation runs."
+
+[[IgnoredVulns]]
+id = "GHSA-95ww-475f-pr4f"
+reason = "No fix available — alias of PYSEC-2026-3046. ragas is dev-only (evaluation scripts), not shipped to production."
+
+# diskcache: dev-only (ragas transitive), no fix released
+[[IgnoredVulns]]
+id = "PYSEC-2026-2447"
+reason = "No fix available — diskcache 5.6.3 is the latest release. Dev-only transitive dependency (via ragas), not shipped to production. Used only in CI/local evaluation runs."
+
+[[IgnoredVulns]]
+id = "GHSA-w8v5-vhqr-4h9v"
+reason = "No fix available — alias of PYSEC-2026-2447. diskcache is dev-only (ragas transitive), not shipped to production."
