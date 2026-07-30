@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.2](https://github.com/Avtr99/Cora-ai/compare/v1.1.1...v1.1.2) (2026-07-30)
+
+
+### Bug Fixes
+
+* **security:** update vulnerable Python dependencies in lockfiles ([b156773](https://github.com/Avtr99/Cora-ai/commit/b156773)). Fixes pyasn1 (0.6.3→0.6.4), torch (2.12.1→2.13.0), torchvision (0.27.1→0.28.0), setuptools (81.0.0→83.0.0), filelock (3.29.5→3.32.2), aiohttp (3.14.1→3.14.3)
+* **security:** revert react-router-dom to 6.x to fix GHSA-qwww-vcr4-c8h2 ([fd3de6b](https://github.com/Avtr99/Cora-ai/commit/fd3de6b)). The bump to 7.18.2 introduced the vulnerability; 6.x is not affected
+* **security:** add osv-scanner.toml to document false positives and non-exploitable vulnerabilities for OSSF scorecard
+
 ## [1.1.1](https://github.com/Avtr99/Cora-ai/compare/v1.1.0...v1.1.1) (2026-07-30)
 
 
