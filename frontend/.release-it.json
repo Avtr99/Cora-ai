@@ -15,6 +15,9 @@
     "release": true,
     "releaseName": "Release v${version}"
   },
+  "hooks": {
+    "before:git:release": "git add ../CHANGELOG.md"
+  },
   "plugins": {
     "@release-it/conventional-changelog": {
       "preset": "angular",
