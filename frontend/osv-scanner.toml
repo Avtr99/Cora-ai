@@ -1,8 +1,0 @@
-# OSV-Scanner ignore list for frontend/package-lock.json.
-#
-# Verified against the actual codebase usage on 2026-07-30.
-
-# react-router: not exploitable in this codebase
-[[IgnoredVulns]]
-id = "GHSA-qwww-vcr4-c8h2"
-reason = "Not exploitable — this advisory only affects applications using unstable React Server Component (RSC) APIs. This project is a Vite SPA (confirmed in vite.config.ts: 'SPA routing when served by FastAPI'). react-router-dom is used only for client-side routing (Link, useParams, useNavigate, useSearchParams, useLocation). No RSC APIs (useServerAction, ServerComponent, renderToPipeableStream, hydrateRoot, useSSR) are used anywhere in the codebase. Fixing requires a major upgrade to react-router 8.3.0 / React 19, which is a separate migration task."
