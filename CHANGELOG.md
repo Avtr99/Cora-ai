@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+# [1.1.0](https://github.com/Avtr99/Cora-ai/compare/v1.0.3...v1.1.0) (2026-07-30)
+
+
+### Bug Fixes
+
+* **chat:** exclude interactive elements from composer focus capture and track scroll correction rAF ([d63bab6](https://github.com/Avtr99/Cora-ai/commit/d63bab6aa4fb71dc5a4bd1259781c21f9914f13c))
+
+
+### Features
+
+* **chat:** add floating scroll button and composer focus helpers; fix case study responsive layout ([78f7508](https://github.com/Avtr99/Cora-ai/commit/78f75084ac4085b323483aa8ee5ed2ea841d1bb0))
+* **chat:** sign and verify conversation history across turns ([ea6ca2e](https://github.com/Avtr99/Cora-ai/commit/ea6ca2eda74eae65ad7908472f13145485e224b1))
+
 ## [1.0.3](https://github.com/Avtr99/Cora-ai/compare/v1.0.2...v1.0.3) (2026-07-14)
 
 ## [1.0.2](https://github.com/Avtr99/Cora-ai/compare/v1.0.1...v1.0.2) (2026-07-14)
