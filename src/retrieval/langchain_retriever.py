@@ -182,7 +182,7 @@ class LangChainRetriever(MultiRoundRetrievalMixin):
         
         if not docs_with_scores:
             # Try filter relaxation if no results
-            if qdrant_filter and supported_filters and len(supported_filters) > 1:
+            if qdrant_filter and supported_filters:
                 relaxed = await self._filter_builder.relax_and_retry(
                     query, supported_filters, candidates_count,
                 )

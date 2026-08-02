@@ -44,6 +44,7 @@ class DocumentRecord:
     publisher: Optional[str] = None
     document_id: Optional[str] = None
     version_number: Optional[str] = None
+    processing_job_id: Optional[str] = None
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
 

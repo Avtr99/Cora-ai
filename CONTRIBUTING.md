@@ -8,8 +8,12 @@ Please be respectful and considerate of others when contributing.
 ## Development Setup
 1. Ensure you have Python 3.11+ and Node 22+ installed.
 2. Install Python dependencies: `pip install -r requirements.txt`
-3. Install Node dependencies: `cd frontend && npm install`
+3. Install Node dependencies: `cd frontend && npm install && npm run build && cd ..`
 4. Set up your `.env` file from `.env.example`
+5. Start Qdrant: `docker run -d -p 6333:6333 qdrant/qdrant:v1.18.2`
+6. Run the backend: `python -m src.api.main`
+
+Or use the full Docker stack: `docker compose up -d --build` (starts `app`, `ingest-worker`, and Qdrant).
 
 ## Making Changes
 1. Fork the repository

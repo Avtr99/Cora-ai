@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { ChevronDown, Check, Zap } from "lucide-react";
 import {
@@ -18,23 +19,28 @@ import {
  * has an API key, the toggle is hidden to avoid clutter.
  */
 export const ProviderToggle: React.FC = () => {
-  const [providers, setProviders] = useState<AvailableProvider[]>([]);
-  const [current, setCurrent] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState(false);
   const [switching, setSwitching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const shouldReduceMotion = useReducedMotion();
 
-  // Fetch available providers on mount
+  // Fetch available providers via react-query so the toggle re-fetches when
+  // settings are saved (SettingsDialog invalidates this query key after save).
+  const { data } = useQuery({
+    queryKey: ['llm', 'providers'],
+    queryFn: () => getAvailableProviders(),
+    staleTime: 30_000,
+  });
+  const providers = data?.available ?? [];
+  const [current, setCurrent] = useState<string | null>(null);
+
+  // Sync current from the server response (e.g. on first load or after a
+  // settings change that switches the active provider).
   useEffect(() => {
-    getAvailableProviders()
-      .then((data) => {
-        setProviders(data.available);
-        setCurrent(data.current);
-      })
-      .catch(() => {/* non-critical */});
-  }, []);
+    if (data?.current) setCurrent(data.current);
+  }, [data?.current]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -63,6 +69,8 @@ export const ProviderToggle: React.FC = () => {
       if (result.success) {
         setCurrent(result.label ?? slug);
         setIsOpen(false);
+        // Refresh the providers list so model names stay in sync after a switch.
+        await queryClient.invalidateQueries({ queryKey: ['llm', 'providers'] });
       } else {
         setError(result.error ?? "Switch failed");
       }

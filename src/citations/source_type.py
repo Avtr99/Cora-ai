@@ -26,13 +26,14 @@ class SourceTypeResolver:
             title,
             url,
             str(source.get("file_name", "")),
+            str(source.get("original_filename", "")),
             str(source.get("parent_doc", "")),
             str(source.get("source", "")),
         ):
             if self._extract_extension(candidate) in self.config.kb_extensions:
                 return "knowledge_base"
 
-        if any(key in source for key in ("file_name", "parent_doc", "page_number", "document_id")):
+        if any(key in source for key in ("file_name", "original_filename", "parent_doc", "page_number", "document_id")):
             return "knowledge_base"
 
         if url and not url.lower().startswith(("http://", "https://")):

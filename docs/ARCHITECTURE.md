@@ -11,7 +11,7 @@
 | Principle | What it means in practice |
 |---|---|
 | **Local-first** | All persistent state lives on the host filesystem (SQLite + local Qdrant). No managed cloud databases, no cloud vector stores, no cloud analytics. |
-| **Single-process deployable** | One FastAPI process serves the API, the React SPA, and the async job queue. Qdrant runs as a sibling container (or a local binary). |
+| **Single- or split-process deployable** | One FastAPI process serves the API, the React SPA, and the async job queue. In Docker, ingestion runs in a separate `ingest-worker` container; in native dev it can run in-process. Qdrant runs as a sibling container (or a local binary). |
 | **Pluggable providers** | Embeddings, reranker, and web search are swappable via env vars. Defaults use hosted APIs (Voyage/Tavily/Gemini), but `ollama` + `RERANK_PROVIDER=none` + `ENABLE_WEB_SEARCH=false` enable a fully offline stack. |
 | **No vendor lock-in for state** | The only required external API key for the default stack is `GEMINI_API_KEY`. Everything else can be replaced with a local provider or disabled. |
 | **Read-only at query time** | Ingestion is an offline, out-of-process step. The running container never writes to Qdrant collections during query serving. |
@@ -24,20 +24,33 @@
 ┌─────────────────────────────────────────────────────────────────────┐
 │                         Host Machine                                │
 │                                                                     │
-│   ┌─────────────────────────┐      ┌─────────────────────────────┐  │
-│   │  docker-compose: app    │      │  docker-compose: qdrant     │  │
-│   │  (FastAPI + React SPA)  │      │  qdrant/qdrant:v1.18.2      │  │
-│   │                         │      │                             │  │
-│   │  :8000  HTTP + SPA      │      │  :6333  HTTP/gRPC           │  │
-│   │   ├─ /v1/*  API routes  │─────▶│  (vector + memory store)    │  │
-│   │   ├─ /api/* SPA aliases │      │                             │  │
-│   │   └─ /*     static SPA  │      │  Volume: qdrant_data        │  │
-│   │                         │      └─────────────────────────────┘  │
-│   │  Volume: cora_data      │                                       │
-│   │   └─ /app/data/         │                                       │
-│   │       ├─ cora.db        │  ← SQLite (cache, feedback, embeddings)│
-│   │       └─ documents/     │  ← uploaded/converted docs            │
-│   └─────────────────────────┘                                       │
+│   ┌──────────────────────────┐      ┌─────────────────────────────┐  │
+│   │  docker compose: app     │      │  docker compose: qdrant     │  │
+│   │  (FastAPI + React SPA)   │      │  qdrant/qdrant:v1.18.2      │  │
+│   │                          │      │                             │  │
+│   │  :8000  HTTP + SPA       │─────▶│  :6333  HTTP/gRPC           │  │
+│   │   ├─ /v1/*  API routes   │      │  (vector + memory store)    │  │
+│   │   ├─ /api/* SPA aliases  │      │                             │  │
+│   │   └─ /*     static SPA   │      │  Volume: qdrant_data        │  │
+│   │                          │      └─────────────────────────────┘  │
+│   └──────────┬───────────────┘                                       │
+│              │ enqueues ingestion jobs in SQLite                      │
+│              ▼                                                       │
+│   ┌──────────────────────────┐                                       │
+│   │  docker compose:         │                                       │
+│   │  ingest-worker           │                                       │
+│   │  (Docling + parser)      │                                       │
+│   │                          │                                       │
+│   │  polls SQLite job table; │─────▶  Qdrant upserts                │
+│   │  writes Qdrant vectors   │                                       │
+│   └──────────┬───────────────┘                                       │
+│              │                                                       │
+│   Shared bind│ mount: ./data:/app/data                                │
+│   ┌──────────┴───────────────┐                                       │
+│   │  /app/data/              │                                       │
+│   │   ├─ cora.db             │  ← SQLite (cache, feedback, embeddings, jobs)│
+│   │   └─ documents/          │  ← uploaded/converted docs             │
+│   └──────────────────────────┘                                       │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
             │
@@ -53,7 +66,7 @@
 
 | Mode | Command | When to use |
 |---|---|---|
-| **Docker Compose (recommended)** | `docker-compose up -d --build` | Full stack including Qdrant. Production-equivalent. |
+| **Docker Compose (recommended)** | `docker compose up -d --build` | Split stack: `app` (query-only), `ingest-worker` (Docling parser), and `qdrant`. The SQLite DB lives on a named volume (`cora_db_data` → `/app/db`) with `SQLITE_JOURNAL_MODE=WAL`; document files stay on the `./data` bind mount. |
 | **Native Python** | `python -m src.api.main` | Development. Requires a separately-running Qdrant (set `QDRANT_URL=http://localhost:6333`). |
 
 In native mode, the frontend dev server can run separately with `cd frontend && npm run dev` (Vite on `:8080`); CORS already allows it.
@@ -62,7 +75,9 @@ In native mode, the frontend dev server can run separately with `cd frontend && 
 
 ## 3. Process & Component Layout
 
-The `app` container runs a **single Python process** (`python -m src.api.main`) that hosts:
+The `app` container runs a **single Python process** (`python -m src.api.main`) that hosts the request-serving path. Ingestion is intentionally not part of this process in Docker; it runs in the separate `ingest-worker` container so parser CPU/RAM spikes do not stall query latency. In native/dev mode, `INGESTION_DISPATCH=in_process` runs the parser as a FastAPI `BackgroundTask` in the same process.
+
+The `app` process hosts:
 
 1. **The FastAPI HTTP server** (uvicorn) on `:8000`
 2. **The built React SPA** served as static files from `frontend/dist`
@@ -133,9 +148,17 @@ For long-running queries. Returns a `job_id` immediately; an in-process worker (
 
 ## 5. Data Stores
 
-### 5.1 SQLite (`data/cora.db`)
+### 5.1 SQLite (`data/cora.db` local dev, `/app/db/cora.db` Docker)
 
 The single local relational store. Schema is created by `migrations/001_initial.sql` on startup.
+
+The SQLite journal mode is configurable via `SQLITE_JOURNAL_MODE` (default `WAL`). In Docker,
+the DB lives on a named volume (`cora_db_data` → `/app/db`) — not the `./data` bind mount —
+because Windows Docker Desktop / WSL2 bind mounts do not support the POSIX locking or
+shared-memory (`-shm` sidecar) that SQLite needs for concurrent access from multiple containers
+(app + ingest-worker). The named volume uses the Docker storage driver (Linux VM filesystem),
+which supports WAL mode. Document files stay on the `./data` bind mount (regular files, no
+locking needed).
 
 | Table | Purpose | Written by | Read by |
 |---|---|---|---|
@@ -240,18 +263,32 @@ The footer now shows only "Research project developed in Germany" — no legal l
 
 ## 9. Ingestion (Via Running Server)
 
-Ingestion is served by the document_store router at `POST /v1/documents` and runs as background jobs inside the `app` process. Uploaded files are converted to Markdown, chunked, embedded, and upserted into Qdrant.
+Ingestion is served by the document_store router at `POST /v1/documents`. In Docker, uploaded
+files are queued as SQLite rows and processed by the separate `ingest-worker` container. In
+native dev mode (`INGESTION_DISPATCH=in_process`) they run as FastAPI `BackgroundTasks` inside
+the `app` process. Files are converted to Markdown, chunked, embedded, and upserted into Qdrant.
 
 ```
 POST /v1/documents (conversion_mode: standard | llm_api)
-  └─ src/document_store/jobs.py        ← background job orchestration
-       ├─ converter.py                 ← PDF → Markdown
+  └─ src/document_store/              ← background job orchestration
+       ├─ dispatch.py                 ← in_process BackgroundTask vs worker queue
+       ├─ handlers.py                 ← process / reindex / delete job handlers
+       ├─ converter.py                ← PDF → Markdown
        │    ├─ standard:  Docling classical pipeline (layout + OCR + tables, non-VLM)
        │    └─ llm_api:   Direct HTTP to OpenAI-compatible endpoint (Gemini 2.5 Flash or GPT-4.1-mini, auto-detected)
-       ├─ indexer.py                   ← chunk + embed + Qdrant upsert
-       │    ├─ embeddings/             ← configured provider (default Voyage)
-       │    └─ QdrantVectorStore       ← batched upsert, deduped by doc_store_id
-       └─ storage.py                   ← SQLite document/job records
+       ├─ indexer.py                  ← chunk + embed + Qdrant upsert
+       │    ├─ embeddings/            ← configured provider (default Voyage)
+       │    └─ QdrantVectorStore      ← batched upsert, deduped by doc_store_id
+       ├─ repository.py               ← SQLite document records + document locking
+       ├─ jobs_repo.py                ← SQLite job records + atomic worker claiming
+       ├─ recovery.py                 ← crash recovery + stale-lock cleanup
+       ├─ uploads.py                  ← upload saving, MIME validation, tag helpers
+       ├─ schema.py                   ← DB schema, path/extension constants
+       ├─ files.py                    ← markdown + metadata sidecar I/O
+       ├─ errors.py                   ← conversion error classification
+       ├─ docling_warmup.py           ← Docling model-warmup heuristic
+       ├─ jobs.py                     ← thin re-export facade (backwards compat)
+       └─ storage.py                  ← thin re-export facade (backwards compat)
 ```
 
 - **Conversion modes:** `standard` (Docling classical, non-VLM pipeline — layout + OCR + table structure, free, CPU, ~1-2s/page on properly provisioned hardware, default for most users) and `llm_api` (AI service, high accuracy — requires either a paid API key or a self-hosted endpoint, direct HTTP call to OpenAI-compatible endpoint). The legacy `local_vlm` mode has been removed; power users can point `llm_api` at a local vLLM server via the AI Model settings or `OPENAI_BASE_URL`.
@@ -268,13 +305,51 @@ POST /v1/documents (conversion_mode: standard | llm_api)
 - **Qdrant upsert batching:** `QDRANT_UPSERT_BATCH_SIZE` (default 1000) caps the number of points per Qdrant upsert request. This avoids oversized payloads and memory spikes when indexing documents that produce many chunks (e.g., 1000+ page PDFs).
 - **Re-ingestion requirement:** Changing `EMBEDDING_PROVIDER` or `EMBEDDING_DIM` requires clearing and re-uploading all documents. There is no online migration path.
 
+### Document Status State Machine
+
+Documents move through a set of statuses during their lifecycle. The diagram below shows all transitions. Recovery (`recover_interrupted_documents`) flips any in-flight status to `failed` at startup so the UI never shows a permanently stuck document.
+
+```mermaid
+stateDiagram-v2
+    [*] --> queued: save_upload()
+    queued --> reading: process job starts
+    reading --> converting: convert_document()
+    converting --> indexing: index_document()
+    indexing --> indexed: indexing complete
+
+    queued --> deleting: delete request
+    indexed --> deleting: delete request
+    failed --> deleting: delete request (retry)
+    deleting --> deleted: delete job complete
+
+    reading --> failed: conversion/indexing error
+    converting --> failed: conversion error
+    indexing --> failed: indexing error
+    queued --> failed: recovery (in_process restart)
+    reading --> failed: recovery (restart)
+    converting --> failed: recovery (restart)
+    indexing --> failed: recovery (restart)
+    deleting --> failed: recovery (restart) / delete final-write failure
+
+    failed --> queued: user re-uploads / retries
+    deleted --> [*]
+```
+
+**Key points:**
+- `queued` — uploaded, waiting for a worker/BackgroundTask to pick it up.
+- `reading` → `converting` → `indexing` — in-flight statuses during processing. All are recovered to `failed` at startup.
+- `indexed` — terminal success state, available for RAG queries.
+- `failed` — terminal error state; the UI shows the error and allows retry (re-upload or re-index).
+- `deleting` — in-flight during deletion; recovered to `failed` at startup or if the final `status='deleted'` write fails.
+- `deleted` — terminal soft-delete state; Qdrant chunks and files are removed.
+
 ---
 
 ## 10. Security & Compliance
 
 | Concern | Mechanism |
 |---|---|
-| **PII redaction** | Forced on in production (`PII_REDACTION_ENABLED=True` is hardcoded when `APP_ENV=production`). Applied before memory storage. |
+| **PII redaction** | Enabled by default (`PII_REDACTION_ENABLED=True` in `config.py`). Applied before memory storage. |
 | **User ID anonymization** | Memory store hashes user IDs via HMAC with `MEMORY_SECRET_KEY` (falls back to `SECRET_KEY`). |
 | **History integrity** | Conversation history is HMAC-signed with `SECRET_KEY` (auto-generated on first run if not set in `.env`). |
 | **Request size** | Hard limit `MAX_REQUEST_BODY_SIZE_BYTES=5 MB`. |
@@ -320,6 +395,8 @@ All runtime configuration lives in `src/config.py` as a pydantic-settings `Setti
 | `QDRANT_MAX_CONCURRENCY` | 5 | You're hitting Qdrant connection limits |
 | `ENABLE_VALIDATION` | False | You need grounding checks and can tolerate extra latency |
 | `DARTBOARD_ROUNDS` | 2 | Set to 1 for single-pass retrieval (faster, less recall) |
+| `SQLITE_JOURNAL_MODE` | `WAL` | `DELETE` for Docker bind mounts on Windows; `WAL` for local dev on a real filesystem |
+| `INGESTION_DISPATCH` | `in_process` | `worker` in Docker (separate `ingest-worker` container); `in_process` for native dev |
 
 ---
 
@@ -331,8 +408,9 @@ copy .env.example .env
 #    Fill in: GEMINI_API_KEY (required), VOYAGE_API_KEY, TAVILY_API_KEY
 #    (SECRET_KEY is auto-generated on first run — no need to set it)
 
-# 2. Start the stack
-docker-compose up -d --build
+# 2. Start the split stack (app + ingest-worker + qdrant)
+docker compose up -d --build
+#    Compose puts the SQLite DB on a named volume (cora_db_data) with WAL mode.
 
 # 3. Verify health
 curl http://127.0.0.1:8000/health    # liveness (always 200)

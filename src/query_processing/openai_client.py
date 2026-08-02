@@ -9,8 +9,10 @@ Works with any provider that exposes the OpenAI Chat Completions API:
 
 from typing import Dict, Any, Optional, Tuple, AsyncIterator
 from tenacity import AsyncRetrying, stop_after_attempt, wait_random_exponential, retry_if_exception
+from loguru import logger
 
 from ..api.middleware.circuit_breaker import get_circuit_breaker, CircuitConfig
+from ..config import get_settings
 from .base_rag_client import BaseRAGClient
 
 
@@ -29,7 +31,7 @@ class OpenAICompatibleClient(BaseRAGClient):
         self,
         api_key: str,
         base_url: str = "https://api.openai.com/v1",
-        model_main: str = "gpt-4.1-mini",
+        model_main: Optional[str] = None,
         model_lite: Optional[str] = None,
         model_relevance: Optional[str] = None,
         organization: Optional[str] = None,
@@ -39,7 +41,7 @@ class OpenAICompatibleClient(BaseRAGClient):
         Args:
             api_key: API key for the provider. For Ollama, use any non-empty string.
             base_url: Base URL for the API. Must end with /v1 for OpenAI-compatible endpoints.
-            model_main: Primary model name for answer generation.
+            model_main: Primary model name for answer generation. Defaults to a provider-specific model.
             model_lite: Lite model for low-latency tasks. Defaults to model_main.
             model_relevance: Model for post-generation relevance check. Defaults to model_lite.
             organization: OpenAI organization ID (optional, OpenAI only).
@@ -54,10 +56,10 @@ class OpenAICompatibleClient(BaseRAGClient):
                 "Install it with: pip install openai"
             ) from e
 
-        self._model_main = model_main
-        self._model_lite = model_lite or model_main
-        self._model_relevance = model_relevance or self._model_lite
         self._base_url = base_url
+        self._model_main = self._resolve_model(model_main, self._default_main_model())
+        self._model_lite = self._resolve_model(model_lite, self._model_main)
+        self._model_relevance = self._resolve_model(model_relevance, self._model_lite)
 
         client_kwargs: Dict[str, Any] = {
             "api_key": api_key,
@@ -81,6 +83,42 @@ class OpenAICompatibleClient(BaseRAGClient):
     # ------------------------------------------------------------------
     # LLMClient interface properties
     # ------------------------------------------------------------------
+
+    @staticmethod
+    def _is_valid_model(model: Optional[str]) -> bool:
+        """Check if a model name is a valid OpenAI-compatible model ID.
+
+        OpenAI-compatible APIs use model IDs that are either provider-agnostic
+        (``gpt-4.1-mini``, ``claude-3.5-sonnet``) or provider-prefixed for
+        gateways like OpenRouter (``google/gemini-2.5-flash``). A bare
+        ``gemini-...`` name is a Gemini API identifier, not an OpenAI-compatible
+        one, and is rejected.
+        """
+        if not model:
+            return False
+        # Provider-prefixed gateway names (e.g. openai/gpt-4o, google/gemini-...)
+        if "/" in model:
+            return True
+        return not model.startswith("gemini-")
+
+    def _default_main_model(self) -> str:
+        """Return a sensible default model for the configured base URL."""
+        settings = get_settings()
+        host = (self._base_url or "").rsplit("//", 1)[-1].split("/", 1)[0].lower()
+        if "openrouter" in host:
+            return getattr(settings, "OPENROUTER_MODEL", None) or "google/gemini-2.5-flash"
+        return getattr(settings, "OPENAI_MODEL", None) or "gpt-4.1-mini"
+
+    def _resolve_model(self, model: Optional[str], fallback: str) -> str:
+        """Return ``model`` if it is a valid OpenAI-compatible ID, else ``fallback``."""
+        if model and self._is_valid_model(model):
+            return model
+        if model:
+            logger.warning(
+                f"Configured OpenAI-compatible model {model!r} is not a valid "
+                f"OpenAI-compatible model ID for {self._base_url}; using {fallback!r}."
+            )
+        return fallback
 
     @property
     def model_main(self) -> str:
@@ -109,27 +147,12 @@ class OpenAICompatibleClient(BaseRAGClient):
         json_mode: bool = False,
     ) -> str:
         """Generate text from a prompt via OpenAI Chat Completions API."""
-        resolved_model = model or self._model_main
+        resolved_model = model or self.model_main
 
-        kwargs: Dict[str, Any] = {
-            "model": resolved_model,
-            "messages": [{"role": "user", "content": prompt}],
-            "temperature": temperature,
-            "top_p": top_p,
-        }
-        if max_output_tokens is not None:
-            kwargs["max_tokens"] = max_output_tokens
-        if json_mode:
-            kwargs["response_format"] = {"type": "json_object"}
-
-        async def _call():
-            if self._circuit:
-                response = await self._circuit.call(
-                    self.client.chat.completions.create, **kwargs
-                )
-            else:
-                response = await self.client.chat.completions.create(**kwargs)
-            return response
+        kwargs = self._build_completion_kwargs(
+            resolved_model, prompt, temperature=temperature, top_p=top_p,
+            max_output_tokens=max_output_tokens, json_mode=json_mode,
+        )
 
         async for attempt in AsyncRetrying(
             stop=stop_after_attempt(3),
@@ -138,7 +161,12 @@ class OpenAICompatibleClient(BaseRAGClient):
             reraise=True,
         ):
             with attempt:
-                response = await _call()
+                if self._circuit:
+                    response = await self._circuit.call(
+                        self.client.chat.completions.create, **kwargs
+                    )
+                else:
+                    response = await self.client.chat.completions.create(**kwargs)
                 return response.choices[0].message.content or ""
 
     async def generate_text_stream(
@@ -150,18 +178,15 @@ class OpenAICompatibleClient(BaseRAGClient):
         top_p: float = 0.9,
     ) -> AsyncIterator[str]:
         """Stream text chunks from a prompt via OpenAI streaming."""
-        resolved_model = model or self._model_main
+        resolved_model = model or self.model_main
 
         if self._circuit and not await self._circuit.can_execute():
             raise OpenAIProcessingError("Circuit is open")
 
-        kwargs: Dict[str, Any] = {
-            "model": resolved_model,
-            "messages": [{"role": "user", "content": prompt}],
-            "temperature": temperature,
-            "top_p": top_p,
-            "stream": True,
-        }
+        kwargs = self._build_completion_kwargs(
+            resolved_model, prompt, temperature=temperature, top_p=top_p,
+            stream=True,
+        )
 
         stream_error = None
         try:
@@ -185,19 +210,9 @@ class OpenAICompatibleClient(BaseRAGClient):
         The prompt already includes the system instruction (prepended by
         BaseRAGClient.search_and_process).
         """
-        kwargs: Dict[str, Any] = {
-            "model": self._model_main,
-            "messages": [{"role": "user", "content": prompt}],
-            "temperature": 0.3,
-            "top_p": 0.9,
-        }
-
-        async def _call():
-            if self._circuit:
-                return await self._circuit.call(
-                    self.client.chat.completions.create, **kwargs
-                )
-            return await self.client.chat.completions.create(**kwargs)
+        kwargs = self._build_completion_kwargs(
+            self.model_main, prompt, temperature=0.3, top_p=0.9,
+        )
 
         async for attempt in AsyncRetrying(
             stop=stop_after_attempt(3),
@@ -206,7 +221,12 @@ class OpenAICompatibleClient(BaseRAGClient):
             reraise=True,
         ):
             with attempt:
-                response = await _call()
+                if self._circuit:
+                    response = await self._circuit.call(
+                        self.client.chat.completions.create, **kwargs
+                    )
+                else:
+                    response = await self.client.chat.completions.create(**kwargs)
                 answer_text = response.choices[0].message.content or ""
                 tokens_in = 0
                 tokens_out = 0
@@ -215,6 +235,60 @@ class OpenAICompatibleClient(BaseRAGClient):
                     tokens_in = getattr(usage, "prompt_tokens", 0) or 0
                     tokens_out = getattr(usage, "completion_tokens", 0) or 0
                 return answer_text, {"tokens_in": tokens_in, "tokens_out": tokens_out}
+
+    # ------------------------------------------------------------------
+    # Reasoning model support
+    # ------------------------------------------------------------------
+
+    # Models that use reasoning tokens and reject temperature/top_p/max_tokens.
+    # Covers GPT-5.x (luna/terra/sol), o1, o3, o4 series.
+    _REASONING_MODEL_PREFIXES = ("gpt-5", "o1", "o3", "o4")
+
+    def _is_reasoning_model(self, model_name: str) -> bool:
+        """Check if a model rejects temperature/top_p/max_tokens (reasoning models).
+
+        Handles both direct names (``gpt-5.6-luna``) and gateway-style names
+        (``openai/gpt-5.6-luna``) by checking the part after the last slash.
+        """
+        bare = (model_name or "").lower().rsplit("/", 1)[-1]
+        return any(bare.startswith(p) for p in self._REASONING_MODEL_PREFIXES)
+
+    def _build_completion_kwargs(
+        self,
+        model: str,
+        prompt: str,
+        *,
+        temperature: float = 0.3,
+        top_p: float = 0.9,
+        max_output_tokens: Optional[int] = None,
+        json_mode: bool = False,
+        stream: bool = False,
+    ) -> Dict[str, Any]:
+        """Build kwargs for chat.completions.create, adapting for reasoning models.
+
+        Reasoning models (GPT-5.x, o1/o3/o4) reject ``temperature``, ``top_p``,
+        and ``max_tokens``. For those we omit the first two and use
+        ``max_completion_tokens`` instead of ``max_tokens``.
+        """
+        kwargs: Dict[str, Any] = {
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+        }
+        if stream:
+            kwargs["stream"] = True
+
+        if not self._is_reasoning_model(model):
+            kwargs["temperature"] = temperature
+            kwargs["top_p"] = top_p
+
+        if max_output_tokens is not None:
+            key = "max_completion_tokens" if self._is_reasoning_model(model) else "max_tokens"
+            kwargs[key] = max_output_tokens
+
+        if json_mode:
+            kwargs["response_format"] = {"type": "json_object"}
+
+        return kwargs
 
     # ------------------------------------------------------------------
     # Error classification

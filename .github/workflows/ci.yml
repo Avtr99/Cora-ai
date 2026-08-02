@@ -77,7 +77,7 @@ jobs:
 
   build-docker:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     needs:
       - lint-and-test-python
       - lint-and-build-frontend
@@ -90,11 +90,22 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
 
-      - name: Build Docker image
+      - name: Build app image (query-only, no parser stack)
         uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5.4.0
         with:
           context: .
           push: false
           platforms: linux/amd64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          build-args: INSTALL_INGESTION=false
+          cache-from: type=gha,scope=app
+          cache-to: type=gha,scope=app,mode=max
+
+      - name: Build ingest-worker image (full parser stack)
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5.4.0
+        with:
+          context: .
+          push: false
+          platforms: linux/amd64
+          build-args: INSTALL_INGESTION=true
+          cache-from: type=gha,scope=ingest-worker
+          cache-to: type=gha,scope=ingest-worker,mode=max

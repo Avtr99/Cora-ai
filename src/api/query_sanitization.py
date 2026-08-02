@@ -151,6 +151,7 @@ def sanitize_metadata(
     *,
     history_verification_failed: bool,
     history_items_dropped: int,
+    config_version: int = 0,
 ) -> QueryMetadataResponse:
     """Sanitize metadata payload and enforce QueryMetadataResponse schema."""
 
@@ -162,6 +163,7 @@ def sanitize_metadata(
 
     sanitized_metadata_dict["history_verification_failed"] = history_verification_failed
     sanitized_metadata_dict["history_items_dropped"] = history_items_dropped
+    sanitized_metadata_dict["config_version"] = config_version
 
     try:
         return QueryMetadataResponse(**sanitized_metadata_dict)
@@ -178,4 +180,5 @@ def sanitize_metadata(
                 "history_verification_failed", False
             ),
             history_items_dropped=sanitized_metadata_dict.get("history_items_dropped", 0),
+            config_version=sanitized_metadata_dict.get("config_version"),
         )

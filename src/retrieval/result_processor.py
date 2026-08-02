@@ -136,7 +136,7 @@ def diversify_by_source(
 
     for i in range(len(documents)):
         meta = results["metadatas"][i] if i < len(results.get("metadatas", [])) else {}
-        source = (meta or {}).get("source", "") or (meta or {}).get("file_name", "") or "unknown"
+        source = (meta or {}).get("source", "") or (meta or {}).get("file_name", "") or (meta or {}).get("original_filename", "") or "unknown"
 
         # Methodology-matched chunks bypass the per-source cap
         bypassed = False
@@ -223,7 +223,7 @@ def boost_methodology_matches(
         base_score = results["scores"][i] if "scores" in results else (1 - results["distances"][i])
 
         metadata = results["metadatas"][i] or {}
-        source = metadata.get("source", "") or metadata.get("file_name", "") or ""
+        source = metadata.get("source", "") or metadata.get("file_name", "") or metadata.get("original_filename", "") or ""
         doc_type = (metadata.get("doc_type") or "").lower()
         document_id = (metadata.get("document_id") or "").upper()
 

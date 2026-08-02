@@ -1,3 +1,4 @@
+import asyncio
 import os
 from io import BytesIO
 from pathlib import Path
@@ -97,8 +98,8 @@ async def test_delete_document_job_marks_document_deleted(document_store_env):
     record = await save_upload(upload, "standard", [])
     job = create_job(record.id, "delete")
 
-    with mock.patch("src.document_store.jobs.delete_document_chunks") as mock_chunks, mock.patch(
-        "src.document_store.jobs.remove_document_files"
+    with mock.patch("src.document_store.handlers.delete_document_chunks") as mock_chunks, mock.patch(
+        "src.document_store.handlers.remove_document_files"
     ):
         mock_chunks.return_value = None
         await delete_document_job(record.id, job.id)
@@ -122,8 +123,8 @@ async def test_delete_document_job_succeeds_when_already_deleted(document_store_
 
     # The fix ensures Qdrant cleanup runs even for already-soft-deleted docs
     # (previously the job exited early, leaving orphaned chunks behind).
-    with mock.patch("src.document_store.jobs.delete_document_chunks") as mock_chunks, mock.patch(
-        "src.document_store.jobs.remove_document_files"
+    with mock.patch("src.document_store.handlers.delete_document_chunks") as mock_chunks, mock.patch(
+        "src.document_store.handlers.remove_document_files"
     ):
         mock_chunks.return_value = None
         await delete_document_job(record.id, job.id)
@@ -144,8 +145,8 @@ async def test_delete_document_job_completes_when_qdrant_cleanup_fails(document_
     record = await save_upload(upload, "standard", [])
     job = create_job(record.id, "delete")
 
-    with mock.patch("src.document_store.jobs.delete_document_chunks") as mock_chunks, mock.patch(
-        "src.document_store.jobs.remove_document_files"
+    with mock.patch("src.document_store.handlers.delete_document_chunks") as mock_chunks, mock.patch(
+        "src.document_store.handlers.remove_document_files"
     ):
         mock_chunks.side_effect = RuntimeError("Qdrant unavailable")
         await delete_document_job(record.id, job.id)
@@ -162,7 +163,12 @@ async def test_recover_interrupted_documents_marks_in_flight_as_failed(document_
     """Priority 1: any document left in an in-flight status at startup must be
     flipped to failed so the UI shows a clear error instead of hanging forever.
     Jobs left in queued/processing must also be flipped to failed so the
-    document_store_jobs table doesn't accumulate ghost rows."""
+    document_store_jobs table doesn't accumulate ghost rows.
+
+    In in_process mode (recover_queued_jobs=True, the default), documents still
+    at 'queued' (uploaded but never picked up before the crash) are ALSO flipped
+    to failed — otherwise the job is failed but the document stays 'queued'
+    forever, leaving the UI stuck with no retry option."""
     from src.document_store.storage import (
         create_job,
         get_document_including_deleted,
@@ -199,12 +205,13 @@ async def test_recover_interrupted_documents_marks_in_flight_as_failed(document_
             stuck_job_ids.append(job.id)
 
     recovered = recover_interrupted_documents()
-    assert recovered == 4  # the four in-flight document statuses
+    # 4 in-flight statuses + 1 queued document (in_process mode recovers queued)
+    assert recovered == 5
 
     for doc_id, original_status in records:
         doc = get_document_including_deleted(doc_id)
         assert doc is not None
-        if original_status in ("converting", "indexing", "reading", "deleting"):
+        if original_status in ("converting", "indexing", "reading", "deleting", "queued"):
             assert doc.status == "failed"
             assert doc.error == "Interrupted by server restart"
         else:
@@ -219,6 +226,52 @@ async def test_recover_interrupted_documents_marks_in_flight_as_failed(document_
 
     # Idempotent: running again recovers nothing.
     assert recover_interrupted_documents() == 0
+
+
+@pytest.mark.asyncio
+async def test_recover_interrupted_documents_preserves_queued_in_worker_mode(document_store_env):
+    """In worker mode (recover_queued_jobs=False), documents and jobs at 'queued'
+    must be left untouched so the ingest-worker can pick them up after an
+    API-container restart. Only 'processing' jobs and in-flight documents are
+    recovered."""
+    from src.document_store.storage import (
+        create_job,
+        get_document_including_deleted,
+        get_job,
+        recover_interrupted_documents,
+        save_upload,
+        update_document,
+        update_job,
+    )
+
+    # A queued document with a queued job — must survive worker-mode recovery.
+    queued_doc = await save_upload(
+        UploadFile(filename="queued.txt", file=BytesIO(b"queued content")),
+        "standard",
+        [],
+    )
+    queued_job = create_job(queued_doc.id, "process")  # status='queued' by default
+
+    # An in-flight document with a processing job — must be recovered.
+    stuck_doc = await save_upload(
+        UploadFile(filename="stuck.txt", file=BytesIO(b"stuck content")),
+        "standard",
+        [],
+    )
+    update_document(stuck_doc.id, status="converting")
+    stuck_job = create_job(stuck_doc.id, "process")
+    update_job(stuck_job.id, "processing")
+
+    recovered = recover_interrupted_documents(recover_queued_jobs=False)
+    assert recovered == 1  # only the converting document
+
+    # Queued document + job preserved for the worker.
+    assert get_document_including_deleted(queued_doc.id).status == "queued"
+    assert get_job(queued_job.id).status == "queued"
+
+    # In-flight document + job recovered.
+    assert get_document_including_deleted(stuck_doc.id).status == "failed"
+    assert get_job(stuck_job.id).status == "failed"
 
 
 def test_get_conversion_capabilities_exposes_upload_limits(document_store_env):
@@ -813,6 +866,68 @@ def test_conversion_capabilities_standard_reports_docling(document_store_env):
     assert std["speed"] == "fast"
 
 
+def test_conversion_capabilities_standard_available_with_worker_dispatch(document_store_env, monkeypatch):
+    """In worker-dispatch mode, standard is available even if Docling is not
+    installed in the query-only app container. The worker is the one with the
+    full parser stack."""
+    monkeypatch.setenv("INGESTION_DISPATCH", "worker")
+
+    import src.config as config
+
+    config.reset_settings_singleton()
+
+    from src.document_store.converter import get_conversion_capabilities
+
+    with mock.patch("src.document_store.converter._docling_available", return_value=False):
+        caps = get_conversion_capabilities()
+        assert caps["standard"]["available"] is True
+
+
+def test_conversion_capabilities_standard_unavailable_in_process_without_docling(
+    document_store_env,
+):
+    """In in_process mode, standard is only available when Docling is local."""
+    from src.document_store.converter import get_conversion_capabilities
+
+    with mock.patch("src.document_store.converter._docling_available", return_value=False):
+        caps = get_conversion_capabilities()
+        assert caps["standard"]["available"] is False
+
+
+# --- Worker status in /conversion-info ---
+
+
+@pytest.mark.asyncio
+async def test_conversion_info_worker_status_down(document_store_env, monkeypatch):
+    """In worker-dispatch mode, /conversion-info reports worker_status.alive=False
+    when no ingest-worker heartbeat is detected, so the frontend can warn the user
+    *before* uploading that their documents will queue but not process."""
+    monkeypatch.setenv("INGESTION_DISPATCH", "worker")
+    import src.config as config
+
+    config.reset_settings_singleton()
+
+    from src.api.document_store_routes import get_conversion_info
+
+    with mock.patch("src.document_store.worker.is_worker_alive", return_value=False):
+        response = await get_conversion_info()
+
+    assert response["worker_status"]["dispatch_mode"] == "worker"
+    assert response["worker_status"]["alive"] is False
+
+
+@pytest.mark.asyncio
+async def test_conversion_info_worker_status_in_process_alive(document_store_env):
+    """In in_process mode, worker_status.alive is True because the API process
+    itself handles ingestion — it is trivially alive if the endpoint responds."""
+    from src.api.document_store_routes import get_conversion_info
+
+    response = await get_conversion_info()
+
+    assert response["worker_status"]["dispatch_mode"] == "in_process"
+    assert response["worker_status"]["alive"] is True
+
+
 # --- R2b: llm_api direct HTTP tests ---
 
 def test_extract_llm_choice_text_string_content(document_store_env):
@@ -959,6 +1074,317 @@ async def test_convert_document_rejects_local_vlm_mode(document_store_env, tmp_p
     assert "Docling" in str(exc_info.value)
 
 
+# --- Job queue / recovery regression tests ---
+
+
+@pytest.mark.asyncio
+async def test_claim_next_job_prioritizes_delete_reindex_process(document_store_env):
+    """Jobs are claimed in priority order: delete, then reindex, then process."""
+    from src.document_store.storage import claim_next_job, create_job, get_job, save_upload
+
+    contents = [b"doc a", b"doc b", b"doc c"]
+    actions = ["process", "reindex", "delete"]
+    for i, (content, action) in enumerate(zip(contents, actions)):
+        upload = UploadFile(filename=f"doc{i}.md", file=BytesIO(content))
+        record = await save_upload(upload, "standard", [])
+        create_job(record.id, action, f"{action} job")
+
+    # Delete should be claimed first regardless of creation order.
+    claimed = claim_next_job()
+    assert claimed is not None
+    assert claimed.action == "delete"
+    assert get_job(claimed.id).status == "processing"
+
+    claimed = claim_next_job()
+    assert claimed is not None
+    assert claimed.action == "reindex"
+
+    claimed = claim_next_job()
+    assert claimed is not None
+    assert claimed.action == "process"
+
+    assert claim_next_job() is None
+
+
+@pytest.mark.asyncio
+async def test_create_job_dedups_queued_same_action(document_store_env):
+    """Creating two queued jobs for the same (document, action) returns the first one."""
+    from src.document_store.storage import create_job, save_upload
+
+    upload = UploadFile(filename="doc.md", file=BytesIO(b"unique content"))
+    record = await save_upload(upload, "standard", [])
+    job1 = create_job(record.id, "process", "first")
+    job2 = create_job(record.id, "process", "second")
+    assert job1.id == job2.id
+
+
+@pytest.mark.asyncio
+async def test_reindex_document_job_reuses_converted_markdown(document_store_env, tmp_path):
+    """Reindex skips reconversion when a converted Markdown file already exists."""
+    from src.document_store.jobs import reindex_document_job
+    from src.document_store.storage import create_job, save_upload, update_document
+
+    upload = UploadFile(filename="doc.md", file=BytesIO(b"# Hello\n\ncontent"))
+    record = await save_upload(upload, "standard", [])
+    converted_path = Path(record.converted_path)
+    converted_path.parent.mkdir(parents=True, exist_ok=True)
+    converted_path.write_text("# Hello\n\ncontent", encoding="utf-8")
+    update_document(record.id, converted_path=str(converted_path), status="indexed")
+
+    job = create_job(record.id, "reindex", "reindex")
+    with (
+        mock.patch("src.document_store.handlers.convert_document") as mock_convert,
+        mock.patch("src.document_store.handlers.index_document", return_value=2) as mock_index,
+    ):
+        await reindex_document_job(record.id, job.id)
+
+    mock_convert.assert_not_called()
+    mock_index.assert_called_once()
+    indexed_record = mock_index.call_args.args[0]
+    assert indexed_record.id == record.id
+
+
+@pytest.mark.asyncio
+async def test_reindex_document_job_reconverts_missing_markdown(document_store_env, tmp_path):
+    """Reindex reconverts the original file when the converted Markdown is missing."""
+    from src.document_store.converter import ConversionResult
+    from src.document_store.jobs import reindex_document_job
+    from src.document_store.storage import create_job, save_upload
+
+    upload = UploadFile(filename="doc.md", file=BytesIO(b"# Hello\n\ncontent"))
+    record = await save_upload(upload, "standard", [])
+    job = create_job(record.id, "reindex", "reindex")
+    result = ConversionResult(markdown="# Converted\n\ncontent", page_count=1)
+
+    with (
+        mock.patch("src.document_store.handlers.convert_document", return_value=result) as mock_convert,
+        mock.patch("src.document_store.handlers.write_converted_markdown") as mock_write,
+        mock.patch("src.document_store.handlers.index_document", return_value=2) as mock_index,
+    ):
+        await reindex_document_job(record.id, job.id)
+
+    mock_convert.assert_called_once()
+    mock_write.assert_called_once()
+    mock_index.assert_called_once()
+
+
+def test_recover_interrupted_documents_stale_sweep_only_old_processing(document_store_env):
+    """Only processing jobs older than the stale threshold are failed by the sweep."""
+    from src.db.database import get_connection
+    from src.document_store.storage import ensure_document_store_tables, get_job, recover_interrupted_documents
+
+    ensure_document_store_tables()
+
+    conn = get_connection()
+    try:
+        conn.execute(
+            """
+            INSERT INTO document_store_documents (
+                id, original_filename, stored_filename, mime_type, extension,
+                size_bytes, sha256, status, conversion_mode, original_path
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "doc1",
+                "a.md",
+                "a.md",
+                "text/plain",
+                ".md",
+                1,
+                "sha",
+                "reading",
+                "standard",
+                "/tmp/a.md",
+            ),
+        )
+        conn.execute(
+            """
+            INSERT INTO document_store_jobs (id, document_id, action, status, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            ("job_old", "doc1", "process", "processing", "2024-01-01 00:00:00", "2000-01-01 00:00:00"),
+        )
+        conn.execute(
+            """
+            INSERT INTO document_store_jobs (id, document_id, action, status, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, datetime('now'))
+            """,
+            ("job_new", "doc1", "process", "processing", "2024-01-01 00:00:00"),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    recover_interrupted_documents(stale_processing_threshold_seconds=3600)
+
+    assert get_job("job_old").status == "failed"
+    assert get_job("job_new").status == "processing"
+
+
+@pytest.mark.asyncio
+async def test_process_job_completes_when_document_is_deleting(document_store_env):
+    """A process job that starts after the document is marked deleting must not
+    run conversion/indexing; it completes cleanly and leaves deletion to the
+    delete job."""
+    from src.document_store.jobs import process_document_job
+    from src.document_store.storage import create_job, get_document, get_job, save_upload, update_document
+
+    upload = UploadFile(filename="doc.md", file=BytesIO(b"# Hello\n\ncontent"))
+    record = await save_upload(upload, "standard", [])
+    update_document(record.id, status="deleting")
+    job = create_job(record.id, "process", "process")
+
+    with mock.patch("src.document_store.handlers.convert_document") as mock_convert:
+        await process_document_job(record.id, job.id)
+
+    mock_convert.assert_not_called()
+    assert get_job(job.id).status == "completed"
+    assert get_document(record.id).status == "deleting"
+
+
+@pytest.mark.asyncio
+async def test_reindex_job_completes_when_document_is_deleted(document_store_env):
+    """A reindex job for an already-deleted document completes without work."""
+    from src.document_store.jobs import reindex_document_job
+    from src.document_store.storage import create_job, get_document_including_deleted, get_job, save_upload, update_document
+
+    upload = UploadFile(filename="doc.md", file=BytesIO(b"# Hello\n\ncontent"))
+    record = await save_upload(upload, "standard", [])
+    update_document(record.id, status="deleted")
+    job = create_job(record.id, "reindex", "reindex")
+
+    with mock.patch("src.document_store.handlers.index_document") as mock_index:
+        await reindex_document_job(record.id, job.id)
+
+    mock_index.assert_not_called()
+    assert get_job(job.id).status == "completed"
+    assert get_document_including_deleted(record.id).status == "deleted"
+
+
+@pytest.mark.asyncio
+async def test_claim_next_job_skips_locked_documents(document_store_env, monkeypatch):
+    """A queued job for a document with processing_job_id set is not claimed."""
+    from src.config import reset_settings_singleton
+    from src.db.database import get_connection
+    from src.document_store.storage import claim_next_job, create_job, save_upload
+
+    monkeypatch.setenv("INGESTION_DISPATCH", "worker")
+    reset_settings_singleton()
+
+    upload = UploadFile(filename="doc.md", file=BytesIO(b"doc a"))
+    record = await save_upload(upload, "standard", [])
+    process_job = create_job(record.id, "process", "process")
+    reindex_job = create_job(record.id, "reindex", "reindex")
+
+    # Simulate that a worker is currently processing the document.
+    conn = get_connection()
+    try:
+        conn.execute(
+            "UPDATE document_store_documents SET processing_job_id = ? WHERE id = ?",
+            (process_job.id, record.id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    # The queued reindex must wait until the lock is released.
+    assert claim_next_job() is None
+
+    # After releasing the lock, the queued job can be claimed (delete has
+    # priority, then reindex, then process).
+    conn = get_connection()
+    try:
+        conn.execute(
+            "UPDATE document_store_documents SET processing_job_id = NULL WHERE id = ?",
+            (record.id,),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    claimed = claim_next_job()
+    assert claimed is not None
+    assert claimed.id == reindex_job.id
+
+    reset_settings_singleton()
+
+
+@pytest.mark.asyncio
+async def test_handler_releases_document_lock_after_failure(document_store_env, monkeypatch):
+    """A failing handler must release the cross-process document lock."""
+    from src.config import reset_settings_singleton
+    from src.document_store.jobs import process_document_job
+    from src.document_store.storage import create_job, get_document_including_deleted, save_upload
+
+    monkeypatch.setenv("INGESTION_DISPATCH", "in_process")
+    reset_settings_singleton()
+
+    upload = UploadFile(filename="doc.pdf", file=BytesIO(b"%PDF-1.4"))
+    record = await save_upload(upload, "standard", [])
+    job = create_job(record.id, "process", "process")
+
+    with mock.patch(
+        "src.document_store.handlers.convert_document",
+        side_effect=RuntimeError("conversion failed"),
+    ):
+        await process_document_job(record.id, job.id)
+
+    updated = get_document_including_deleted(record.id)
+    assert updated.processing_job_id is None
+    assert updated.status == "failed"
+    reset_settings_singleton()
+
+
+def test_release_stale_document_locks_clears_orphaned_lock(document_store_env):
+    """A lock pointing at a deleted job row (e.g. via ON DELETE CASCADE) must
+    be cleared by the stale-lock sweep, not left permanently set."""
+    from src.db.database import get_connection
+    from src.document_store.storage import (
+        ensure_document_store_tables,
+        get_document_including_deleted,
+        recover_interrupted_documents,
+    )
+
+    ensure_document_store_tables()
+
+    conn = get_connection()
+    try:
+        conn.execute(
+            """
+            INSERT INTO document_store_documents (
+                id, original_filename, stored_filename, mime_type, extension,
+                size_bytes, sha256, status, conversion_mode, original_path,
+                processing_job_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "doc_orphan",
+                "a.md",
+                "a.md",
+                "text/plain",
+                ".md",
+                1,
+                "sha",
+                "indexed",
+                "standard",
+                "/tmp/a.md",
+                "job_missing",
+            ),
+        )
+        # No matching job row exists — the lock is orphaned.
+        conn.commit()
+    finally:
+        conn.close()
+
+    # recover_interrupted_documents runs the stale-lock sweep; with the old
+    # `IN (...)` form this would not match and the lock would stay set.
+    recover_interrupted_documents()
+
+    record = get_document_including_deleted("doc_orphan")
+    assert record is not None
+    assert record.processing_job_id is None
+
+
 def test_category_backfill_migration_moves_non_registry_names(document_store_env):
     """006 migration moves pre-split non-registry names from registry to category."""
     from pathlib import Path
@@ -1057,3 +1483,171 @@ def test_migrations_recorded_when_table_created_outside_migrations(document_stor
 
     assert "004_document_metadata.sql" in applied
     assert "005_document_category.sql" in applied
+
+
+@pytest.mark.asyncio
+async def test_process_job_hard_timeout_marks_failed(document_store_env, monkeypatch):
+    """A hung conversion that exceeds the hard asyncio timeout is cancelled and
+    the document + job are marked failed so the UI allows retry and the worker
+    slot + document lock are freed."""
+    from src.config import reset_settings_singleton
+    from src.document_store.jobs import process_document_job
+    from src.document_store.storage import (
+        create_job,
+        get_document_including_deleted,
+        get_job,
+        save_upload,
+    )
+
+    # Tiny timeout so the test runs fast.
+    monkeypatch.setenv("DOCUMENT_DOCLING_TIMEOUT", "0.1")
+    monkeypatch.setenv("DOCUMENT_JOB_HARD_TIMEOUT_MARGIN_SECONDS", "0.1")
+    reset_settings_singleton()
+
+    upload = UploadFile(filename="doc.md", file=BytesIO(b"# Hello\n\ncontent"))
+    record = await save_upload(upload, "standard", [])
+    job = create_job(record.id, "process", "process")
+
+    async def slow_inner(doc_id, job_id):
+        await asyncio.sleep(10)  # far exceeds the 0.2s ceiling
+
+    with mock.patch(
+        "src.document_store.handlers._process_document_job_inner",
+        side_effect=slow_inner,
+    ):
+        await process_document_job(record.id, job.id)
+
+    doc = get_document_including_deleted(record.id)
+    assert doc.status == "failed"
+    assert "hard time limit" in doc.error
+    # Lock must be released even after a timeout cancellation.
+    assert doc.processing_job_id is None
+
+    job_row = get_job(job.id)
+    assert job_row.status == "failed"
+    assert "hard time limit" in job_row.error
+
+    reset_settings_singleton()
+
+
+@pytest.mark.asyncio
+async def test_hard_timeout_does_not_clobber_after_sweep_released_lock(
+    document_store_env, monkeypatch
+):
+    """Race condition: if the stuck-job sweep fires before the hard timeout,
+    marks the doc failed, and releases the lock, a new job may start. When the
+    old task's hard timeout then fires, it must NOT overwrite the new job's
+    document status. The timeout handler must check lock ownership first."""
+    from src.config import reset_settings_singleton
+    from src.document_store.jobs import process_document_job
+    from src.document_store.storage import (
+        create_job,
+        get_document_including_deleted,
+        get_job,
+        recover_interrupted_documents,
+        save_upload,
+        update_document,
+        update_job,
+    )
+
+    # Give enough ceiling for the test to simulate the sweep before timeout.
+    monkeypatch.setenv("DOCUMENT_DOCLING_TIMEOUT", "0.5")
+    monkeypatch.setenv("DOCUMENT_JOB_HARD_TIMEOUT_MARGIN_SECONDS", "0.5")
+    reset_settings_singleton()
+
+    upload = UploadFile(filename="doc.md", file=BytesIO(b"# Hello\n\ncontent"))
+    record = await save_upload(upload, "standard", [])
+    old_job = create_job(record.id, "process", "process")
+
+    sweep_done = asyncio.Event()
+
+    async def slow_inner(doc_id, job_id):
+        # Simulate the sweep firing while the task is hung: mark the job
+        # failed, mark the doc failed, and release the lock — exactly what
+        # recover_interrupted_documents does.
+        update_job(job_id, "processing")  # set updated_at so sweep can find it
+        # Force the job's updated_at into the past so the sweep targets it.
+        from src.db.database import get_connection
+        conn = get_connection()
+        try:
+            conn.execute(
+                "UPDATE document_store_jobs SET updated_at = '2000-01-01 00:00:00' WHERE id = ?",
+                (job_id,),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        recover_interrupted_documents(
+            recover_queued_jobs=False, stale_processing_threshold_seconds=0.01
+        )
+        # Lock is now released by the sweep. Simulate a new job acquiring it.
+        new_job = create_job(doc_id, "process", "process")
+        from src.document_store.storage import try_acquire_document_lock
+        assert try_acquire_document_lock(doc_id, new_job.id) is True
+        update_document(doc_id, status="reading", error=None)
+        sweep_done.set()
+        # Now hang until the hard timeout fires.
+        await asyncio.sleep(10)
+
+    with mock.patch(
+        "src.document_store.handlers._process_document_job_inner",
+        side_effect=slow_inner,
+    ):
+        await process_document_job(record.id, old_job.id)
+
+    doc = get_document_including_deleted(record.id)
+    # The new job set status to "reading". The old job's hard timeout must NOT
+    # have overwritten it to "failed".
+    assert doc.status == "reading", (
+        f"Expected 'reading' (new job's status), got '{doc.status}' — "
+        "the hard timeout clobbered a new job after the sweep released the lock"
+    )
+
+    # Old job is marked failed by the timeout (that's fine — it IS the old job).
+    old_job_row = get_job(old_job.id)
+    assert old_job_row.status == "failed"
+
+    reset_settings_singleton()
+
+
+@pytest.mark.asyncio
+async def test_delete_job_marks_doc_failed_when_final_update_fails(document_store_env):
+    """If update_document(status='deleted') fails, the document must be marked
+    'failed' (not left stuck in 'deleting') so the UI allows a retry."""
+    from src.document_store.jobs import delete_document_job
+    from src.document_store.storage import (
+        create_job,
+        get_document_including_deleted,
+        get_job,
+        save_upload,
+    )
+
+    upload = UploadFile(filename="doc.md", file=BytesIO(b"# Hello\n\ncontent"))
+    record = await save_upload(upload, "standard", [])
+    job = create_job(record.id, "delete", "delete")
+
+    # Build a side_effect that fails only for status='deleted' but succeeds
+    # for status='failed' (the recovery write inside the except block).
+    real_update = __import__(
+        "src.document_store.handlers", fromlist=["update_document"]
+    ).update_document
+
+    def selective_update(doc_id, **kwargs):
+        if kwargs.get("status") == "deleted":
+            raise RuntimeError("DB write failed")
+        return real_update(doc_id, **kwargs)
+
+    with (
+        mock.patch("src.document_store.handlers.delete_document_chunks", return_value=None),
+        mock.patch("src.document_store.handlers.remove_document_files"),
+        mock.patch("src.document_store.handlers.update_document", side_effect=selective_update),
+    ):
+        await delete_document_job(record.id, job.id)
+
+    doc = get_document_including_deleted(record.id)
+    assert doc.status == "failed"
+    assert "Delete failed" in doc.error
+
+    job_row = get_job(job.id)
+    assert job_row.status == "failed"

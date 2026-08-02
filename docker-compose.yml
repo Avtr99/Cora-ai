@@ -1,9 +1,22 @@
 # Cora AI — Local-First Docker Stack
-# Usage: docker-compose up -d --build
+#
+# Split ingestion stack: a query-only `app` container plus a separate
+# `ingest-worker` container that runs the heavy PDF/OCR parsing.
+# This isolates parser CPU/RAM spikes from query latency.
+#   Usage: docker compose up -d --build
+#
+# Security: .env values are injected as container environment variables and
+# are visible via `docker inspect`. For production / shared hosts, prefer
+# Docker secrets or an external secret manager instead of plain .env files.
 
 services:
   app:
-    build: .
+    build:
+      context: .
+      args:
+        # Query-only image: no Docling/torch/RapidOCR models (~700MB smaller).
+        # Ingestion is dispatched to the ingest-worker service below.
+        INSTALL_INGESTION: "false"
     platform: linux/amd64
     ports:
       - "8000:8000"
@@ -11,18 +24,82 @@ services:
       - .env
     environment:
       # Override .env values for the container network
-      - DATABASE_URL=sqlite:////app/data/cora.db
+      # The SQLite DB lives on a named volume (cora_db_data → /app/db) instead
+      # of the bind mount. Windows bind mounts via Docker Desktop / WSL2 do not
+      # support the POSIX locking SQLite needs for concurrent access from
+      # multiple containers (app + ingest-worker). Named volumes use the Docker
+      # storage driver (Linux VM filesystem), which supports proper locking.
+      # Document files stay on the bind mount at ./data/ (regular files, no
+      # locking needed).
+      - DATABASE_URL=sqlite:////app/db/cora.db
       - QDRANT_URL=http://qdrant:6333
       - CORS_ORIGINS=http://localhost:8000,http://localhost:8080
+      # Worker dispatch: the app only enqueues job rows; ingest-worker runs
+      # the converter/indexer.
+      - INGESTION_DISPATCH=worker
+      # The named volume supports WAL mode (shared memory/mmap works on the
+      # Linux VM filesystem). WAL is faster than DELETE and allows concurrent
+      # readers + one writer without locking.
+      - SQLITE_JOURNAL_MODE=WAL
     volumes:
-      # Bind mount (not a named volume) so user data is directly accessible
-      # in ./data/ for easy inspection, backup, and migration. This also
-      # prevents `docker-compose down -v` from accidentally destroying
-      # indexed documents — a footgun with named volumes.
+      # Named volume for the SQLite database — avoids WSL2 bind mount
+      # corruption from concurrent writes (app + ingest-worker).
+      - cora_db_data:/app/db
+      # Bind mount for document files (originals, converted markdown, metadata
+      # sidecars). These are regular files, not databases, so the bind mount
+      # is safe. Kept on ./data/ for easy inspection and backup.
       - ./data:/app/data
     depends_on:
       qdrant:
         condition: service_healthy
+    # Resource limits prevent the query-serving container from being
+    # OOM-killed when the worker spikes. The app is lightweight
+    # (no Docling/torch) but still runs the full RAG pipeline (embedding
+    # client, reranker, LLM, Qdrant searches) under concurrent load. 2g
+    # covers local embeddings (FastEmbed ~500MB) + 10-20 concurrent queries.
+    # Tune up for high-traffic deploys.
+    mem_limit: 2g
+    cpus: 2.0
+    restart: unless-stopped
+
+  ingest-worker:
+    # Separate worker that polls the SQLite job table for queued ingestion
+    # jobs and runs the Docling converter + Qdrant indexer. Keeps CPU/RAM
+    # spikes from PDF/OCR parsing off the query-serving container.
+    build:
+      context: .
+      args:
+        # Full parser stack: Docling + torch + RapidOCR + prebaked models.
+        INSTALL_INGESTION: "true"
+    platform: linux/amd64
+    # No ports exposed — the worker is not queryable.
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=sqlite:////app/db/cora.db
+      - QDRANT_URL=http://qdrant:6333
+      # The worker reads INGESTION_DISPATCH only to stay consistent with the
+      # app; its loop is independent of this value.
+      - INGESTION_DISPATCH=worker
+      # Named volume supports WAL mode (see app service comment above).
+      - SQLITE_JOURNAL_MODE=WAL
+    volumes:
+      # Shares the same named DB volume and document bind mount as app.
+      - cora_db_data:/app/db
+      - ./data:/app/data
+    depends_on:
+      qdrant:
+        condition: service_healthy
+    command: ["python", "-m", "src.document_store.worker"]
+    # The worker runs no HTTP server, so the inherited curl-based Dockerfile
+    # HEALTHCHECK (which targets :8000) would always fail. Disable it.
+    healthcheck:
+      disable: true
+    # Resource limits: the worker loads torch + Docling models (~2-4GB RSS
+    # when active). Cap at 4G so a runaway parse job can't OOM the app or
+    # Qdrant. Tune up for large multi-page PDF batches.
+    mem_limit: 4g
+    cpus: 2.0
     restart: unless-stopped
 
   qdrant:
@@ -36,7 +113,9 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    mem_limit: 2g
     restart: unless-stopped
 
 volumes:
   qdrant_data:
+  cora_db_data:

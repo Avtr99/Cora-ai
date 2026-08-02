@@ -9,6 +9,7 @@ from fastapi import HTTPException, Request
 from loguru import logger
 
 from ..config import get_settings
+from ..db.revisions import get_revisions
 from ..query_processing.filter_extractor import extract_filters
 from ..utils.security import sign_history, verify_history_signature
 from ..agents.reasoning_formatter import create_timeout_response
@@ -59,6 +60,11 @@ async def process_query_core(
         )
 
     safe_query = sanitization_result.sanitized_text
+
+    # Capture the config generation at request start. This is an observability
+    # stamp, not a consistency guarantee: later stages may read a newer config if
+    # a settings save happens mid-request.
+    config_version = get_revisions().get("config_version", 0)
 
     # NOTE: Filter extraction moved to specific pipelines (Orchestrator vs Legacy)
     # to avoid duplication and precedence issues.
@@ -286,6 +292,7 @@ async def process_query_core(
             output_sanitizer,
             history_verification_failed=original_history_present and not history_verified,
             history_items_dropped=history_items_dropped,
+            config_version=config_version,
         )
 
     sanitized_quiz = sanitize_quiz_payload(processed_results.get("quiz"), output_sanitizer)
@@ -307,4 +314,5 @@ async def process_query_core(
         history_signature=history_signature,
         history=[Message(**m) for m in new_history] if new_history else None,
         truncated=processed_results.get("truncated", False),
+        config_version=config_version,
     )

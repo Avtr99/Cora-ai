@@ -1,11 +1,13 @@
 """Settings API routes.
 
 Provides endpoints for:
-- GET  /v1/settings/llm        — Get current LLM provider config (never returns API key)
-- PUT  /v1/settings/llm        — Update LLM provider config
-- GET  /v1/settings/llm/models — List available models for a provider (e.g. Ollama /api/tags)
-- POST /v1/settings/llm/test   — Test an LLM config before saving (validates key + model)
-- GET  /v1/settings/status     — Full configuration status with validation warnings
+- GET  /v1/settings/llm           -- Get current LLM provider config (never returns API key)
+- PUT  /v1/settings/llm           -- Update LLM provider config
+- POST /v1/settings/llm/switch    -- Quick-switch between saved provider profiles
+- GET  /v1/settings/llm/providers -- List available providers for the chat toggle
+- GET  /v1/settings/llm/models    -- List available models for a provider (e.g. Ollama /api/tags)
+- POST /v1/settings/llm/test      -- Test an LLM config before saving (validates key + model)
+- GET  /v1/settings/status        -- Full configuration status with validation warnings
 """
 
 from fastapi import APIRouter

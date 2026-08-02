@@ -14,6 +14,7 @@ from fastapi import Request
 from loguru import logger
 
 from ..config import get_settings
+from ..db.revisions import get_revisions
 from ..agents.reasoning_formatter import create_timeout_response
 from .lifespan import (
     get_gemini_client,
@@ -126,6 +127,11 @@ async def process_query_core_stream(
         return
 
     safe_query = sanitization_result.sanitized_text
+
+    # Capture the config generation at request start. This is an observability
+    # stamp, not a consistency guarantee: later stages may read a newer config if
+    # a settings save happens mid-request.
+    config_version = get_revisions().get("config_version", 0)
 
     retriever = get_retriever()
     gemini_client = get_gemini_client()
@@ -287,6 +293,7 @@ async def process_query_core_stream(
             output_sanitizer,
             history_verification_failed=original_history_present and not history_verified,
             history_items_dropped=history_items_dropped,
+            config_version=config_version,
         )
 
     sanitized_reasoning_steps = None
@@ -318,6 +325,7 @@ async def process_query_core_stream(
         history_signature=history_signature,
         history=[Message(**m) for m in new_history] if new_history else None,
         truncated=final_result.get("truncated", False),
+        config_version=config_version,
     )
 
     payload = response.model_dump() if hasattr(response, "model_dump") else dict(response)

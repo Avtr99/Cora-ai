@@ -45,10 +45,21 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({ backendReady, onUpload
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [dropError, setDropError] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
+  const [workerWarning, setWorkerWarning] = useState<string | null>(null);
 
   const maxBytes = capabilities?.upload_limits?.max_bytes ?? DOCUMENT_UPLOAD_MAX_BYTES;
   const maxMbLabel = `${Math.round(maxBytes / (1024 * 1024))} MB`;
   const allowedExtensions = capabilities?.upload_limits?.allowed_extensions ?? FALLBACK_ALLOWED_EXTENSIONS;
+
+  // Worker-down warning: in worker-dispatch mode, if the ingest-worker is not
+  // running, uploads will be accepted and queued but never processed. Surface
+  // this *before* the user uploads so they can start the worker first. This is
+  // a runtime liveness signal (from worker_status), distinct from the
+  // deployment-capability signal (standard.available) which only says whether
+  // the deployment *can* do Standard mode.
+  const workerDown =
+    capabilities?.worker_status?.dispatch_mode === 'worker' &&
+    !capabilities?.worker_status?.alive;
 
   useEffect(() => {
     if (!backendReady) return;
@@ -107,6 +118,7 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({ backendReady, onUpload
     setIsUploading(true);
     setUploadError(null);
     setUploadSuccess(null);
+    setWorkerWarning(null);
     setUploadProgress({ done: 0, total: stagedFiles.length });
     const parsedTags = tags.split(',').map((tag) => tag.trim()).filter(Boolean);
     const results = await uploadDocumentsBatch(
@@ -129,6 +141,18 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({ backendReady, onUpload
       if (modeInfo && modeInfo.privacy === 'external' && modeInfo.cost_per_page && modeInfo.cost_per_page !== '—') {
         const providerLabel = modeInfo.provider === 'gemini' ? 'Gemini' : 'OpenAI';
         successMsg += ` Estimated cost: ${modeInfo.cost_per_page} per page (${providerLabel} ${modeInfo.model || ''}).`;
+      }
+      // Surface the backend's post-upload warning (e.g. worker went down
+      // between the capability check and the upload) as a separate yellow
+      // banner, NOT appended to the green success message — mixing "queued
+      // for processing" (positive) with "will not be processed" (warning) in
+      // the same green banner is a tonal/visual conflict.
+      const successResults = results.filter(
+        (r): r is Extract<DocumentUploadBatchResult, { ok: true }> => r.ok,
+      );
+      const warning = successResults.find((r) => r.response.warning)?.response.warning;
+      if (warning) {
+        setWorkerWarning(warning);
       }
       setUploadSuccess(successMsg);
       setTags('');
@@ -185,11 +209,31 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({ backendReady, onUpload
           onFilesAdded={handleAddFiles}
         />
 
+        {workerDown && (
+          <div className="mt-3 flex items-start gap-2 rounded-lg bg-semantic-warning-bg/50 border border-semantic-warning-border p-2.5 text-semantic-warning-text text-xs font-inter">
+            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" aria-hidden="true" />
+            <span className="flex-1">
+              The background PDF parser is not running, so uploaded files won&apos;t be
+              added to the knowledge base until it starts. Start it from your terminal: <code className="font-mono text-2xs">docker compose up -d ingest-worker</code>
+            </span>
+          </div>
+        )}
+
         {uploadSuccess && (
           <div className="mt-3 flex items-start gap-2 rounded-lg bg-semantic-success-bg p-2.5 text-semantic-success-text text-xs font-inter">
             <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5" />
             <span className="flex-1">{uploadSuccess}</span>
             <button type="button" onClick={() => setUploadSuccess(null)} className="shrink-0" aria-label="Dismiss success message">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+
+        {workerWarning && (
+          <div className="mt-3 flex items-start gap-2 rounded-lg bg-semantic-warning-bg/50 border border-semantic-warning-border p-2.5 text-semantic-warning-text text-xs font-inter">
+            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" aria-hidden="true" />
+            <span className="flex-1">{workerWarning}</span>
+            <button type="button" onClick={() => setWorkerWarning(null)} className="shrink-0" aria-label="Dismiss warning message">
               <X className="h-4 w-4" />
             </button>
           </div>

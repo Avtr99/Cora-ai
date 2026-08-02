@@ -38,4 +38,7 @@ class OrchestratorConfig:
     
     # Performance
     max_total_time_ms: int = 30000  # 30 second default; configurable via settings
+    # Hybrid retrieval uses both KB and web sources by default. Set to False
+    # only when a deployment explicitly accepts the additional latency of
+    # sequential retrieval.
     parallel_retrieval: bool = True

@@ -13,6 +13,7 @@ from loguru import logger
 from ..config import get_settings
 from ..document_loader.metadata_extractor import get_metadata_extractor
 from ..query_processing.llm_factory import get_llm_settings
+from .files import _atomic_write_text
 from .models import DocumentRecord
 from .storage import update_document
 from .title_utils import _build_display_title, _clean_display_name, _extract_content_title
@@ -111,8 +112,7 @@ def write_converted_markdown(record: DocumentRecord, result: ConversionResult) -
     if not record.converted_path:
         raise ValueError("Converted path is not configured")
     converted_path = Path(record.converted_path)
-    converted_path.parent.mkdir(parents=True, exist_ok=True)
-    converted_path.write_text(result.markdown.strip() + "\n", encoding="utf-8")
+    _atomic_write_text(converted_path, result.markdown.strip() + "\n")
     update_document(
         record.id,
         converted_path=str(converted_path),
@@ -433,9 +433,17 @@ def get_conversion_capabilities() -> dict[str, Any]:
         if ext.strip()
     )
 
+    # Standard mode is handled by the ingest worker in worker-dispatch
+    # deployments, even if the query-only app container does not have Docling
+    # installed. For in-process deployments it is only available when Docling is
+    # importable in the same process.
+    standard_available = (
+        settings.INGESTION_DISPATCH == "worker" or _docling_available()
+    )
+
     return {
         "standard": {
-            "available": _docling_available(),
+            "available": standard_available,
             "model": "docling-standard-classical",
             "provider": "docling",
             "cost_per_page": "Free",
@@ -519,10 +527,13 @@ async def _convert_pdf_with_llm_api(path: Path) -> ConversionResult:
         reraise=True,
     )
     async def _convert_page(client: httpx.AsyncClient, img_b64: str) -> str:
-        payload = {
+        # Reasoning models (GPT-5.x, o1/o3/o4) reject temperature and max_tokens.
+        # Detect by model name and adapt the payload accordingly.
+        lower_model = (model or "").lower()
+        bare_model = lower_model.rsplit("/", 1)[-1]
+        is_reasoning = any(bare_model.startswith(p) for p in ("gpt-5", "o1", "o3", "o4"))
+        payload: dict[str, Any] = {
             "model": model,
-            "max_tokens": 8192,
-            "temperature": 0.0,
             "messages": [
                 {
                     "role": "user",
@@ -536,6 +547,11 @@ async def _convert_pdf_with_llm_api(path: Path) -> ConversionResult:
                 }
             ],
         }
+        if is_reasoning:
+            payload["max_completion_tokens"] = 8192
+        else:
+            payload["max_tokens"] = 8192
+            payload["temperature"] = 0.0
         resp = await client.post(url, json=payload, timeout=120)
         status = resp.status_code
         # 429 and 5xx are retried by tenacity (raise HTTPStatusError).
@@ -566,8 +582,15 @@ async def _convert_pdf_with_llm_api(path: Path) -> ConversionResult:
 
     for idx, result in enumerate(results):
         if isinstance(result, Exception):
-            logger.warning("llm_api conversion failed on page {} ({})", idx + 1, type(result).__name__)
-            warnings.append(f"Page {idx + 1}: AI conversion failed ({type(result).__name__}). Text may be missing.")
+            # Extract HTTP status + body for HTTPStatusError so the user can
+            # tell rate-limiting (429) from auth (401/403) from server errors (5xx).
+            detail = type(result).__name__
+            if isinstance(result, httpx.HTTPStatusError):
+                resp = result.response
+                body_preview = (resp.text or "")[:300]
+                detail = f"HTTP {resp.status_code} — {body_preview}"
+            logger.warning("llm_api conversion failed on page {} ({})", idx + 1, detail)
+            warnings.append(f"Page {idx + 1}: AI conversion failed ({detail}). Text may be missing.")
         elif result and result.strip():
             pages.append(result.strip())
 

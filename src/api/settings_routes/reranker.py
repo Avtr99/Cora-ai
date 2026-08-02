@@ -6,7 +6,9 @@ from pydantic import BaseModel, Field
 from loguru import logger
 
 from ...config import get_settings, reload_settings
-from ...db.app_settings import save_app_setting
+from ...db.app_settings import save_app_settings
+from ...utils.cache import invalidate_query_cache_for_config_change
+from .helpers import reranker_has_api_key
 
 router = APIRouter()
 
@@ -32,13 +34,7 @@ async def get_reranker_config() -> RerankerSettingsResponse:
     settings = get_settings()
     provider = settings.RERANK_PROVIDER.lower()
 
-    has_key = False
-    if provider == "none":
-        has_key = True
-    elif provider == "voyage":
-        has_key = bool(settings.VOYAGE_API_KEY)
-    elif provider == "cohere":
-        has_key = bool(settings.COHERE_API_KEY)
+    has_key = reranker_has_api_key(settings)
 
     return RerankerSettingsResponse(
         provider=provider,
@@ -59,18 +55,27 @@ async def update_reranker_config(update: RerankerSettingsUpdate) -> RerankerSett
         )
 
     provider = update.provider.lower()
-    save_app_setting("rerank_provider", provider)
+
+    # Single transactional write so a crash cannot leave a partial config.
+    settings_dict = {"rerank_provider": provider}
 
     if update.model is not None:
-        save_app_setting("rerank_model", update.model)
+        settings_dict["rerank_model"] = update.model or None
 
+    # API key — scoped per provider so the embeddings route (which has its
+    # own embedding_*_api_key keys) can never overwrite this one. Empty string
+    # clears; None means "not sent, preserve existing" (skip the write).
     if update.api_key is not None:
         if provider == "voyage":
-            save_app_setting("voyage_api_key", update.api_key)
+            settings_dict["reranker_voyage_api_key"] = update.api_key or None
         elif provider == "cohere":
-            save_app_setting("cohere_api_key", update.api_key)
+            settings_dict["reranker_cohere_api_key"] = update.api_key or None
+
+    save_app_settings(settings_dict)
 
     reload_settings()
-    logger.info(f"Reranker settings updated: provider={provider}")
+    # Invalidate cached answers from the old reranker stack.
+    await invalidate_query_cache_for_config_change()
+    logger.info(f"Reranker settings updated: provider={provider} (cache invalidated)")
 
     return await get_reranker_config()

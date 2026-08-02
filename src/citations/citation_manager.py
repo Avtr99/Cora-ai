@@ -40,7 +40,7 @@ class CitationManager:
         self.config = config or CitationConfig(min_relevance_score=min_relevance_score)
         self.min_relevance_score = self.config.min_relevance_score
         self.safe_metadata_fields = {
-            "file_name", "parent_doc", "source", "page_number",
+            "file_name", "original_filename", "parent_doc", "source", "page_number",
             "section", "registry", "category", "document_id", "version_number", "title",
             "publisher", "registry_document_id", "methodology_codes",
         }

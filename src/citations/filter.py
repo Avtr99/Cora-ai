@@ -7,6 +7,7 @@ from typing import List, Set
 from loguru import logger
 
 from .config import CitationConfig, _WORD_RE
+from .markers import extract_cited_indices, unique_sources_by_type
 from .models import Citation
 from .source_name import clean_source_name, normalized_source_key
 
@@ -34,10 +35,22 @@ class CitationFilter:
             query_words = self._extract_signal_tokens(query.lower())
             answer_words -= query_words
 
+        explicitly_cited = self._extract_explicitly_cited_sources(citations, answer)
+        retained_explicit: Set[tuple[str, str]] = set()
         filtered: List[Citation] = []
         filtered_out = 0
 
         for citation in citations:
+            # Match by (source_type, strip().lower()) — the same key the
+            # renumberer uses — so the filter and renumberer never disagree
+            # on which citation index N refers to.
+            citation_key = (citation.source_type, citation.source_name.strip().lower())
+            if citation_key in explicitly_cited:
+                if citation_key not in retained_explicit:
+                    filtered.append(citation)
+                    retained_explicit.add(citation_key)
+                continue
+
             # Web citations from Gemini grounding are inherently answer-grounded:
             # the answer was generated FROM those sources, so they should always
             # be retained regardless of snippet/name overlap heuristics.
@@ -152,3 +165,39 @@ class CitationFilter:
             return url.split("?")[0].split("#")[0].lower()
         except Exception:
             return url.lower()
+
+    def _extract_explicitly_cited_sources(
+        self,
+        citations: List[Citation],
+        answer: str,
+    ) -> Set[tuple[str, str]]:
+        """Return the set of ``(source_type, source_name.strip().lower())``
+        pairs that the answer explicitly references via ``[cite_kb: N]`` /
+        ``[Knowledge Base, cite: N]`` / ``[cite_web: N]`` / ``[Web, cite: N]``
+        markers.
+
+        Index ``N`` is mapped via :func:`unique_sources_by_type` — the same
+        convention the renumberer uses — so the filter's retain/drop decision
+        and the renumberer's marker rewriting always agree on which source
+        ``N`` refers to. Explicitly cited sources are retained even when
+        snippet/name overlap heuristics would reject them: the LLM grounded a
+        claim on that source, so dropping it would hide the evidence behind
+        the answer and leave a dangling marker.
+        """
+        if not citations or not answer:
+            return set()
+
+        cited_indices = extract_cited_indices(answer)
+        if not any(cited_indices.values()):
+            return set()
+
+        explicit: Set[tuple[str, str]] = set()
+        for source_type, indices in cited_indices.items():
+            if not indices:
+                continue
+            unique_names = unique_sources_by_type(citations, source_type)
+            for n in indices:
+                if 1 <= n <= len(unique_names):
+                    explicit.add((source_type, unique_names[n - 1].strip().lower()))
+
+        return explicit

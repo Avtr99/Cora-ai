@@ -164,3 +164,6 @@ bundle-report.json
 tests/test_secret_key_auto.py
 Improve securtiy.md
 docs/OPEN_SOURCE_PLAN.md
+docs/ROADMAP_RELIABILITY_HARDENING.md
+docs/TICKETS.md
+docs/ROADMAP_FRAGILITY_AUDIT.md

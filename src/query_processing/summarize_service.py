@@ -193,7 +193,9 @@ async def summarize_document(
         dist = c["distance"]
         formatted_citations.append({
             "source_name": (
-                meta.get("file_name")
+                meta.get("title")
+                or meta.get("file_name")
+                or meta.get("original_filename")
                 or meta.get("parent_doc")
                 or meta.get("source")
                 or "Unknown"

@@ -133,8 +133,11 @@ def create_embeddings() -> Any:
 
 def _create_voyage_embeddings(settings) -> Any:
     """Voyage AI embeddings (default, 1024d with voyage-4-lite)."""
-    if not settings.VOYAGE_API_KEY:
-        raise ValueError("VOYAGE_API_KEY is required when EMBEDDING_PROVIDER=voyage")
+    # Scoped key (from Settings UI) takes precedence; .env key is the fallback
+    # for operators who never used the UI.
+    api_key = settings.EMBEDDING_VOYAGE_API_KEY or settings.VOYAGE_API_KEY
+    if not api_key:
+        raise ValueError("Voyage API key is required when EMBEDDING_PROVIDER=voyage. Set it in the Settings UI or via VOYAGE_API_KEY in .env.")
 
     from langchain_voyageai import VoyageAIEmbeddings
 
@@ -143,14 +146,15 @@ def _create_voyage_embeddings(settings) -> Any:
     logger.info("Using Voyage AI embeddings (model=%s, dim=%d)", model, settings.EMBEDDING_DIM)
     return VoyageAIEmbeddings(
         model=model,
-        voyage_api_key=settings.VOYAGE_API_KEY,
+        voyage_api_key=api_key,
     )
 
 
 def _create_cohere_embeddings(settings) -> Any:
     """Cohere embeddings (1024d with embed-english-v3 — drop-in compatible)."""
-    if not settings.COHERE_API_KEY:
-        raise ValueError("COHERE_API_KEY is required when EMBEDDING_PROVIDER=cohere")
+    api_key = settings.EMBEDDING_COHERE_API_KEY or settings.COHERE_API_KEY
+    if not api_key:
+        raise ValueError("Cohere API key is required when EMBEDDING_PROVIDER=cohere. Set it in the Settings UI or via COHERE_API_KEY in .env.")
 
     from langchain_cohere import CohereEmbeddings
 
@@ -159,7 +163,7 @@ def _create_cohere_embeddings(settings) -> Any:
     logger.info("Using Cohere embeddings (model=%s, dim=%d)", model, settings.EMBEDDING_DIM)
     return CohereEmbeddings(
         model=model,
-        cohere_api_key=settings.COHERE_API_KEY,
+        cohere_api_key=api_key,
     )
 
 
@@ -193,8 +197,10 @@ def _create_openai_embeddings(settings) -> Any:
 
     Ref: https://docs.langchain.com/oss/python/integrations/embeddings/openai
     """
-    if not settings.OPENAI_API_KEY:
-        raise ValueError("OPENAI_API_KEY is required when EMBEDDING_PROVIDER=openai")
+    # Scoped key (from Settings UI) takes precedence; .env key is the fallback.
+    api_key = settings.EMBEDDING_OPENAI_API_KEY or settings.OPENAI_API_KEY
+    if not api_key:
+        raise ValueError("OpenAI API key is required when EMBEDDING_PROVIDER=openai. Set it in the Settings UI or via OPENAI_API_KEY in .env.")
 
     from langchain_openai import OpenAIEmbeddings
 
@@ -206,7 +212,7 @@ def _create_openai_embeddings(settings) -> Any:
     # Pass it only for those models — older models (ada-002) don't support it.
     kwargs: Dict[str, Any] = {
         "model": model,
-        "api_key": settings.OPENAI_API_KEY,
+        "api_key": api_key,
     }
     if model.startswith("text-embedding-3"):
         kwargs["dimensions"] = settings.EMBEDDING_DIM

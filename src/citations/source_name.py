@@ -37,7 +37,9 @@ def clean_source_name(name: str) -> str:
     cleaned = _SOURCE_PREFIX_RE.sub("", cleaned)
     cleaned = cleaned.replace("\\", "/")
     if "/" in cleaned:
-        cleaned = cleaned.split("/")[-1]
+        final_segment = cleaned.rsplit("/", 1)[-1]
+        if cleaned.startswith(("/", "./", "../")) or _EXTENSION_STRIP_RE.search(final_segment):
+            cleaned = final_segment
 
     cleaned = _EXTENSION_STRIP_RE.sub("", cleaned)
     version_match = _VERSION_PREFIX_RE.match(cleaned)

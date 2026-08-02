@@ -130,7 +130,7 @@ class RAGOrchestrator:
 
         # Initialize agents — all receive the LLMClient, not a raw genai.Client
         query_rewriter = QueryRewriterAgent(llm_client, model_name)
-        router = RouterAgent(llm_client, model_name=None)  # Use default Lite model for speed
+        router = RouterAgent(llm_client, model_name=None)  # model_name=None → router uses llm.model_lite
 
         # Initialize pluggable search provider based on config
         settings = get_settings()

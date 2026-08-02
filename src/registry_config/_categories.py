@@ -9,9 +9,12 @@ extractor stores the pattern name under the ``category`` field.
 Marker safety notes
 -------------------
 Content markers are matched via case-insensitive **substring** test
-(``marker in text.lower()``).  Short acronyms that appear inside common
-English words are false-positive risks and have been removed or made
-more specific:
+(``marker in text.lower()``).  The same markers also seed the router's KB
+keyword set, so removing a broad marker changes both document classification
+and heuristic routing. Keep broad domain terms out of category classifiers,
+but add them to a routing-only list when they are useful as general KB signals.
+Short acronyms that appear inside common English words are false-positive risks
+and have been removed or made more specific:
 
   - bare ``"arr"``  → removed (matches "array", "narrative", "arrow")
   - bare ``"alm"``  → removed (matches "calm", "palm")
@@ -60,8 +63,11 @@ CATEGORY_PATTERNS: List[RegistryPattern] = [
             "price forecast", "offset demand",
             "voluntary carbon market report", "credit issuance",
             "credit retirement", "unit retirement",
-            "market trends", "carbon market",
-            "voluntary carbon market",
+            "market trends",
+            # NOTE: "carbon market" and "voluntary carbon market" removed —
+            # they are domain-level terms that match nearly every VCM document,
+            # causing widespread misclassification as "Market Intelligence".
+            # A document needs specific market-report markers to qualify.
         ],
         id_patterns=[],
         version_patterns=[],

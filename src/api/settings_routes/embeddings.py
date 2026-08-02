@@ -6,7 +6,9 @@ from pydantic import BaseModel, Field
 from loguru import logger
 
 from ...config import get_settings, reload_settings
-from ...db.app_settings import save_app_setting
+from ...db.app_settings import save_app_settings
+from ...utils.cache import invalidate_query_cache_for_config_change
+from .helpers import embedding_has_api_key
 
 router = APIRouter()
 
@@ -36,15 +38,7 @@ async def get_embedding_config() -> EmbeddingSettingsResponse:
     settings = get_settings()
     provider = settings.EMBEDDING_PROVIDER.lower()
 
-    has_key = False
-    if provider == "voyage":
-        has_key = bool(settings.VOYAGE_API_KEY)
-    elif provider == "cohere":
-        has_key = bool(settings.COHERE_API_KEY)
-    elif provider == "openai":
-        has_key = bool(getattr(settings, "OPENAI_API_KEY", None))
-    elif provider == "ollama":
-        has_key = True  # No key needed
+    has_key = embedding_has_api_key(settings)
 
     return EmbeddingSettingsResponse(
         provider=provider,
@@ -72,10 +66,8 @@ async def update_embedding_config(update: EmbeddingSettingsUpdate) -> EmbeddingS
 
     provider = update.provider.lower()
 
-    # Save provider
-    save_app_setting("embedding_provider", provider)
-
-    # Save model (use default if not provided)
+    # Build the full settings dict and write it in a single transaction so a
+    # crash mid-save cannot leave a partial config (provider written, key not).
     defaults = {
         "voyage": "voyage-4-lite",
         "cohere": "embed-english-v3",
@@ -83,29 +75,37 @@ async def update_embedding_config(update: EmbeddingSettingsUpdate) -> EmbeddingS
         "openai": "text-embedding-3-small",
     }
     model = update.model or defaults.get(provider, "")
-    save_app_setting("embedding_model", model)
 
-    # Save dimension (use default if not provided)
     default_dims = {"voyage": 1024, "cohere": 1024, "ollama": 1024, "openai": 1024}
     dim = update.dim or default_dims.get(provider, 1024)
-    save_app_setting("embedding_dim", str(dim))
 
-    # Save API key to the appropriate key
+    settings_dict = {
+        "embedding_provider": provider,
+        "embedding_model": model,
+        "embedding_dim": str(dim),
+    }
+
+    # API key — scoped per provider so the reranker route (which has its own
+    # reranker_*_api_key keys) can never overwrite this one. An empty string
+    # clears the key; None means "not sent, preserve existing" (skip the write).
     if update.api_key is not None:
         if provider == "voyage":
-            save_app_setting("voyage_api_key", update.api_key)
+            settings_dict["embedding_voyage_api_key"] = update.api_key or None
         elif provider == "cohere":
-            save_app_setting("cohere_api_key", update.api_key)
+            settings_dict["embedding_cohere_api_key"] = update.api_key or None
         elif provider == "openai":
-            save_app_setting("openai_api_key", update.api_key)
+            settings_dict["embedding_openai_api_key"] = update.api_key or None
         # Ollama doesn't need a key
 
-    # Save Ollama base URL if provided
     if update.ollama_base_url is not None:
-        save_app_setting("ollama_base_url", update.ollama_base_url)
+        settings_dict["ollama_base_url"] = update.ollama_base_url or None
+
+    save_app_settings(settings_dict)
 
     # Reload settings so the new values take effect
     reload_settings()
-    logger.info(f"Embedding settings updated: provider={provider}, model={model}, dim={dim}")
+    # Invalidate cached answers from the old embedding stack.
+    await invalidate_query_cache_for_config_change()
+    logger.info(f"Embedding settings updated: provider={provider}, model={model}, dim={dim} (cache invalidated)")
 
     return await get_embedding_config()

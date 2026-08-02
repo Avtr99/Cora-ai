@@ -143,14 +143,15 @@ class ConversationalHandler:
 
         Args:
             llm_client: LLMClient instance used for text generation
-            model_name: Model to use (defaults to lite model for speed)
+            model_name: Model to use (defaults to the client's lite model for speed)
         """
         self.llm = llm_client
-        settings = get_settings()
-        # Use lite model for conversational responses (faster, cheaper)
-        self.model_name = model_name or getattr(
-            settings, "GEMINI_MODEL_LITE", "gemini-2.5-flash-lite"
-        )
+        # Use the client's lite model for conversational responses (faster,
+        # cheaper). This is provider-agnostic — the client resolves its own
+        # lite model (e.g. GeminiClient uses GEMINI_MODEL_LITE, OpenAICompatibleClient
+        # uses the configured model_lite). Hardcoding GEMINI_MODEL_LITE here would
+        # send a Gemini model name to OpenRouter/OpenAI, which would fail.
+        self.model_name = model_name or getattr(llm_client, "model_lite", None)
     
     @staticmethod
     def is_conversational(query: str, chat_history: Optional[List[Dict[str, str]]] = None) -> bool:

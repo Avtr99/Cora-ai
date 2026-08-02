@@ -27,16 +27,25 @@ _settings_lock = Lock()
 
 # Keys stored in the app_settings table for embedding/search/reranker config.
 # These overlay the .env values so users can change them from the UI.
+#
+# API keys are SCOPED per subsystem (embedding_* / reranker_*) so the
+# embeddings and reranker routes never share a DB row. The shared
+# voyage_api_key / cohere_api_key / openai_api_key names are .env-only
+# fallbacks (read by env-provider detection in llm_profile_manager) and are
+# intentionally NOT in this map — the DB must not write back to them. See
+# docs/ROADMAP_FRAGILITY_AUDIT.md (P0 shared-key fix) and migration 009.
 DB_SETTING_KEYS = {
     "embedding_provider": "EMBEDDING_PROVIDER",
     "embedding_model": "EMBEDDING_MODEL",
     "embedding_dim": "EMBEDDING_DIM",
     "ollama_base_url": "OLLAMA_BASE_URL",
-    "voyage_api_key": "VOYAGE_API_KEY",
-    "cohere_api_key": "COHERE_API_KEY",
-    "openai_api_key": "OPENAI_API_KEY",
+    "embedding_voyage_api_key": "EMBEDDING_VOYAGE_API_KEY",
+    "embedding_cohere_api_key": "EMBEDDING_COHERE_API_KEY",
+    "embedding_openai_api_key": "EMBEDDING_OPENAI_API_KEY",
     "rerank_provider": "RERANK_PROVIDER",
     "rerank_model": "RERANK_MODEL",
+    "reranker_voyage_api_key": "RERANKER_VOYAGE_API_KEY",
+    "reranker_cohere_api_key": "RERANKER_COHERE_API_KEY",
     "search_provider": "SEARCH_PROVIDER",
     "tavily_api_key": "TAVILY_API_KEY",
 }
@@ -141,12 +150,16 @@ def reload_settings() -> Settings:
     """Re-read DB overlay and update the singleton.
 
     Call this after saving settings via the API so the new values take
-    effect without requiring a full server restart.
+    effect without requiring a full server restart. Also bumps the
+    ``config_version`` observability counter so query responses and the status
+    endpoint can report which config generation a request started under.
     """
     global _settings_instance
     with _settings_lock:
         if _settings_instance is not None:
             _apply_db_overlay(_settings_instance)
+            from .db.revisions import bump_config_version
+            bump_config_version()
     return _settings_instance
 
 

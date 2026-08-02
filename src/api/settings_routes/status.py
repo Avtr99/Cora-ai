@@ -9,6 +9,7 @@ from ...query_processing.llm_factory import (
     get_llm_settings,
     is_llm_configured,
 )
+from .helpers import embedding_has_api_key, reranker_has_api_key
 
 router = APIRouter()
 
@@ -34,6 +35,10 @@ class ConfigStatusResponse(BaseModel):
     chat_ready: bool = Field(..., description="True when the chat can answer grounded questions: LLM is configured and either the KB has documents or web search is enabled")
     kb_ready: bool = Field(..., description="True when the Qdrant knowledge base has indexed documents")
     search_ready: bool = Field(..., description="True when a web search provider other than 'none' is configured")
+    corpus_revision: int = Field(0, description="Monotonically increasing counter bumped on each ingestion batch. Folded into the query cache key so reingestion invalidates stale answers.")
+    config_revision: int = Field(0, description="Monotonically increasing counter bumped on every embedding/reranker/LLM model change. Folded into the query cache key so model swaps invalidate stale answers.")
+    config_version: int = Field(0, description="Monotonically increasing counter bumped on every Settings UI save. Returned on query responses and folded into the query cache key so cached responses do not serve a stale stamp.")
+    config_version_updated_at: Optional[str] = Field(None, description="Timestamp of the last config_version bump (ISO 8601, if available).")
 
 
 @router.get("/status", response_model=ConfigStatusResponse)
@@ -73,17 +78,9 @@ async def get_config_status() -> ConfigStatusResponse:
 
     # --- Embeddings ---
     emb_provider = settings.EMBEDDING_PROVIDER.lower()
-    emb_has_key = False
     emb_warning = None
 
-    if emb_provider == "voyage":
-        emb_has_key = bool(settings.VOYAGE_API_KEY)
-    elif emb_provider == "cohere":
-        emb_has_key = bool(settings.COHERE_API_KEY)
-    elif emb_provider == "openai":
-        emb_has_key = bool(getattr(settings, "OPENAI_API_KEY", None))
-    elif emb_provider == "ollama":
-        emb_has_key = True  # No key needed
+    emb_has_key = embedding_has_api_key(settings)
 
     emb_configured = emb_has_key
     if not emb_has_key:
@@ -100,17 +97,13 @@ async def get_config_status() -> ConfigStatusResponse:
 
     # --- Reranker ---
     rerank_provider = settings.RERANK_PROVIDER.lower()
-    rerank_has_key = False
     rerank_warning = None
 
+    rerank_has_key = reranker_has_api_key(settings)
+
     if rerank_provider == "none":
-        rerank_has_key = True  # No key needed — reranking disabled
         rerank_configured = True
-    elif rerank_provider == "voyage":
-        rerank_has_key = bool(settings.VOYAGE_API_KEY)
-        rerank_configured = rerank_has_key
-    elif rerank_provider == "cohere":
-        rerank_has_key = bool(settings.COHERE_API_KEY)
+    elif rerank_provider in ("voyage", "cohere"):
         rerank_configured = rerank_has_key
     else:
         rerank_configured = False
@@ -214,6 +207,22 @@ async def get_config_status() -> ConfigStatusResponse:
     # is at least one answer source (KB or web search).
     chat_ready = llm_configured and (kb_ready or search_ready)
 
+    # --- Cache revisions and config version ---
+    # Exposed for debugging: the query cache key folds these in, so a bump
+    # here means every cached answer was invalidated.
+    try:
+        from ...db.revisions import get_revisions
+        revisions = get_revisions()
+        corpus_revision = revisions.get("corpus_revision", 0)
+        config_revision = revisions.get("config_revision", 0)
+        config_version = revisions.get("config_version", 0)
+        config_version_updated_at = revisions.get("config_version_updated_at")
+    except Exception:
+        corpus_revision = 0
+        config_revision = 0
+        config_version = 0
+        config_version_updated_at = None
+
     return ConfigStatusResponse(
         ready=ready,
         llm=llm_status,
@@ -225,4 +234,8 @@ async def get_config_status() -> ConfigStatusResponse:
         chat_ready=chat_ready,
         kb_ready=kb_ready,
         search_ready=search_ready,
+        corpus_revision=corpus_revision,
+        config_revision=config_revision,
+        config_version=config_version,
+        config_version_updated_at=config_version_updated_at,
     )

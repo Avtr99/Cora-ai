@@ -127,13 +127,13 @@ Your goal is to transform ambiguous user inputs into precise, semantic vector se
     <allowed_metadata_fields>
         <instruction>Only use fields listed below. Do not invent new fields.</instruction>
         <taxonomy_note>
-        IMPORTANT — Correct taxonomy for metadata filtering:
-        - CARBON REGISTRIES (issue credits): Verra, Gold Standard, CDM, PACM (CDM successor under Article 6.4), ART, American Carbon Registry, Climate Action Reserve, Plan Vivo, Global Carbon Council, Isometric, Puro.earth
-        - STANDARDS, INITIATIVES, AND GOVERNANCE BODIES (set rules, do NOT issue credits): ICVCM, SBTi, VCMI, Social Carbon, Carbon Standards International, GHG Protocol, CCB, SD VISta, TCAT
-        - POLICY FRAMEWORKS (government/UN mechanisms and compliance schemes): CORSIA, Article 6.4, VCM Policy, EU ETS, UK ETS, China ETS, California Cap-and-Trade, Washington Cap-and-Invest, RGGI, K-ETS, NZ ETS
-        Use category="registry" + registry="..." for actual registries.
-        Use category="standard" + standard="..." for standards bodies.
-        Use category="policy" + policy_framework="..." for policy frameworks.
+        IMPORTANT — Metadata filtering rules:
+        - The system stores SPECIFIC organisation and topic names under ``category`` and ``registry`` — never generic type words. For example, a valid category is the NAME of a specific body or topic (e.g. a standard body, a registry, a policy framework, a project type), NOT the word "standard", "policy", or "registry" itself.
+        - NEVER emit generic category values like category="standard", category="policy", category="registry", or category="framework" — these are type words, not stored values, and will silently return zero results.
+        - ``standard`` and ``policy_framework`` may be valid fields in custom or legacy corpora. Use them only when the query explicitly names a specific value and you are confident it exactly matches the stored metadata; never invent a value.
+        - The knowledge base is not limited to the organisations listed in the acronyms section above. Users can ingest documents from any organisation. Do NOT assume a category or registry value is invalid just because you have not seen it before — if the query names a specific organisation, that name may be a valid filter value.
+        - Only apply a metadata filter when the query explicitly names a specific organisation, registry, or topic that you are confident matches a stored value. If unsure, include the term in natural language text only — do NOT guess a filter value.
+        - When in doubt, prefer natural language expansion over a metadata filter. A missing filter is always safe; a wrong filter silently eliminates all relevant documents.
         </taxonomy_note>
         <fields_list>
         {allowed_fields}
@@ -154,6 +154,7 @@ Your goal is to transform ambiguous user inputs into precise, semantic vector se
         **Metadata Extraction**: Identify specific filtering criteria (registry, methodology, project, policy, developer).
         - Append these to the query using `field="value"` syntax.
         - STRICT RULE: You must check <allowed_metadata_fields> before applying a filter. If the field is not in the list, include the term in the natural language text only.
+        - STRICT RULE: Never guess a categorical value (category, registry, standard, policy_framework). Only use a value if you are confident it is the EXACT string stored in the system. Generic values like "standard", "policy", or "registry" are NEVER valid category values. When unsure, omit the filter entirely — natural language expansion is always safe.
     </step_3>
     <step_4>
         **Sub-Query Generation**: If the user asks for multiple distinct data points, break the request into a list of specific sub-queries.
@@ -187,10 +188,10 @@ Your goal is to transform ambiguous user inputs into precise, semantic vector se
         <input>what are ICVCM CCP requirements for carbon credits</input>
         <output>
         {{
-            "rewritten_query": "Integrity Council Core Carbon Principles requirements carbon credit quality standards ICVCM category=\"standard\"",
+            "rewritten_query": "Integrity Council for the Voluntary Carbon Market Core Carbon Principles requirements carbon credit quality standards ICVCM",
             "sub_queries": ["ICVCM Core Carbon Principles ten requirements additionality permanence", "CCP carbon credit quality assessment ICVCM eligibility", "Core Carbon Principles monitoring leakage safeguards verification"],
             "detected_intent": "standard_compliance",
-            "corrections_made": ["Expanded ICVCM -> Integrity Council for the Voluntary Carbon Market", "Expanded CCP -> Core Carbon Principles", "Added category filter for standard documents"]
+            "corrections_made": ["Expanded ICVCM -> Integrity Council for the Voluntary Carbon Market", "Expanded CCP -> Core Carbon Principles"]
         }}
         </output>
     </example>
@@ -198,10 +199,10 @@ Your goal is to transform ambiguous user inputs into precise, semantic vector se
         <input>Article 6.4 mechanism rules under Paris Agreement</input>
         <output>
         {{
-            "rewritten_query": "Article 6.4 mechanism implementation rules Paris Agreement UNFCCC category=\"policy\" policy_framework=\"Article 6.4\"",
+            "rewritten_query": "Article 6.4 mechanism implementation rules Paris Agreement UNFCCC Supervisory Body",
             "sub_queries": ["Article 6.4 supervisory body procedures approval", "A6.4 mechanism baseline additionality requirements", "Paris Agreement Article 6 paragraph 4 implementation framework"],
             "detected_intent": "policy_inquiry",
-            "corrections_made": ["Correctly classified as policy framework, not registry", "Added category and policy_framework filters"]
+            "corrections_made": ["Expanded Article 6.4 context for vector search"]
         }}
         </output>
     </example>
@@ -209,10 +210,10 @@ Your goal is to transform ambiguous user inputs into precise, semantic vector se
         <input>VCS standard verification rules for IFM projects</input>
         <output>
         {{
-            "rewritten_query": "Verified Carbon Standard verification rules Improved Forest Management projects VCS registry=\"VCS\"",
+            "rewritten_query": "Verified Carbon Standard verification rules Improved Forest Management projects Verra registry=\"Verra\"",
             "sub_queries": ["VCS Improved Forest Management methodology requirements verification", "Verra IFM project validation monitoring reporting verification MRV", "VCS standard carbon credit issuance IFM forest management"],
             "detected_intent": "standard_verification",
-            "corrections_made": ["Expanded VCS -> Verified Carbon Standard", "Expanded IFM -> Improved Forest Management", "Added registry filter for VCS documents"]
+            "corrections_made": ["Expanded VCS -> Verified Carbon Standard", "Expanded IFM -> Improved Forest Management", "Added registry filter for Verra documents"]
         }}
         </output>
     </example>

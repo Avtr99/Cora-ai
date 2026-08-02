@@ -33,12 +33,42 @@ class GeminiClient(BaseRAGClient):
     Uses true async generation (client.aio) to handle concurrent requests
     efficiently without blocking the event loop.
     """
-    
+
     _instance: Optional['GeminiClient'] = None
+
+    @staticmethod
+    def _is_valid_model(model: Optional[str]) -> bool:
+        """Check if a model name is a valid Gemini API identifier.
+
+        Accepts either a short ID (``gemini-2.5-flash``) or a full resource
+        path (``models/gemini-2.5-flash`` / ``tunedModels/...``). Anything
+        with another provider prefix (e.g. ``google/gemini-2.5-flash``) or
+        a non-Gemini name is rejected.
+        """
+        if not model:
+            return False
+        if "/" in model:
+            prefix, _, suffix = model.partition("/")
+            if prefix == "tunedModels":
+                return True
+            return prefix == "models" and suffix.startswith("gemini-")
+        return model.startswith("gemini-")
 
     @property
     def model_name(self) -> str:
-        """Get the main model name for answer generation (higher accuracy)."""
+        """Get the main model name for answer generation (higher accuracy).
+
+        Uses the DB/UI-supplied model if available, otherwise falls back to
+        the env default. This keeps the cache-invalidation fingerprint and the
+        actual generation model in sync.
+        """
+        if self._model_main and self._is_valid_model(self._model_main):
+            return self._model_main
+        if self._model_main:
+            logger.warning(
+                f"Configured Gemini model {self._model_main!r} is not a valid "
+                f"Gemini model ID; falling back to env default."
+            )
         settings = get_settings()
         return getattr(settings, "GEMINI_MODEL_MAIN", "gemini-2.5-flash")
 
@@ -50,25 +80,47 @@ class GeminiClient(BaseRAGClient):
     @property
     def model_lite(self) -> str:
         """LLMClient interface — lite model for low-latency tasks."""
+        if self._model_lite and self._is_valid_model(self._model_lite):
+            return self._model_lite
+        if self._model_lite:
+            logger.warning(
+                f"Configured Gemini lite model {self._model_lite!r} is not a "
+                f"valid Gemini model ID; falling back to env default."
+            )
         settings = get_settings()
         return getattr(settings, "GEMINI_MODEL_LITE", "gemini-2.5-flash-lite")
 
     @property
     def model_relevance(self) -> str:
         """LLMClient interface — model for post-generation relevance check."""
-        return self._model_relevance or self.model_lite
+        if self._model_relevance and self._is_valid_model(self._model_relevance):
+            return self._model_relevance
+        if self._model_relevance:
+            logger.warning(
+                f"Configured Gemini relevance model {self._model_relevance!r} is "
+                f"not a valid Gemini model ID; falling back to lite model."
+            )
+        return self.model_lite
 
     @property
     def model_name_lite(self) -> str:
         """Legacy alias for model_lite (backwards compatibility)."""
         return self.model_lite
 
-    def __init__(self, api_key: Optional[str] = None, model_relevance: Optional[str] = None):
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        model_main: Optional[str] = None,
+        model_lite: Optional[str] = None,
+        model_relevance: Optional[str] = None,
+    ):
         """
         Initialize Gemini client with API key authentication.
         """
         super().__init__()
         self._api_key = api_key
+        self._model_main = model_main
+        self._model_lite = model_lite
         self._model_relevance = model_relevance
         self._initialize_client()
 

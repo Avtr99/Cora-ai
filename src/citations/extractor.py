@@ -56,7 +56,9 @@ class CitationExtractor:
                 continue
 
             raw_source_name = (
-                metadata.get("file_name")
+                metadata.get("title")
+                or metadata.get("file_name")
+                or metadata.get("original_filename")
                 or metadata.get("parent_doc")
                 or metadata.get("source")
                 or f"Document {index + 1}"

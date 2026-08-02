@@ -239,6 +239,36 @@ class TestCitationExtraction:
         
         assert len(citations) == 3
 
+    def test_title_preferred_over_filename_for_source_name(self):
+        """The extractor must prefer metadata.title over file_name/source.
+
+        Regression: the citation extractor's fallback chain was missing
+        ``title``, so it picked ``source`` (the raw filename) even when a
+        proper document title was available in metadata. This made the
+        frontend show "AR ACM0003 Ver02.0" (filename) while the LLM cited
+        the document by its real title "ACM0003: A/R Large-scale
+        Consolidated Methodology v02.0" — an inconsistency that confused
+        users and broke citation grounding.
+        """
+        vector_results = {
+            "documents": ["ACM0003 methodology content"],
+            "metadatas": [{
+                "title": "ACM0003: A/R Large-scale Consolidated Methodology v02.0",
+                "source": "AR-ACM0003_ver02.0.pdf",
+                "original_filename": "AR-ACM0003_ver02.0.pdf",
+            }],
+            "distances": [0.1],
+        }
+
+        citations = self.manager.extract_citations_from_vector_results(vector_results)
+
+        assert len(citations) == 1
+        # The citation must use the title, not the filename.
+        assert "ACM0003" in citations[0].source_name
+        assert "A/R" in citations[0].source_name
+        assert "AR-ACM0003" not in citations[0].source_name
+        assert citations[0].source_name.endswith("v02.0")
+
 
 class TestFormatCitationsForResponse:
     """Test citation formatting for API response."""
@@ -575,6 +605,12 @@ class TestCleanSourceName:
         result = self.manager.clean_source_name("ndc mrv ets guidance.md")
         assert result == "NDC MRV ETS Guidance"
 
+    def test_domain_slash_is_not_treated_as_path_separator(self):
+        result = self.manager.clean_source_name(
+            "ACM0003: A/R Large-scale Consolidated Methodology v02.0"
+        )
+        assert result == "ACM0003: A/R Large Scale Consolidated Methodology v02.0"
+
 
 class TestCitationFiltering:
     """Test filter_citations_by_answer() for Phase 3."""
@@ -669,7 +705,90 @@ class TestCitationFiltering:
         filtered = self.manager.filter_citations_by_answer(citations, answer)
         assert len(filtered) == 1
         assert filtered[0].source_name == "Focused Snippet"
-    
+
+    def test_explicit_kb_marker_keeps_cited_source_when_snippet_prefix_does_not_overlap(self):
+        citations = [
+            Citation(
+                source_id="doc_1",
+                source_name="ACM0003 Methodology",
+                source_type="knowledge_base",
+                content_snippet="Table 2. Emission sources and greenhouse gases selected for accounting.",
+                relevance_score=0.9,
+            )
+        ]
+        answer = (
+            "Project participants may apply the combined additionality tool or an approved "
+            "standardized baseline [cite_kb: 1]."
+        )
+
+        filtered = self.manager.filter_citations_by_answer(citations, answer)
+
+        assert filtered == citations
+
+    def test_explicit_marker_and_renumberer_agree_on_duplicate_source_names(self):
+        """Filter and renumberer must map citation index N to the same source.
+
+        When the citation list contains duplicate source names, the filter's
+        retain decision and the renumberer's marker rewriting must use the
+        same index→source mapping (unique names by first-seen order). If they
+        diverge, the filter can retain a citation the renumberer can't map,
+        leaving a dangling [cite_kb: N] reference in the final answer.
+        """
+        from src.query_processing.citation_verifier import renumber_citation_markers
+
+        citations = [
+            Citation(
+                source_id="doc_1",
+                source_name="ACM0003 Methodology",
+                source_type="knowledge_base",
+                content_snippet="Emission sources selected for accounting.",
+                relevance_score=0.9,
+            ),
+            Citation(
+                source_id="doc_2",
+                source_name="ACM0003 Methodology",  # duplicate name, different chunk
+                source_type="knowledge_base",
+                content_snippet="Baseline approach for A/R project activities.",
+                relevance_score=0.85,
+            ),
+            Citation(
+                source_id="doc_3",
+                source_name="VCS Standard",
+                source_type="knowledge_base",
+                content_snippet="VCS program-level requirements.",
+                relevance_score=0.8,
+            ),
+            Citation(
+                source_id="doc_4",
+                source_name="Unrelated Doc",
+                source_type="knowledge_base",
+                content_snippet="Completely different content.",
+                relevance_score=0.5,
+            ),
+        ]
+        # Unique KB sources by first-seen order:
+        #   1 = "ACM0003 Methodology"  2 = "VCS Standard"  3 = "Unrelated Doc"
+        # LLM cites sources 1 and 2; source 3 should be dropped.
+        answer = (
+            "Project participants may apply the combined additionality tool "
+            "[cite_kb: 1] or an approved standardized baseline [cite_kb: 2]."
+        )
+
+        filtered = self.manager.filter_citations_by_answer(citations, answer)
+
+        retained_names = {c.source_name for c in filtered}
+        assert "ACM0003 Methodology" in retained_names
+        assert "VCS Standard" in retained_names
+        assert "Unrelated Doc" not in retained_names
+
+        # The renumberer must preserve valid markers — no dangling references.
+        # The renumberer rewrites numbers, not format, so [cite_kb: N] stays.
+        renumbered = renumber_citation_markers(answer, citations, filtered)
+        assert "[cite_kb: 1]" in renumbered
+        assert "[cite_kb: 2]" in renumbered
+        # No orphaned empty markers from unmapped references.
+        assert "[]" not in renumbered
+
     def test_no_fallback_when_no_matches(self):
         """Should return empty list when no citations match answer evidence."""
         citations = [
@@ -1148,7 +1267,13 @@ class TestRouteProcessorCitationRegressions:
             answer_generator=_DummyAnswerGenerator({"answer": "", "sources": []}),
             web_search=_DummyWebSearch(search_result=web_search_result, hybrid_result=hybrid_synthesis_result),
             citation_manager=CitationManager(min_relevance_score=0.0),
-            config=_build_route_processor_config(enable_web_search=True, parallel_retrieval=False),
+            # Use parallel mode so both KB and web run — this test verifies
+            # citation alignment when both sources contribute. This also makes
+            # the test independent of the configured retrieval ordering.
+            config=_build_route_processor_config(
+                enable_web_search=True,
+                parallel_retrieval=True,
+            ),
         )
 
         result = await processor.process_hybrid_route(

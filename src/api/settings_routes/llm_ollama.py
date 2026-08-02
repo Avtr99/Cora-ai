@@ -1,11 +1,12 @@
-"""Ollama model-listing helpers for the LLM settings routes."""
+"""Ollama model-listing helpers and route for the LLM settings routes."""
 
 from typing import Optional, List
 from urllib.parse import urlparse
 
 import httpx
-from fastapi import HTTPException
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+from loguru import logger
 
 
 class LLMModel(BaseModel):
@@ -21,8 +22,11 @@ class LLMModelsResponse(BaseModel):
     models: List[LLMModel] = []
 
 
+router = APIRouter()
+
+
 # Hostnames permitted for the Ollama model-listing proxy. Restricting to
-# loopback addresses prevents SSRF — the server fetches the URL on the
+# loopback addresses prevents SSRF -- the server fetches the URL on the
 # user's behalf, so an attacker could otherwise target internal services.
 _ALLOWED_OLLAMA_HOSTS = {"localhost", "127.0.0.1", "::1"}
 _ALLOWED_OLLAMA_PORT = 11434
@@ -84,3 +88,33 @@ async def _list_ollama_models(base_url: str) -> LLMModelsResponse:
         ))
 
     return LLMModelsResponse(models=models)
+
+
+@router.get("/llm/models", response_model=LLMModelsResponse)
+async def list_llm_models(base_url: str) -> LLMModelsResponse:
+    """List available models from a provider.
+
+    Currently supports Ollama's native `/api/tags` endpoint.
+    For OpenAI and other providers, the user enters the model name manually.
+
+    Query parameter:
+        base_url: The provider's base URL (e.g. http://localhost:11434 for Ollama)
+    """
+    if not base_url:
+        raise HTTPException(status_code=400, detail="base_url query parameter is required")
+
+    # Validate the URL is a local Ollama instance before making any request.
+    # This prevents SSRF -- without validation an attacker could point the
+    # server at internal services (e.g. cloud metadata endpoints).
+    try:
+        validated_url = _validate_ollama_url(base_url)
+    except HTTPException:
+        # Not a valid local Ollama URL -- fall through to the empty-list
+        # response for non-Ollama providers (user enters model name manually).
+        return LLMModelsResponse(models=[])
+
+    try:
+        return await _list_ollama_models(validated_url)
+    except Exception as e:
+        logger.error(f"Failed to list Ollama models: {e}")
+        raise HTTPException(status_code=502, detail=f"Failed to fetch models from Ollama: {e}")

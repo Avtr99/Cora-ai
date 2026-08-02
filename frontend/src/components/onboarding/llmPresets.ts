@@ -19,6 +19,7 @@ export interface PresetConfig {
   needsApiKey: boolean;
   needsBaseUrl: boolean;
   modelPlaceholder: string;
+  defaultModel: string;
   description: string;
 }
 
@@ -30,6 +31,7 @@ export const PRESETS: Record<ProviderPreset, PresetConfig> = {
     needsApiKey: true,
     needsBaseUrl: false,
     modelPlaceholder: "gemini-2.5-flash",
+    defaultModel: "gemini-2.5-flash",
     description: "Google's Gemini models. Requires a Gemini API key.",
   },
   openai: {
@@ -39,6 +41,7 @@ export const PRESETS: Record<ProviderPreset, PresetConfig> = {
     needsApiKey: true,
     needsBaseUrl: false,
     modelPlaceholder: "gpt-4.1-mini",
+    defaultModel: "gpt-4.1-mini",
     description: "OpenAI's GPT models. Requires an OpenAI API key.",
   },
   ollama: {
@@ -48,6 +51,7 @@ export const PRESETS: Record<ProviderPreset, PresetConfig> = {
     needsApiKey: false,
     needsBaseUrl: true,
     modelPlaceholder: "Pull a model with: ollama pull <model-name>",
+    defaultModel: "",
     description: "Run models locally with Ollama. No API key needed. Start with `ollama serve`.",
   },
   openrouter: {
@@ -57,6 +61,7 @@ export const PRESETS: Record<ProviderPreset, PresetConfig> = {
     needsApiKey: true,
     needsBaseUrl: false,
     modelPlaceholder: "e.g. anthropic/claude-3.5-sonnet",
+    defaultModel: "google/gemini-2.5-flash",
     description: "Access multiple providers through OpenRouter. Requires an OpenRouter API key.",
   },
   custom: {
@@ -66,6 +71,7 @@ export const PRESETS: Record<ProviderPreset, PresetConfig> = {
     needsApiKey: true,
     needsBaseUrl: true,
     modelPlaceholder: "Model name",
+    defaultModel: "",
     description: "Any provider that exposes the OpenAI Chat Completions API.",
   },
 };

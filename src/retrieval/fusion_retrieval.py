@@ -116,7 +116,7 @@ class FusionRetriever:
                     merged.append((doc, score))
 
         relaxed_fields: List[str] = []
-        if not merged and supported_filters and len(supported_filters) > 1:
+        if not merged and supported_filters:
             relaxed = await self._filter_builder.relax_and_retry(
                 query, supported_filters, self.initial_candidates
             )

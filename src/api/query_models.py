@@ -35,6 +35,11 @@ class Query(BaseModel):
         description="HMAC-SHA256 hex signature for history integrity, or 'unsigned' for dev mode.",
     )
     include_debug: bool = False
+    client_request_id: Optional[str] = Field(
+        default=None,
+        max_length=128,
+        description="Optional client-provided idempotency key for async query requests.",
+    )
 
 
 class CitationDetail(BaseModel):
@@ -117,6 +122,10 @@ class QueryMetadataResponse(BaseModel):
     timing_breakdown: Optional[Dict[str, float]] = None
     history_verification_failed: bool = False
     history_items_dropped: int = 0
+    config_version: Optional[int] = Field(
+        None,
+        description="Config generation at request start (observability stamp, not a consistency guarantee).",
+    )
 
 
 class Response(BaseModel):
@@ -135,6 +144,10 @@ class Response(BaseModel):
     history_signature: Optional[str] = None
     history: Optional[List[Message]] = None
     truncated: bool = False
+    config_version: int = Field(
+        0,
+        description="Config generation at request start (observability stamp, not a consistency guarantee).",
+    )
 
 
 class TestQueryRequest(BaseModel):
@@ -155,3 +168,7 @@ class TestQueryResponse(BaseModel):
     latency_ms: float
     reasoning_steps: Optional[List[Dict[str, Any]]] = None
     citations: Optional[Dict[str, Any]] = None
+    config_version: int = Field(
+        0,
+        description="Config generation at request start (observability stamp, not a consistency guarantee).",
+    )

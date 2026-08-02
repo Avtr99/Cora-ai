@@ -156,33 +156,28 @@ async def check_gemini_health() -> ComponentHealth:
 async def check_embeddings_health() -> ComponentHealth:
     """Check embedding provider connectivity (lightweight check)."""
     start = time.perf_counter()
-    
+
     try:
         settings = get_settings()
         provider = settings.EMBEDDING_PROVIDER
-        
-        # Validate that the configured provider has its required credentials
-        if provider == "voyage" and not settings.VOYAGE_API_KEY:
+
+        # Delegate the key-present check to the shared helper so the scoped-key
+        # fallback logic lives in exactly one place (adding a new provider only
+        # requires updating helpers.py, not this function too).
+        from .settings_routes.helpers import embedding_has_api_key
+
+        if not embedding_has_api_key(settings):
+            _KEY_HINTS = {
+                "voyage": "VOYAGE_API_KEY",
+                "cohere": "COHERE_API_KEY",
+                "openai": "OPENAI_API_KEY",
+            }
+            hint = _KEY_HINTS.get(provider, "the provider's API key")
             return ComponentHealth(
                 name="embeddings",
                 status=HealthStatus.UNHEALTHY,
-                message="VOYAGE_API_KEY not configured (EMBEDDING_PROVIDER=voyage)"
+                message=f"API key not configured for embedding provider '{provider}'. Set it in the Settings UI or via {hint} in .env."
             )
-        elif provider == "cohere" and not settings.COHERE_API_KEY:
-            return ComponentHealth(
-                name="embeddings",
-                status=HealthStatus.UNHEALTHY,
-                message="COHERE_API_KEY not configured (EMBEDDING_PROVIDER=cohere)"
-            )
-        elif provider == "openai" and not settings.OPENAI_API_KEY:
-            return ComponentHealth(
-                name="embeddings",
-                status=HealthStatus.UNHEALTHY,
-                message="OPENAI_API_KEY not configured (EMBEDDING_PROVIDER=openai)"
-            )
-        elif provider == "ollama":
-            # Ollama runs locally — no API key needed, just check it's reachable
-            pass
         
         # Check circuit breaker status (only applies to cloud providers)
         from .middleware.circuit_breaker import voyage_circuit

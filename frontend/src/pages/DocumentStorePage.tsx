@@ -59,6 +59,12 @@ const DocumentStorePage: React.FC = () => {
   // until these IDs disappear from the list. Without this, the refetchInterval
   // sees no "pending" statuses and stops polling before the background job runs.
   const [pendingDeletionIds, setPendingDeletionIds] = useState<Set<string>>(() => new Set());
+  // Track docs awaiting worker pickup after reindex. The API route deliberately
+  // keeps the doc at its current status (e.g. 'failed') until the worker claims
+  // the job, so the hasActiveJobs polling gate doesn't fire. We keep polling
+  // these docs until they transition to an active status or the timeout expires.
+  const [pendingReindexIds, setPendingReindexIds] = useState<Map<string, number>>(() => new Map());
+  const REINDEX_POLL_TIMEOUT_MS = 60_000;
   const previewOpen = previewDocument !== null;
 
   useEffect(() => {
@@ -68,12 +74,13 @@ const DocumentStorePage: React.FC = () => {
 
   const documentsQuery = useQuery({
     queryKey: ['document-store', 'documents'],
-    queryFn: () => fetchDocuments(),
+    queryFn: ({ signal }) => fetchDocuments({}, signal),
     refetchInterval: (query) => {
       const docs = query.state.data ?? [];
       const hasPendingDeletion = pendingDeletionIds.size > 0;
+      const hasPendingReindex = pendingReindexIds.size > 0;
       const hasActiveJobs = docs.some((doc) => ['queued', 'reading', 'converting', 'indexing', 'deleting'].includes(doc.status));
-      return hasActiveJobs || hasPendingDeletion ? 2500 : false;
+      return hasActiveJobs || hasPendingDeletion || hasPendingReindex ? 2500 : false;
     },
   });
 
@@ -100,9 +107,35 @@ const DocumentStorePage: React.FC = () => {
     }
   }, [documents, pendingDeletionIds]);
 
+  // Remove reindexed doc IDs from pending once the worker picks them up (doc
+  // enters an active status → hasActiveJobs takes over) or the timeout expires
+  // (worker down — stop polling, doc stays at its current status for retry).
+  // Also remove IDs whose doc has disappeared (deleted while pending reindex)
+  // so we don't keep polling for a doc that no longer exists.
+  useEffect(() => {
+    if (pendingReindexIds.size === 0) return;
+    const now = Date.now();
+    const activeStatuses = ['queued', 'reading', 'converting', 'indexing', 'deleting'];
+    const next = new Map(pendingReindexIds);
+    for (const [id, ts] of pendingReindexIds) {
+      if (now - ts > REINDEX_POLL_TIMEOUT_MS) {
+        next.delete(id);
+        continue;
+      }
+      const doc = documents.find((d) => d.id === id);
+      if (!doc || activeStatuses.includes(doc.status)) {
+        next.delete(id);
+      }
+    }
+    if (next.size !== pendingReindexIds.size) setPendingReindexIds(next);
+  }, [documents, pendingReindexIds]);
+
   const reindexMutation = useMutation({
     mutationFn: reindexDocument,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['document-store', 'documents'] }),
+    onSuccess: (_data, documentId) => {
+      setPendingReindexIds((prev) => new Map(prev).set(documentId, Date.now()));
+      queryClient.invalidateQueries({ queryKey: ['document-store', 'documents'] });
+    },
   });
 
   const deleteMutation = useMutation({
@@ -192,28 +225,36 @@ const DocumentStorePage: React.FC = () => {
       confirmLabel: 'Reindex all',
       onConfirm: () => {
         setReindexAllSnapshot(snapshot);
+        setPendingReindexIds((prev) => {
+          const next = new Map(prev);
+          const now = Date.now();
+          for (const id of snapshot) next.set(id, now);
+          return next;
+        });
         reindexAllMutation.mutate();
       },
     });
   }, [documents, reindexAllMutation]);
 
   const reindexAllProgress = useMemo(() => {
-    if (!reindexAllSnapshot || !reindexAllMutation.isPending) return null;
+    if (!reindexAllSnapshot) return null;
     const total = reindexAllSnapshot.size;
     const completed = documents.filter(
-      (doc) => reindexAllSnapshot.has(doc.id) && !['queued', 'reading', 'converting', 'indexing'].includes(doc.status),
+      (doc) => reindexAllSnapshot.has(doc.id)
+        && !['queued', 'reading', 'converting', 'indexing'].includes(doc.status)
+        && !pendingReindexIds.has(doc.id),
     ).length;
     return { completed, total };
-  }, [reindexAllSnapshot, reindexAllMutation.isPending, documents]);
+  }, [reindexAllSnapshot, pendingReindexIds, documents]);
 
   useEffect(() => {
-    if (reindexAllSnapshot && !reindexAllMutation.isPending) {
-      const allDone = documents.every(
-        (doc) => !reindexAllSnapshot.has(doc.id) || !['queued', 'reading', 'converting', 'indexing'].includes(doc.status),
-      );
-      if (allDone) setReindexAllSnapshot(null);
-    }
-  }, [reindexAllSnapshot, reindexAllMutation.isPending, documents]);
+    if (!reindexAllSnapshot) return;
+    const allDone = documents.every(
+      (doc) => !reindexAllSnapshot.has(doc.id)
+        || (!['queued', 'reading', 'converting', 'indexing'].includes(doc.status) && !pendingReindexIds.has(doc.id)),
+    );
+    if (allDone) setReindexAllSnapshot(null);
+  }, [reindexAllSnapshot, pendingReindexIds, documents]);
 
   const handleClearAll = useCallback(() => {
     if (documents.length === 0) return;
@@ -397,8 +438,9 @@ const DocumentStorePage: React.FC = () => {
                   onSelect={handleSelect}
                   onReindex={handleReindex}
                   onDelete={handleDelete}
-                  isReindexing={busyDocIds.has(doc.id) && reindexMutation.isPending}
+                  isReindexing={(busyDocIds.has(doc.id) && reindexMutation.isPending) || pendingReindexIds.has(doc.id)}
                   isDeleting={busyDocIds.has(doc.id) && deleteMutation.isPending}
+                  isPendingReindex={pendingReindexIds.has(doc.id)}
                 />
               ))}
             </div>

@@ -72,6 +72,8 @@ async def initialize_components():
         logger.error(error_msg, exc_info=True)
         initialization_errors.append({"component": "retriever", "error": error_msg})
     
+    new_client = None
+    new_orchestrator = None
     try:
         if not is_llm_configured():
             logger.warning(
@@ -80,14 +82,14 @@ async def initialize_components():
             )
         else:
             logger.info("Initializing LLM client...")
-            llm_client = create_llm_client()
-            logger.info(f"LLM client initialized: {type(llm_client).__name__}")
+            new_client = create_llm_client()
+            logger.info(f"LLM client initialized: {type(new_client).__name__}")
     except Exception as e:
         error_msg = f"Failed to initialize LLM client: {type(e).__name__}: {str(e)}"
         logger.error(error_msg, exc_info=True)
         initialization_errors.append({"component": "llm_client", "error": error_msg})
 
-    if retriever and llm_client:
+    if retriever and new_client:
         try:
             logger.info("Initializing RAG Orchestrator...")
 
@@ -112,10 +114,10 @@ async def initialize_components():
                 max_total_time_ms=settings.RAG_TIMEOUT_MS,
             )
 
-            rag_orchestrator = await StreamingRAGOrchestrator.create(
-                llm_client=llm_client,
+            new_orchestrator = await StreamingRAGOrchestrator.create(
+                llm_client=new_client,
                 retriever=retriever,
-                answer_generator=llm_client,
+                answer_generator=new_client,
                 config=orchestrator_config,
             )
             logger.info("RAG Orchestrator initialized successfully")
@@ -138,8 +140,15 @@ async def initialize_components():
         logger.error(error_msg, exc_info=True)
         initialization_errors.append({"component": "citation_manager", "error": error_msg})
     
+    # Publish the new LLM client + orchestrator atomically, using the same
+    # lock that protects runtime hot-swaps.
+    if new_client is not None and new_orchestrator is not None:
+        async with _llm_swap_lock:
+            llm_client = new_client
+            rag_orchestrator = new_orchestrator
+
     # Check critical components
-    if retriever is None or llm_client is None:
+    if retriever is None or llm_client is None or rag_orchestrator is None:
         if not is_llm_configured():
             logger.warning("LLM not configured — running in setup mode. Visit /setup to configure.")
         else:
@@ -212,17 +221,39 @@ async def lifespan(app):
         from ..document_store.storage import ensure_document_store_tables, recover_interrupted_documents
         ensure_document_store_tables()
         logger.info("Document store tables ensured")
-        # Recover any documents left in an in-flight status by a previous
-        # crash/restart. Without this they stay "converting" forever.
-        try:
-            recovered = recover_interrupted_documents()
-            if recovered:
-                logger.warning(
-                    f"Recovered {recovered} document(s) stuck in an in-flight status "
-                    "after server restart — marked as failed."
-                )
-        except Exception as e:
-            logger.error(f"Document store recovery sweep failed: {e}")
+        # Recover documents left in an in-flight status by a previous
+        # crash/restart. In worker-dispatch mode the API skips recovery
+        # entirely — the API and worker start concurrently, and if the API
+        # marks in-flight documents as failed while the worker is actively
+        # processing them, the worker would later overwrite the status to
+        # 'indexed', leaving a transient incorrect 'failed' state in the UI.
+        # The worker owns all recovery (jobs, documents, stale locks) on its
+        # own startup.
+        dispatch_mode = getattr(get_settings(), "INGESTION_DISPATCH", "in_process")
+        if dispatch_mode != "worker":
+            try:
+                recovered = recover_interrupted_documents()
+                if recovered:
+                    logger.warning(
+                        f"Recovered {recovered} document(s) stuck in an in-flight status "
+                        "after server restart — marked as failed."
+                    )
+            except Exception as e:
+                logger.error(f"Document store recovery sweep failed: {e}")
+
+        # In worker-dispatch mode, warn if no ingest-worker is running so the
+        # operator knows uploads will sit in 'queued' indefinitely.
+        if dispatch_mode == "worker":
+            try:
+                from ..document_store.worker import is_worker_alive
+                if not is_worker_alive():
+                    logger.warning(
+                        "INGESTION_DISPATCH=worker but no ingest-worker heartbeat "
+                        "detected. Document uploads will be queued but NOT processed "
+                        "until the ingest-worker container is started."
+                    )
+            except Exception as e:
+                logger.debug(f"Could not check worker heartbeat: {e}")
     except Exception as e:
         logger.error(f"Failed to ensure document store tables: {e}")
     
@@ -324,6 +355,7 @@ async def hot_swap_llm_client() -> dict:
         except Exception as e:
             logger.warning(f"Hot-swap: SQLite cache wiring failed (non-critical): {e}")
 
+        new_orchestrator = None
         # Rebuild the orchestrator with the new client, reusing the existing
         # retriever and citation_manager.
         if retriever is not None:
@@ -353,7 +385,7 @@ async def hot_swap_llm_client() -> dict:
                     max_total_time_ms=settings.RAG_TIMEOUT_MS,
                 )
 
-                rag_orchestrator = await StreamingRAGOrchestrator.create(
+                new_orchestrator = await StreamingRAGOrchestrator.create(
                     llm_client=new_client,
                     retriever=retriever,
                     answer_generator=new_client,
@@ -363,15 +395,15 @@ async def hot_swap_llm_client() -> dict:
             except Exception as e:
                 error_msg = f"Hot-swap: orchestrator rebuild failed: {type(e).__name__}: {e}"
                 logger.error(error_msg, exc_info=True)
-                # Still swap the client - direct callers via get_llm_client() get
-                # the new client. The old orchestrator keeps the old client, which
-                # is better than no orchestrator for streaming queries.
+                return {"success": False, "error": error_msg}
         else:
             logger.warning("Hot-swap: retriever not available, skipping orchestrator rebuild")
 
         # Atomic update: both globals are assigned only after client and
         # orchestrator are successfully rebuilt.
         llm_client = new_client
+        if new_orchestrator is not None:
+            rag_orchestrator = new_orchestrator
     return {
         "success": True,
         "client_type": type(new_client).__name__,

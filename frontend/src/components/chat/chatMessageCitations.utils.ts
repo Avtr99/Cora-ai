@@ -6,22 +6,78 @@ const INLINE_CITATION_REGEX = /\[(?:(Knowledge Base|Web)(?:,\s*cite:\s*([\d,\s]+
 const ROUTING_SOURCE_TOKENS = new Set(['knowledge_base', 'web_search', 'hybrid', 'error_fallback']);
 export const CITATION_INTERNAL_URL = 'https://citation.internal/';
 
-/** Decode URL-encoded source names defensively (e.g. vm0047%20arr%20v1.0). */
+const MAX_DECODE_PASSES = 8;
+
+/** Encode a Unicode code point as UTF-8 bytes. */
+function codePointToUtf8(point: number): number[] {
+  if (point <= 0x7f) return [point];
+  if (point <= 0x7ff) return [0xc0 | (point >> 6), 0x80 | (point & 0x3f)];
+  if (point <= 0xffff) {
+    return [
+      0xe0 | (point >> 12),
+      0x80 | ((point >> 6) & 0x3f),
+      0x80 | (point & 0x3f),
+    ];
+  }
+  return [
+    0xf0 | (point >> 18),
+    0x80 | ((point >> 12) & 0x3f),
+    0x80 | ((point >> 6) & 0x3f),
+    0x80 | (point & 0x3f),
+  ];
+}
+
+/**
+ * Percent-decode a string, leaving invalid/broken % sequences as literals.
+ * Works byte-by-byte so a single malformed % does not abort decoding of the
+ * rest of the label (e.g. `vm0048%20reducing%` -> `vm0048 reducing%`).
+ */
+function safePercentDecode(input: string): string {
+  const bytes: number[] = [];
+  let i = 0;
+  while (i < input.length) {
+    if (input[i] === '%' && i + 2 < input.length) {
+      const hex = input.slice(i + 1, i + 3);
+      if (/^[0-9A-Fa-f]{2}$/.test(hex)) {
+        bytes.push(parseInt(hex, 16));
+        i += 3;
+        continue;
+      }
+    }
+
+    const code = input.charCodeAt(i);
+    // Handle UTF-16 surrogate pairs so characters outside the BMP round-trip.
+    if (code >= 0xd800 && code <= 0xdbff && i + 1 < input.length) {
+      const low = input.charCodeAt(i + 1);
+      if (low >= 0xdc00 && low <= 0xdfff) {
+        const point = 0x10000 + ((code - 0xd800) << 10) + (low - 0xdc00);
+        bytes.push(...codePointToUtf8(point));
+        i += 2;
+        continue;
+      }
+    }
+
+    bytes.push(...codePointToUtf8(code));
+    i += 1;
+  }
+
+  return new TextDecoder().decode(new Uint8Array(bytes));
+}
+
+/**
+ * Decode URL-encoded source names defensively (e.g. vm0047%20arr%20v1.0).
+ * Handles %20, +, double/triple encoding, and malformed % sequences that
+ * would make decodeURIComponent throw.
+ */
 export function decodeSourceLabel(label: string): string {
   if (!label || (!label.includes('%') && !label.includes('+'))) return label;
-  try {
-    let decoded = label.replace(/\+/g, ' ');
-    let guard = 0;
-    while (decoded.includes('%') && guard < 8) {
-      const next = decodeURIComponent(decoded);
-      if (next === decoded) break;
-      decoded = next;
-      guard++;
-    }
-    return decoded;
-  } catch {
-    return label;
+  let decoded = label.replace(/\+/g, ' ');
+  for (let pass = 0; pass < MAX_DECODE_PASSES; pass++) {
+    const next = safePercentDecode(decoded);
+    if (next === decoded) break;
+    decoded = next;
   }
+  return decoded;
 }
 
 function cleanKbLabel(label: string): string {

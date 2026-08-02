@@ -40,8 +40,9 @@ needed, owns its data, and can be adapted to any document domain beyond the VCM.
 If you are an AI agent (Claude Code, Cursor, Devin, etc.) working in this repo, start here:
 
 > Read this README and `.env.example` for full configuration. Setup: copy `.env.example`
-> → `.env` and fill in keys; start the stack with `docker compose up -d --build` (includes
-> Qdrant) or run `python -m src.api.main` after starting Qdrant on `localhost:6333`. Build
+> → `.env` and fill in keys; start the stack with `docker compose up -d --build` (starts
+> `app`, `ingest-worker`, and Qdrant) or run `python -m src.api.main` after starting Qdrant
+> on `localhost:6333`. Build
 > the frontend with `cd frontend && npm run build`. Run tests with `pytest`, lint with
 > `ruff check src/`. Access settings via the `get_settings()` singleton — never read env
 > vars directly. Configure the LLM provider in the `/setup` UI or by setting `GEMINI_API_KEY`,
@@ -233,13 +234,25 @@ TAVILY_API_KEY=your_tavily_api_key      # default web search provider
 ### 2. Start the stack
 
 ```bash
-docker-compose up -d --build
+docker compose up -d --build
 ```
 
-This starts:
+This starts three services:
 
 - `app` (FastAPI + built React SPA) on http://localhost:8000
+- `ingest-worker` (Docling PDF parser + Qdrant indexer; no exposed port; polls SQLite for jobs)
 - `qdrant` (vector database) on http://localhost:6333
+
+The `app` and `ingest-worker` services share a `./data:/app/data` bind mount for uploaded
+documents and a named volume (`cora_db_data`) for the SQLite database. The DB is on a named
+volume because Windows Docker Desktop / WSL2 bind mounts do not support the POSIX locking
+SQLite needs for concurrent access from multiple containers. `docker-compose.yml` sets
+`SQLITE_JOURNAL_MODE=WAL` for both containers (the named volume supports it).
+
+> **Security note:** `docker-compose.yml` loads `.env` as container environment variables.
+> Anyone with access to the Docker daemon can view these values with `docker inspect`.
+> For sensitive deployments, use [Docker secrets](https://docs.docker.com/engine/swarm/secrets/)
+> or an external secret manager instead of storing keys directly in `.env`.
 
 ### 3. Verify
 
@@ -292,6 +305,11 @@ docker run -d -p 6333:6333 qdrant/qdrant:v1.18.2
 # Copy and edit .env
 cp .env.example .env
 # Set QDRANT_URL=http://localhost:6333 and add your API keys
+# Leave SQLITE_JOURNAL_MODE unset to use the default WAL on a real local filesystem
+
+# Build the frontend so FastAPI can serve it
+# (or use `npm run dev` in the frontend/ dir for Vite dev server on :8080)
+cd frontend && npm ci && npm run build && cd ..
 
 python -m src.api.main
 ```
@@ -389,6 +407,10 @@ Qdrant for vectors and conversation memory.
 - Power users can point it at a local vLLM server (e.g. PaddleOCR-VL-1.6) via
   `OPENAI_BASE_URL` — a config change, not a code mode.
 
+> **Large batches slow?** PDF conversion is CPU- and memory-bound. If your host
+> has more resources, you can convert more documents in parallel — see
+> [Scaling Ingestion Throughput](docs/SCALING_INGESTION.md).
+
 ---
 
 ## API highlights
@@ -425,6 +447,8 @@ every option. The most important ones:
 | `EMBEDDING_PROVIDER` | `voyage` (default), `cohere`, `openai`, or `ollama` (local). |
 | `RERANK_PROVIDER` | `voyage` (default), `cohere`, or `none`. |
 | `SEARCH_PROVIDER` | `tavily` (default) or `none`. `none` falls back to Tavily when `ENABLE_WEB_SEARCH=true`; set `ENABLE_WEB_SEARCH=false` to disable web search entirely. |
+| `DATABASE_URL` | SQLite database path. `sqlite:///data/cora.db` for local dev, `sqlite:////app/db/cora.db` in Docker (named volume). |
+| `SQLITE_JOURNAL_MODE` | `WAL` (default) for both local dev and Docker. The Docker named volume supports WAL's shared-memory requirement. |
 | `QDRANT_COLLECTION_NAME` | Name of the Qdrant collection. Default is `cora_dense_only`. |
 | `SECRET_KEY` | Signs conversation history and anonymizes memory user IDs. **Auto-generated on first run** and persisted to SQLite — no setup needed. Set it in `.env` only if you want your own key. |
 

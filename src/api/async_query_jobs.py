@@ -1,7 +1,7 @@
 """
 Async Query Job Manager
 
-Provides queue-backed execution for long-running query requests.
+Provides queue-backed, SQLite-persistent execution for long-running query requests.
 """
 
 import asyncio
@@ -15,9 +15,10 @@ from typing import Any, Awaitable, Callable, Dict, Optional
 from fastapi import HTTPException
 from loguru import logger
 
+from ..db import async_query_jobs as job_store
+
 
 JobProcessor = Callable[[Dict[str, Any], str], Awaitable[Dict[str, Any]]]
-_TERMINAL_STATUSES = {"completed", "failed"}
 MAX_PAYLOAD_BYTES = 32 * 1024
 _DEFAULT_INTERNAL_ERROR_MESSAGE = "Internal error processing query"
 
@@ -48,23 +49,20 @@ def _format_exception(exc: Exception) -> str:
     if isinstance(exc, HTTPException):
         safe_detail = _sanitize_error_text(str(exc.detail or "Request failed"))
         return f"HTTP {exc.status_code}: {safe_detail}"
-
-    if str(exc):
-        fallback_message = _sanitize_error_text(str(exc))
-        if fallback_message and fallback_message.lower() not in {"none", "null"}:
-            return _DEFAULT_INTERNAL_ERROR_MESSAGE
-
     return _DEFAULT_INTERNAL_ERROR_MESSAGE
 
 
 class AsyncQueryJobManager:
-    """In-memory queue-backed manager for async query jobs."""
+    """SQLite-backed queue manager for async query jobs.
+
+    The in-memory asyncio.Queue is used only to signal workers. All state lives
+    in SQLite, so queued and in-flight jobs survive restarts and can be resumed.
+    """
 
     def __init__(self, max_queue_size: int = 100, job_ttl_seconds: int = 3600) -> None:
         self._max_queue_size = max_queue_size
         self._job_ttl_seconds = job_ttl_seconds
-        self._queue: asyncio.Queue[str] = asyncio.Queue(maxsize=max_queue_size)
-        self._jobs: Dict[str, Dict[str, Any]] = {}
+        self._queue: asyncio.Queue[str] = asyncio.Queue()
         self._processor: Optional[JobProcessor] = None
         self._lock = asyncio.Lock()
         self._workers: list[asyncio.Task] = []
@@ -85,10 +83,10 @@ class AsyncQueryJobManager:
 
             self._max_queue_size = max_queue_size
             self._job_ttl_seconds = job_ttl_seconds
-            self._queue = asyncio.Queue(maxsize=max_queue_size)
+            self._queue = asyncio.Queue()
 
     async def start(self, worker_count: int = 1) -> None:
-        """Start background workers."""
+        """Start background workers and resume any queued jobs from the database."""
         async with self._lock:
             if self._running:
                 return
@@ -97,6 +95,8 @@ class AsyncQueryJobManager:
                 raise RuntimeError("Async query processor is not registered")
 
             self._shutdown_event.clear()
+            await asyncio.to_thread(job_store.ensure_schema)
+            await self._recover_jobs()
             self._workers = [
                 asyncio.create_task(self._worker_loop(worker_id=i + 1))
                 for i in range(max(worker_count, 1))
@@ -132,57 +132,79 @@ class AsyncQueryJobManager:
         if cleanup_task is not None:
             cleanup_task.cancel()
 
-        if workers or cleanup_task is not None:
-            await asyncio.gather(*workers, cleanup_task, return_exceptions=True)
+        tasks = [t for t in (*workers, cleanup_task) if t is not None]
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
 
         logger.info("Async query job manager stopped")
 
     async def enqueue(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        """Enqueue a new async query job."""
+        """Enqueue a new async query job, or return an existing one by idempotency key."""
         if not self._running:
             raise RuntimeError("Async query service is not ready")
 
         validated_payload = self._validate_payload(payload)
 
-        await self._cleanup_expired_jobs()
+        client_request_id: Optional[str] = validated_payload.get("client_request_id")
 
         async with self._lock:
-            if self._queue.full():
+            if client_request_id:
+                existing = await asyncio.to_thread(
+                    job_store.find_active_job_by_client_request_id,
+                    client_request_id,
+                    time.time(),
+                )
+                if existing:
+                    existing["queue_depth"] = await self._queue_depth()
+                    return self._to_accepted(existing)
+
+            queue_depth = await self._queue_depth()
+            if queue_depth >= self._max_queue_size:
                 raise asyncio.QueueFull
 
             job_id = uuid.uuid4().hex
             submitted_at = _utc_now_iso()
-            self._jobs[job_id] = {
+            await asyncio.to_thread(
+                job_store.create_job,
+                job_id,
+                validated_payload,
+                submitted_at,
+                client_request_id,
+            )
+            self._queue.put_nowait(job_id)
+
+            return {
                 "job_id": job_id,
                 "status": "queued",
                 "submitted_at": submitted_at,
-                "started_at": None,
-                "completed_at": None,
-                "result": None,
-                "error": None,
-                "payload": validated_payload,
-                "expires_at_unix": None,
+                "queue_depth": queue_depth + 1,
             }
-            self._queue.put_nowait(job_id)
-            queue_depth = self._queue.qsize()
-
-        return {
-            "job_id": job_id,
-            "status": "queued",
-            "submitted_at": submitted_at,
-            "queue_depth": queue_depth,
-        }
 
     async def get_job(self, job_id: str) -> Optional[Dict[str, Any]]:
         """Get public job details by ID."""
-        await self._cleanup_expired_jobs()
+        return await asyncio.to_thread(job_store.get_job_public, job_id)
 
-        async with self._lock:
-            job = self._jobs.get(job_id)
-            if not job:
-                return None
+    async def _queue_depth(self) -> int:
+        return await asyncio.to_thread(job_store.count_queued_jobs)
 
-            return self._to_public_job(job)
+    async def _recover_jobs(self) -> None:
+        """On startup, mark interrupted processing jobs as failed and re-enqueue queued jobs."""
+        completed_at = _utc_now_iso()
+        expires_at = time.time() + self._job_ttl_seconds
+
+        interrupted = await asyncio.to_thread(
+            job_store.mark_interrupted_processing,
+            completed_at,
+            expires_at,
+        )
+        if interrupted:
+            logger.warning(f"Marked {interrupted} interrupted processing job(s) as failed")
+
+        queued_ids = await asyncio.to_thread(job_store.load_queued_job_ids)
+        if queued_ids:
+            logger.info(f"Resuming {len(queued_ids)} queued async query job(s)")
+            for job_id in queued_ids:
+                self._queue.put_nowait(job_id)
 
     async def _worker_loop(self, worker_id: int) -> None:
         """Process jobs sequentially from the queue."""
@@ -197,30 +219,31 @@ class AsyncQueryJobManager:
             except asyncio.CancelledError:
                 break
 
-            payload: Optional[Dict[str, Any]] = None
             try:
-                async with self._lock:
-                    job = self._jobs.get(job_id)
-                    if job is None:
-                        continue
+                started_at = _utc_now_iso()
+                claimed = await asyncio.to_thread(job_store.claim_job, job_id, started_at)
+                if not claimed:
+                    continue
 
-                    job["status"] = "processing"
-                    job["started_at"] = _utc_now_iso()
-                    payload = dict(job.get("payload", {}))
+                job = await asyncio.to_thread(job_store.get_job_with_payload, job_id)
+                if job is None:
+                    continue
 
-                if payload is None:
+                payload = job["payload"]
+                if not isinstance(payload, dict):
                     continue
 
                 result = await self._processor(payload, job_id)  # type: ignore[misc]
 
-                async with self._lock:
-                    job = self._jobs.get(job_id)
-                    if job is not None:
-                        job["status"] = "completed"
-                        job["completed_at"] = _utc_now_iso()
-                        job["result"] = result
-                        job["error"] = None
-                        job["expires_at_unix"] = time.time() + self._job_ttl_seconds
+                completed_at = _utc_now_iso()
+                expires_at = time.time() + self._job_ttl_seconds
+                await asyncio.to_thread(
+                    job_store.complete_job,
+                    job_id,
+                    result,
+                    completed_at,
+                    expires_at,
+                )
 
             except asyncio.CancelledError:
                 break
@@ -228,18 +251,19 @@ class AsyncQueryJobManager:
                 logger.exception(
                     f"Async query job failed [job_id={job_id}]: {type(exc).__name__}",
                 )
-                async with self._lock:
-                    job = self._jobs.get(job_id)
-                    if job is not None:
-                        job["status"] = "failed"
-                        job["completed_at"] = _utc_now_iso()
-                        job["error"] = _format_exception(exc)
-                        job["result"] = None
-                        job["expires_at_unix"] = time.time() + self._job_ttl_seconds
+                completed_at = _utc_now_iso()
+                expires_at = time.time() + self._job_ttl_seconds
+                error = _format_exception(exc)
+                await asyncio.to_thread(
+                    job_store.fail_job,
+                    job_id,
+                    error,
+                    completed_at,
+                    expires_at,
+                )
             finally:
                 if job_id is not None:
                     self._queue.task_done()
-                await self._cleanup_expired_jobs()
 
         logger.info(f"Async query worker stopped: worker-{worker_id}")
 
@@ -278,32 +302,26 @@ class AsyncQueryJobManager:
         return json.loads(serialized_payload)
 
     async def _cleanup_expired_jobs(self) -> None:
-        now = time.time()
-        async with self._lock:
-            expired_job_ids = [
-                job_id
-                for job_id, job in self._jobs.items()
-                if job.get("status") in _TERMINAL_STATUSES
-                and isinstance(job.get("expires_at_unix"), (int, float))
-                and job["expires_at_unix"] <= now
-            ]
+        """Delete terminal jobs whose TTL has expired.
 
-            for job_id in expired_job_ids:
-                self._jobs.pop(job_id, None)
-
-            if expired_job_ids:
-                logger.debug(f"Cleaned up {len(expired_job_ids)} expired async query jobs")
+        ponytail: we do not keep tombstones for 410 Gone responses; an expired
+        and pruned job is indistinguishable from a never-created one (404). This
+        matches the original in-memory behavior and avoids keeping extra state.
+        """
+        try:
+            pruned = await asyncio.to_thread(job_store.prune_expired_jobs, time.time())
+            if pruned:
+                logger.debug(f"Cleaned up {pruned} expired async query jobs")
+        except Exception:
+            logger.exception("Failed to prune expired async query jobs")
 
     @staticmethod
-    def _to_public_job(job: Dict[str, Any]) -> Dict[str, Any]:
+    def _to_accepted(job: Dict[str, Any]) -> Dict[str, Any]:
         return {
-            "job_id": job.get("job_id"),
-            "status": job.get("status"),
-            "submitted_at": job.get("submitted_at"),
-            "started_at": job.get("started_at"),
-            "completed_at": job.get("completed_at"),
-            "result": job.get("result"),
-            "error": job.get("error"),
+            "job_id": job["job_id"],
+            "status": job["status"],
+            "submitted_at": job["submitted_at"],
+            "queue_depth": job.get("queue_depth", 0),
         }
 
 

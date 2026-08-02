@@ -131,7 +131,7 @@ Response = QueryResponse
 
 class AsyncQueryAcceptedResponse(BaseModel):
     job_id: str
-    status: Literal["queued"]
+    status: Literal["queued", "processing", "completed", "failed"]
     submitted_at: str
     queue_depth: int
 

@@ -1,13 +1,21 @@
 from __future__ import annotations
 
 import uuid
+from pathlib import Path
 from typing import Literal
 
 from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 from loguru import logger
 
-from ..document_store.jobs import delete_document_job, process_document_job, reindex_document_job
+from ..config import get_settings
+from ..document_store.jobs import (
+    delete_document_job,
+    process_document_job,
+    raise_if_conversion_unavailable,
+    reindex_document_job,
+    schedule_ingestion_job,
+)
 from ..document_store.converter import get_conversion_capabilities
 from ..document_store.storage import (
     create_job,
@@ -16,6 +24,7 @@ from ..document_store.storage import (
     list_documents,
     parse_tags,
     read_markdown,
+    safe_original_filename,
     save_upload,
     update_document,
 )
@@ -50,6 +59,10 @@ class DocumentListResponse(BaseModel):
 class DocumentUploadResponse(BaseModel):
     document: DocumentResponse
     job_id: str
+    warning: str | None = Field(
+        None,
+        description="Present when the upload was accepted but processing may not proceed (e.g. no ingest-worker running).",
+    )
 
 
 class DocumentJobResponse(BaseModel):
@@ -85,12 +98,37 @@ class ConversionCapabilitiesResponse(BaseModel):
         default_factory=dict,
         description="Server-side upload constraints: allowed_extensions and max_bytes",
     )
+    worker_status: dict = Field(
+        default_factory=dict,
+        description=(
+            "Ingestion worker runtime status. Contains 'dispatch_mode' "
+            "(worker|in_process) and 'alive' (bool). When dispatch_mode is "
+            "'worker' and alive is False, uploads will be accepted and queued "
+            "but will not be processed until the ingest-worker is started."
+        ),
+    )
 
 
 @router.get("/conversion-info", response_model=ConversionCapabilitiesResponse)
 async def get_conversion_info():
-    """Return availability and resolved provider/model for each conversion mode."""
-    return get_conversion_capabilities()
+    """Return availability and resolved provider/model for each conversion mode,
+    plus the ingest-worker runtime status so the frontend can warn the user
+    *before* uploading when the worker is down in worker-dispatch mode."""
+    capabilities = get_conversion_capabilities()
+    dispatch_mode = getattr(get_settings(), "INGESTION_DISPATCH", "in_process")
+    if dispatch_mode == "worker":
+        from ..document_store.worker import is_worker_alive
+
+        alive = is_worker_alive()
+    else:
+        # In-process: the API process itself handles ingestion, so it is
+        # trivially alive if this endpoint is responding.
+        alive = True
+    capabilities["worker_status"] = {
+        "dispatch_mode": dispatch_mode,
+        "alive": alive,
+    }
+    return capabilities
 
 
 @router.get("", response_model=DocumentListResponse)
@@ -111,10 +149,32 @@ async def upload_document(
     conversion_mode: Literal["standard", "llm_api"] = Form("standard"),
 ):
     try:
+        # Fail fast before writing the file if this container cannot handle a
+        # standard PDF in in_process mode. Prevents an orphaned record/file.
+        original_name = safe_original_filename(file.filename)
+        raise_if_conversion_unavailable(
+            conversion_mode, Path(original_name).suffix.lower()
+        )
+
         record = await save_upload(file, conversion_mode, parse_tags(tags))
         job = create_job(record.id, "process", "Document queued")
-        background_tasks.add_task(process_document_job, record.id, job.id)
-        return {"document": record.to_api(), "job_id": job.id}
+        schedule_ingestion_job(background_tasks, process_document_job, record.id, job.id)
+        response: dict = {"document": record.to_api(), "job_id": job.id}
+        # In worker-dispatch mode, warn if no ingest-worker is running so the
+        # user knows the upload will sit in 'queued' indefinitely.
+        dispatch_mode = getattr(get_settings(), "INGESTION_DISPATCH", "in_process")
+        if dispatch_mode == "worker":
+            from ..document_store.worker import is_worker_alive
+            if not is_worker_alive():
+                response["warning"] = (
+                    "Your file was saved but won't be parsed into the knowledge "
+                    "base yet. The background parser that reads PDFs is not "
+                    "running. Start it from your terminal with: "
+                    "docker compose up -d ingest-worker"
+                )
+        return response
+    except HTTPException:
+        raise
     except FileExistsError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except ValueError as exc:
@@ -134,7 +194,7 @@ async def reindex_all_documents(background_tasks: BackgroundTasks):
     job_ids: list[str] = []
     for record in records:
         job = create_job(record.id, "reindex", "Document refresh queued")
-        background_tasks.add_task(reindex_document_job, record.id, job.id)
+        schedule_ingestion_job(background_tasks, reindex_document_job, record.id, job.id)
         job_ids.append(job.id)
     logger.info("Reindex-all queued {} documents", len(records))
     return {"queued": len(records), "job_ids": job_ids}
@@ -149,7 +209,7 @@ async def clear_all_documents(background_tasks: BackgroundTasks):
     job_ids: list[str] = []
     for record in records:
         job = create_job(record.id, "delete", "Document deletion queued")
-        background_tasks.add_task(delete_document_job, record.id, job.id)
+        schedule_ingestion_job(background_tasks, delete_document_job, record.id, job.id)
         job_ids.append(job.id)
     logger.info("Clear-all queued {} documents for deletion", len(records))
     return {"queued": len(records), "job_ids": job_ids}
@@ -187,8 +247,16 @@ async def reindex_document(document_id: str, background_tasks: BackgroundTasks):
     record = get_document(document_id)
     if record is None:
         raise HTTPException(status_code=404, detail="Document not found")
+    # Clear any prior error so the UI stops showing the old failure message.
+    # Don't set a status here — the document stays at its current status
+    # (e.g. 'failed' or 'indexed') until the worker picks up the reindex job
+    # and the handler transitions it to 'converting'/'indexing'. Setting
+    # 'queued' here would leave the document stuck if the worker crashed
+    # before the handler ran, because 'queued' is not in
+    # _INTERRUPTED_STATUSES and would never be recovered.
+    record = update_document(document_id, error=None)
     job = create_job(record.id, "reindex", "Document refresh queued")
-    background_tasks.add_task(reindex_document_job, record.id, job.id)
+    schedule_ingestion_job(background_tasks, reindex_document_job, record.id, job.id)
     return {"document": record.to_api(), "job_id": job.id}
 
 
@@ -197,8 +265,13 @@ async def delete_document(document_id: str, background_tasks: BackgroundTasks):
     record = get_document(document_id)
     if record is None:
         raise HTTPException(status_code=404, detail="Document not found")
+    # Mark as deleting immediately so the user sees visual feedback and the
+    # frontend keeps polling until the document disappears. The actual file +
+    # Qdrant cleanup runs in-process as a BackgroundTask (delete doesn't need
+    # the worker's Docling stack — just Qdrant + filesystem + SQLite).
+    record = update_document(document_id, status="deleting", error=None)
     job = create_job(record.id, "delete", "Document deletion queued")
-    background_tasks.add_task(delete_document_job, record.id, job.id)
+    schedule_ingestion_job(background_tasks, delete_document_job, record.id, job.id)
     return {"document": record.to_api(), "job_id": job.id}
 
 

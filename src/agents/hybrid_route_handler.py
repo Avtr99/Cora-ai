@@ -334,7 +334,14 @@ class HybridRouteHandler:
         web_timeout_ms: Optional[int],
         original_query: Optional[str] = None,
     ) -> tuple[Dict[str, Any], Dict[str, Any]]:
-        """Execute KB and web retrieval sequentially with error handling."""
+        """Execute KB and web retrieval sequentially with error handling.
+
+        Hybrid retrieval intentionally queries both sources, even when the KB
+        returns a high-scoring result. Relevance scores measure topical fit, not
+        freshness or completeness, so a strong KB result must not suppress web
+        verification for a hybrid query. The KB relevance threshold is applied
+        later when deciding which context is safe to use for synthesis.
+        """
         # KB retrieval with exception handling
         try:
             vector_results = await self.retriever.retrieve(
@@ -352,13 +359,14 @@ class HybridRouteHandler:
             logger.error("KB retrieval failed in sequential mode: %s", e, exc_info=True)
             vector_results = {"documents": [], "metadatas": [], "ids": [], "distances": []}
 
-        # Web search with exception handling
+        # Hybrid retrieval always includes web results. A high KB relevance
+        # score does not establish freshness or answer completeness.
         try:
             web_results = await self.web_search.search(query, timeout_ms=web_timeout_ms)
         except Exception as e:
             logger.error("Web search failed in sequential mode: %s", e, exc_info=True)
             web_results = {"answer": "", "sources": [], "grounded": False}
-        
+
         return vector_results, web_results
     
     def _extract_sources(self, vector_results: Dict[str, Any]) -> List[str]:

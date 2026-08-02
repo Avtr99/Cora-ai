@@ -28,6 +28,7 @@ from typing import Dict, Tuple
 
 from loguru import logger
 
+from ..citations.markers import CITE_KB_RE, CITE_WEB_RE, unique_sources_by_type
 from ..citations.source_name import normalized_source_key
 
 # Match inline citations: [some text]
@@ -306,38 +307,13 @@ def normalize_kb_citations(answer: str, sources: list[str]) -> str:
 
 # ─── Citation renumbering after filtering ──────────────────────────────
 
-# Matches all citation marker formats the LLM produces:
-#   [cite_kb: 1]  [cite_kb: 1, 2]  [Knowledge Base, cite: 1]  [Web, cite: 1, 2]
-_CITE_KB_RE = re.compile(
-    r"\[(?:cite_kb:\s*([\d,\s]+)|Knowledge\s+Base,\s*cite:\s*([\d,\s]+))\]",
-    re.IGNORECASE,
-)
-_CITE_WEB_RE = re.compile(
-    r"\[(?:cite_web:\s*([\d,\s]+)|Web,\s*cite:\s*([\d,\s]+))\]",
-    re.IGNORECASE,
-)
-
-
-def _unique_sources_by_type(citations: list, source_type: str) -> list[str]:
-    """Return unique source names for *source_type* in first-seen order."""
-    seen: set[str] = set()
-    names: list[str] = []
-    for c in citations:
-        if c.source_type != source_type:
-            continue
-        key = c.source_name.strip().lower()
-        if key and key not in seen:
-            seen.add(key)
-            names.append(c.source_name)
-    return names
-
 
 def _build_renumber_map(
     original: list, filtered: list, source_type: str
 ) -> dict[int, int]:
     """Map old 1-indexed position → new 1-indexed position for *source_type*."""
-    old_names = _unique_sources_by_type(original, source_type)
-    new_names = _unique_sources_by_type(filtered, source_type)
+    old_names = unique_sources_by_type(original, source_type)
+    new_names = unique_sources_by_type(filtered, source_type)
     new_index: dict[str, int] = {}
     for i, name in enumerate(new_names, 1):
         new_index[name.strip().lower()] = i
@@ -398,8 +374,8 @@ def renumber_citation_markers(
     kb_map = _build_renumber_map(original_citations, filtered_citations, "knowledge_base")
     web_map = _build_renumber_map(original_citations, filtered_citations, "web")
 
-    answer = _CITE_KB_RE.sub(lambda m: _replace_numbers(m, kb_map), answer)
-    answer = _CITE_WEB_RE.sub(lambda m: _replace_numbers(m, web_map), answer)
+    answer = CITE_KB_RE.sub(lambda m: _replace_numbers(m, kb_map), answer)
+    answer = CITE_WEB_RE.sub(lambda m: _replace_numbers(m, web_map), answer)
 
     # Clean up spacing left by removed markers.
     answer = re.sub(r"  +", " ", answer).strip()

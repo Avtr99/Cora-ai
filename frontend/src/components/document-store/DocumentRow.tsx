@@ -2,7 +2,7 @@ import React from 'react';
 import { FileText, RefreshCw, Trash2 } from 'lucide-react';
 import { StatusBadge } from './StatusBadge';
 import { formatBytes } from '@/services/documentStoreApi';
-import type { DocumentStoreRecord } from '@/services/documentStoreApi';
+import type { DocumentStoreRecord, DocumentStatus } from '@/services/documentStoreApi';
 
 function formatDate(value?: string | null): string {
   if (!value) return '-';
@@ -16,6 +16,11 @@ interface DocumentRowProps {
   onDelete: (document: DocumentStoreRecord) => void;
   isReindexing: boolean;
   isDeleting: boolean;
+  /** True when a reindex job has been queued but the worker hasn't picked it
+   * up yet. The backend deliberately keeps the doc at its current status
+   * (e.g. 'indexed') until the handler transitions it, so the UI must show
+   * an optimistic 'queued' badge to give the user immediate feedback. */
+  isPendingReindex?: boolean;
 }
 
 export const DocumentRow: React.FC<DocumentRowProps> = ({
@@ -25,8 +30,21 @@ export const DocumentRow: React.FC<DocumentRowProps> = ({
   onDelete,
   isReindexing,
   isDeleting,
+  isPendingReindex = false,
 }) => {
-  const busy = isReindexing || isDeleting || document.status === 'deleting';
+  // Reindex is blocked while a job is in flight for this document (queued,
+  // reading, converting, indexing, deleting). Delete is only blocked while a
+  // delete is already running — the user should be able to delete a doc that
+  // is stuck in processing to cancel it.
+  const reindexDisabled =
+    isReindexing ||
+    ['queued', 'reading', 'converting', 'indexing', 'deleting'].includes(document.status);
+  const deleteDisabled = isDeleting || document.status === 'deleting';
+
+  // Optimistic status: when a reindex is pending but the backend hasn't
+  // transitioned the doc yet, show 'queued' so the user sees feedback.
+  const effectiveStatus: DocumentStatus =
+    isPendingReindex && document.status === 'indexed' ? 'queued' : document.status;
 
   return (
     <div className="group relative border-b border-border-ui last:border-b-0 bg-surface-card transition-colors hover:bg-surface-subtle/50">
@@ -54,14 +72,14 @@ export const DocumentRow: React.FC<DocumentRowProps> = ({
           {formatDate(document.created_at)}
         </div>
         <div className="text-right pointer-events-none">
-          <StatusBadge status={document.status} />
+          <StatusBadge status={effectiveStatus} />
         </div>
         <div className="text-right opacity-100 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 transition-opacity pointer-events-auto">
           <div className="flex items-center justify-end gap-1">
             <button
               type="button"
               onClick={() => onReindex(document.id)}
-              disabled={busy}
+              disabled={reindexDisabled}
               className="h-7 w-7 flex items-center justify-center rounded-lg text-text-muted hover:text-brand-700 hover:bg-brand-50 disabled:opacity-50"
               aria-label="Refresh"
               title="Refresh"
@@ -71,7 +89,7 @@ export const DocumentRow: React.FC<DocumentRowProps> = ({
             <button
               type="button"
               onClick={() => onDelete(document)}
-              disabled={busy}
+              disabled={deleteDisabled}
               className="h-7 w-7 flex items-center justify-center rounded-lg text-text-muted hover:text-semantic-error-icon hover:bg-semantic-error-bg disabled:opacity-50"
               aria-label="Delete"
               title="Delete"

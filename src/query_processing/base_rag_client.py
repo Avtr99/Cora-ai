@@ -160,14 +160,12 @@ class BaseRAGClient:
             return
 
         try:
-            from ..utils.cache import get_query_cache_key, QUERY_HANDLER_TYPE
             settings = get_settings()
-            hash_key = get_query_cache_key(query)
-            await self._sqlite_cache.set(
-                hash_key,
-                QUERY_HANDLER_TYPE,
+            await query_cache.set_result(
+                query,
                 result,
-                ttl_seconds=getattr(settings, "CACHE_TTL_SECONDS", 86400),
+                context_fingerprint=None,
+                ttl=getattr(settings, "CACHE_TTL_SECONDS", 86400),
             )
             logger.debug("Persisted query result to SQLite cache: {}", query[:50])
         except Exception as e:
@@ -346,6 +344,7 @@ class BaseRAGClient:
                 src = (
                     meta.get("title")
                     or meta.get("file_name")
+                    or meta.get("original_filename")
                     or meta.get("parent_doc")
                     or meta.get("source")
                     or ""

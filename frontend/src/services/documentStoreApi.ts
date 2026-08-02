@@ -29,6 +29,10 @@ export interface ConversionCapabilities {
     allowed_extensions: string[];
     max_bytes: number;
   };
+  worker_status?: {
+    dispatch_mode: 'worker' | 'in_process';
+    alive: boolean;
+  };
 }
 
 // Static, always-true facts about each mode. Used as fallbacks so the selector
@@ -44,7 +48,7 @@ export const CONVERSION_OPTIONS: Array<{
   {
     value: 'standard',
     label: 'Standard',
-    description: 'Free, runs on your CPU. Best for most VCM documents. Reads text, headings, and tables directly from the PDF. Handles scanned pages with built-in OCR. About 1 to 2 seconds per page. For documents with complex layouts, math formulas, charts, or images, consider LLM API mode for better accuracy.',
+    description: 'Free, runs on your CPU. Best for most VCM documents. Reads text, headings, and tables directly from the PDF. Handles scanned pages with built-in OCR. For documents with complex layouts, math formulas, charts, or images, consider LLM API mode for better accuracy.',
     defaults: { cost: 'Free', speed: 'fast', privacy: 'local' },
   },
   {
@@ -58,6 +62,7 @@ export const CONVERSION_OPTIONS: Array<{
 export interface DocumentStoreRecord {
   id: string;
   original_filename: string;
+  stored_filename: string;
   mime_type: string;
   extension: string;
   size_bytes: number;
@@ -71,6 +76,7 @@ export interface DocumentStoreRecord {
   tags: string[];
   warnings: string[];
   error?: string | null;
+  processing_job_id?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
 }
@@ -82,6 +88,7 @@ interface DocumentListResponse {
 interface DocumentUploadResponse {
   document: DocumentStoreRecord;
   job_id: string;
+  warning?: string | null;
 }
 
 interface MarkdownResponse {
@@ -121,13 +128,19 @@ async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export async function fetchDocuments(filters: { status?: string; extension?: string; tag?: string } = {}): Promise<DocumentStoreRecord[]> {
+export async function fetchDocuments(
+  filters: { status?: string; extension?: string; tag?: string } = {},
+  signal?: AbortSignal,
+): Promise<DocumentStoreRecord[]> {
   const params = new URLSearchParams();
   if (filters.status) params.set('status', filters.status);
   if (filters.extension) params.set('extension', filters.extension);
   if (filters.tag) params.set('tag', filters.tag);
   const query = params.toString();
-  const data = await requestJson<DocumentListResponse>(`${DOCUMENTS_ENDPOINT}${query ? `?${query}` : ''}`);
+  const data = await requestJson<DocumentListResponse>(
+    `${DOCUMENTS_ENDPOINT}${query ? `?${query}` : ''}`,
+    { signal },
+  );
   return data.documents;
 }
 

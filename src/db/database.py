@@ -73,19 +73,29 @@ def get_db_path() -> str:
     return db_path
 
 def get_connection() -> sqlite3.Connection:
-    conn = sqlite3.connect(get_db_path(), check_same_thread=False)
+    db_path = get_db_path()
+    conn = sqlite3.connect(db_path, check_same_thread=False)
     conn.row_factory = sqlite3.Row
-    
-    # Configure SQLite for concurrency and performance
-    # WAL (Write-Ahead Logging) is critical for concurrent reads/writes
-    conn.execute("PRAGMA journal_mode=WAL;")
-    # Wait up to 5000ms if db is locked
+
+    # Configure SQLite concurrency/integrity. The journal mode is controlled by
+    # settings so it can be matched to the filesystem. In Docker, the DB lives
+    # on a named volume (supports WAL). For local dev, WAL is the default.
+    settings = get_settings()
+    # Only change journal mode if it differs from the desired mode. Setting
+    # journal_mode on every connection is wasteful (it's a persistent DB-level
+    # property, not per-connection) and can fail if the mode change requires
+    # exclusive access (e.g. WAL→DELETE needs to checkpoint and remove sidecar
+    # files). If the DB is already in the desired mode, skip the PRAGMA.
+    current_mode = conn.execute("PRAGMA journal_mode;").fetchone()[0]
+    if current_mode.lower() != settings.SQLITE_JOURNAL_MODE.lower():
+        conn.execute(f"PRAGMA journal_mode={settings.SQLITE_JOURNAL_MODE};")
+    # Wait up to 5000ms if the db is locked
     conn.execute("PRAGMA busy_timeout=5000;")
     # Safe with WAL, improves performance
     conn.execute("PRAGMA synchronous=NORMAL;")
     # Enable foreign keys
     conn.execute("PRAGMA foreign_keys=ON;")
-    
+
     return conn
 
 def run_migrations():
@@ -125,7 +135,7 @@ def run_migrations():
                 # Run the migration (may be a no-op if every ADD COLUMN was skipped)
                 cursor.executescript(script)
                 # Record it
-                cursor.execute("INSERT INTO schema_migrations (version) VALUES (?)", (file,))
+                cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES (?)", (file,))
                 conn.commit()
                 logger.info(f"Successfully applied {file}.")
                 

@@ -52,11 +52,10 @@ export const ChatInterface: React.FC = () => {
     return -1;
   }, [messages]);
 
-  // Simple stick-to-bottom: scroll to bottom when a new message is added
-  // or when the last message transitions out of 'pending' (the placeholder
-  // is replaced by the full answer, which is much taller). Status updates
-  // only change the pending bubble's text, not its height class, so we
-  // don't need to scroll on every content update.
+  // Manage auto-scroll around new turns:
+  // - When a new user/pending message is appended, keep the latest turn in view.
+  // - When the pending placeholder is replaced by the final answer, scroll to
+  //   the start of the user's question so the answer is read from the top.
   const stickToBottomRef = useRef(true);
   const previousMessageCountRef = useRef(messages.length);
   const previousLastMessageStatusRef = useRef<string | undefined>(undefined);
@@ -67,21 +66,35 @@ export const ChatInterface: React.FC = () => {
 
   useEffect(() => {
     const container = parentScrollRef.current;
-    if (!container) return;
     const countChanged = messages.length > previousMessageCountRef.current;
     const lastMessageCompleted = (
       previousLastMessageStatusRef.current === 'pending' &&
       lastMessageStatus !== 'pending'
     );
-    if (countChanged || lastMessageCompleted) {
+
+    if (countChanged) {
+      // New user / placeholder message appended: keep the latest turn in view.
       stickToBottomRef.current = true;
+      if (container) {
+        const maxScrollTop = container.scrollHeight - container.clientHeight;
+        if (maxScrollTop > 0) {
+          container.scrollTo({ top: maxScrollTop, behavior: 'auto' });
+        }
+      }
     }
+
+    if (lastMessageCompleted && stickToBottomRef.current) {
+      // The full answer just arrived. Pin the viewport to the start of the
+      // user's question so the answer is read from the top, not the bottom.
+      if (lastUserMessageIndex >= 0) {
+        virtualizer.scrollToIndex(lastUserMessageIndex, { align: 'start', behavior: 'auto' });
+      }
+      stickToBottomRef.current = false;
+    }
+
     previousMessageCountRef.current = messages.length;
     previousLastMessageStatusRef.current = lastMessageStatus;
-    if (stickToBottomRef.current) {
-      container.scrollTop = container.scrollHeight;
-    }
-  }, [messages.length, lastMessageStatus, parentScrollRef]);
+  }, [messages.length, lastMessageStatus, parentScrollRef, virtualizer, lastUserMessageIndex]);
 
   // Cancel stick-to-bottom when the user manually scrolls up
   useEffect(() => {

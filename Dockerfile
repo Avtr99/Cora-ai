@@ -82,9 +82,10 @@ RUN if [ "$INSTALL_INGESTION" != "false" ]; then \
 # files in a new Docker layer.
 RUN mkdir -p /app/data/documents/originals /app/data/documents/converted /app/data/documents/metadata \
     /app/data/.cache/huggingface /app/data/.cache/datasets \
+    /app/db \
     /app/models \
     && echo "cora:x:1000:1000:Cora:/app/data:/sbin/nologin" >> /etc/passwd \
-    && chown -R 1000:1000 /app/data /app/models
+    && chown -R 1000:1000 /app/data /app/db /app/models
 
 # Switch to non-root user before downloading models so they are owned by cora
 # from the start and a later chown does not duplicate them.

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import {
   getLLMSettings,
@@ -31,12 +31,16 @@ const SetupPage = (): JSX.Element => {
   const [ollamaModels, setOllamaModels] = useState<LLMModel[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
   const [configStatus, setConfigStatus] = useState<ConfigStatus | null>(null);
+  // Skip the modelMain reset on the initial settings load so the user's
+  // actual configured model isn't replaced with the preset default.
+  const skipModelResetRef = useRef(true);
 
   const fetchSettings = useCallback(async () => {
     try {
       const [s, status] = await Promise.all([getLLMSettings(), getConfigStatus().catch(() => null)]);
       setSettings(s);
       setConfigStatus(status);
+      skipModelResetRef.current = true;
       setPreset(presetFromSettings(s));
       if (s.base_url) setBaseUrl(s.base_url);
       if (s.model_main) setModelMain(s.model_main);
@@ -51,12 +55,20 @@ const SetupPage = (): JSX.Element => {
     void fetchSettings();
   }, [fetchSettings]);
 
-  // When preset changes, update base_url
+  // When preset changes, update base_url and reset model to the preset's
+  // recommended default. Prevents a stale model from the previous provider
+  // from being saved under the new provider. Skipped on initial load so the
+  // user's actual configured model is preserved.
   useEffect(() => {
     const config = PRESETS[preset];
     if (config.base_url !== null) {
       setBaseUrl(config.base_url);
     }
+    if (skipModelResetRef.current) {
+      skipModelResetRef.current = false;
+      return; // Initial load: keep the loaded model.
+    }
+    setModelMain(config.defaultModel);
   }, [preset]);
 
   // Fetch Ollama models when preset is ollama

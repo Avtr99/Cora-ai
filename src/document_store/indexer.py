@@ -16,6 +16,7 @@ from qdrant_client import QdrantClient, models
 
 from ..config import get_settings
 from ..embeddings import create_embeddings
+from ..db.revisions import bump_corpus_revision
 from ..db.sqlite_cache import get_sqlite_cache
 from .logging_utils import _log_ingestion_stage
 from .models import DocumentRecord
@@ -47,13 +48,12 @@ _PAYLOAD_INDEX_FIELDS = (
 # so we must NOT strip placeholders from llm_api-converted documents.
 _IMAGE_PLACEHOLDER_RE = re.compile(r"<!--\s*image\s*-->\s*")
 
-# Debounce cache invalidation during ingestion bursts. A single ``DELETE`` clears
+# Debounce the cache *clear* during ingestion bursts. A single ``DELETE`` clears
 # the whole backend_cache table, so repeated calls from many documents hitting
 # the same burst are coalesced into one call after the delay expires.
-# Trade-off: the invalidation is asynchronous, so for ~0.7s after a document is
-# marked "completed" the query cache may still return stale results. This is
-# acceptable for the ingestion backlog use case; the delay is a fixed module
-# constant, not a runtime setting.
+# The ``corpus_revision`` is bumped immediately after each Qdrant write, so a
+# new query gets a fresh cache key right away and will not hit a stale entry.
+# The delayed clear only reclaims the space occupied by now-unreachable rows.
 _CACHE_INVALIDATION_DEBOUNCE_SECONDS = 0.7
 
 _invalidation_task: Optional[asyncio.Task] = None
@@ -128,6 +128,13 @@ async def index_document(record: DocumentRecord, job_id: Optional[str] = None) -
 
     await asyncio.to_thread(_replace_document_chunks, record, chunks, job_id)
 
+    # Bump the corpus revision immediately after a successful Qdrant upsert so
+    # the query cache key changes right away. The cache clear is still scheduled
+    # (debounced) to reclaim the space of stale entries.
+    start = time.perf_counter()
+    await asyncio.to_thread(bump_corpus_revision)
+    _log_ingestion_stage("indexer", "corpus_revision_bump", record.id, job_id, time.perf_counter() - start)
+
     start = time.perf_counter()
     await schedule_cache_invalidation()
     _log_ingestion_stage("indexer", "cache_invalidation", record.id, job_id, time.perf_counter() - start)
@@ -138,6 +145,11 @@ async def index_document(record: DocumentRecord, job_id: Optional[str] = None) -
 
 async def delete_document_chunks(document_id: str) -> None:
     await asyncio.to_thread(_delete_document_chunks_sync, document_id)
+
+    # Bump the corpus revision immediately after a successful Qdrant delete so
+    # the query cache key changes right away, even before the debounced clear.
+    await asyncio.to_thread(bump_corpus_revision)
+
     await schedule_cache_invalidation()
 
 
@@ -147,9 +159,26 @@ async def invalidate_document_caches() -> None:
     A single ``clear()`` with no handler_type removes every row from
     backend_cache (query, route, rewrite, etc.) — no need to clear
     individual handler types separately.
+
+    The corpus revision is bumped immediately after each Qdrant write
+    (``index_document`` / ``delete_document_chunks``) so new queries see a
+    changed key right away; this function only reclaims the stale entries.
+
+    Also invalidates the categorical-values cache so newly ingested
+    categories/registries are immediately usable as filter values.
     """
     cache = await get_sqlite_cache()
     await cache.clear()
+
+    # Invalidate categorical value cache so new documents' category/registry
+    # values are visible to the filter validator without a restart.
+    try:
+        from ..retrieval.schema_discovery import invalidate_categorical_values_cache
+
+        settings = get_settings()
+        invalidate_categorical_values_cache(settings.QDRANT_COLLECTION_NAME)
+    except Exception:
+        logger.debug("Could not invalidate categorical values cache during ingestion")
 
 
 async def schedule_cache_invalidation() -> None:

@@ -9,7 +9,7 @@
  * Also shows a compact config-status summary at the bottom.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   Dialog,
@@ -72,6 +72,8 @@ const SettingsDialog = ({ open, onOpenChange, onSaved }: SettingsDialogProps): J
     // Invalidate the chat readiness config status so the banner/composer update
     // immediately after the user changes providers (especially web search).
     await queryClient.invalidateQueries({ queryKey: ['chat-readiness', 'config-status'] });
+    // Refresh the provider toggle so model names update after a settings save.
+    await queryClient.invalidateQueries({ queryKey: ['llm', 'providers'] });
     // Also refresh the dialog's own system status summary.
     try {
       const status = await getConfigStatus();
@@ -89,6 +91,10 @@ const SettingsDialog = ({ open, onOpenChange, onSaved }: SettingsDialogProps): J
     baseUrl: "",
     modelMain: "",
   });
+  // Skip the modelMain reset on the initial settings load — the loaded model
+  // is the user's actual configured value, not a stale carry-over from a
+  // different preset. Set to true right before setLlmForm in the load callback.
+  const skipModelResetRef = useRef(true);
   const [llmSaving, setLlmSaving] = useState(false);
   const [llmError, setLlmError] = useState<string | null>(null);
   const [llmSaved, setLlmSaved] = useState(false);
@@ -134,6 +140,10 @@ const SettingsDialog = ({ open, onOpenChange, onSaved }: SettingsDialogProps): J
       if (llm) {
         setLlmSettings(llm);
         const detected = presetFromSettings(llm);
+        // Mark that the next preset-change effect should NOT reset modelMain —
+        // the value below is the user's actual configured model, loaded from
+        // the backend, not a stale carry-over from a different preset.
+        skipModelResetRef.current = true;
         setLlmForm({
           preset: detected,
           apiKey: "",
@@ -160,14 +170,35 @@ const SettingsDialog = ({ open, onOpenChange, onSaved }: SettingsDialogProps): J
     return () => { cancelled = true; };
   }, [open]);
 
-  // Update base_url when LLM preset changes
+  // Update base_url and model when LLM preset changes. Resetting the model
+  // prevents a stale model name from the previous provider (e.g. an OpenRouter
+  // model string) from being saved under the new provider (e.g. Gemini). The
+  // preset's defaultModel is pre-filled as a tested recommendation — the user
+  // can override it before saving.
+  // Skipped on the initial settings load (skipModelResetRef) so the user's
+  // actual configured model isn't replaced with the preset default.
   useEffect(() => {
     setLlmForm((prev) => {
       const config = PRESETS[prev.preset];
-      if (config.base_url !== null) {
-        return { ...prev, baseUrl: config.base_url };
+      // Gemini (base_url=null): clear baseUrl so the previous provider's URL
+      // doesn't leak into the Gemini config. Custom (base_url=""): keep
+      // previous so the user can edit their custom URL. Others: use preset.
+      const syncedBaseUrl = config.base_url === null
+        ? ""
+        : (config.base_url || prev.baseUrl);
+      if (skipModelResetRef.current) {
+        skipModelResetRef.current = false;
+        // Initial load: keep the loaded model, only sync baseUrl.
+        return {
+          ...prev,
+          baseUrl: syncedBaseUrl,
+        };
       }
-      return prev;
+      return {
+        ...prev,
+        baseUrl: syncedBaseUrl,
+        modelMain: config.defaultModel,
+      };
     });
   }, [llmForm.preset]);
 
@@ -322,7 +353,7 @@ const SettingsDialog = ({ open, onOpenChange, onSaved }: SettingsDialogProps): J
             {tab === "llm" && (
               <div className="space-y-3">
                 {llmSaved ? (
-                  <SavedBanner text="LLM settings saved. Restart the backend for the new model to take effect." />
+                  <SavedBanner text="LLM settings saved. The new model is active immediately." />
                 ) : (
                   <>
                     <ProviderGrid
@@ -382,8 +413,8 @@ const SettingsDialog = ({ open, onOpenChange, onSaved }: SettingsDialogProps): J
                     />
 
                     <p className="text-xs text-text-muted font-inter">
-                      Note: after changing the provider, the backend needs to restart for the new
-                      client to take effect.
+                      Note: changes take effect immediately — no restart needed. Use the provider
+                      toggle in the search bar to switch between configured providers.
                     </p>
                   </>
                 )}

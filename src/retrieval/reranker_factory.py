@@ -118,17 +118,20 @@ def create_reranker() -> Optional[Reranker]:
         logger.info("Reranking disabled (RERANK_PROVIDER=none) — using dense scores")
         return None
     elif provider == "voyage":
-        if not settings.VOYAGE_API_KEY:
-            raise ValueError("VOYAGE_API_KEY is required when RERANK_PROVIDER=voyage")
+        # Scoped key (from Settings UI) takes precedence; .env key is the fallback.
+        api_key = settings.RERANKER_VOYAGE_API_KEY or settings.VOYAGE_API_KEY
+        if not api_key:
+            raise ValueError("Voyage API key is required when RERANK_PROVIDER=voyage. Set it in the Settings UI or via VOYAGE_API_KEY in .env.")
         model = settings.RERANK_MODEL or "rerank-2.5"
         logger.info("Using Voyage reranker (model=%s)", model)
-        return VoyageReranker(api_key=settings.VOYAGE_API_KEY, model=model)
+        return VoyageReranker(api_key=api_key, model=model)
     elif provider == "cohere":
-        if not settings.COHERE_API_KEY:
-            raise ValueError("COHERE_API_KEY is required when RERANK_PROVIDER=cohere")
+        api_key = settings.RERANKER_COHERE_API_KEY or settings.COHERE_API_KEY
+        if not api_key:
+            raise ValueError("Cohere API key is required when RERANK_PROVIDER=cohere. Set it in the Settings UI or via COHERE_API_KEY in .env.")
         model = settings.RERANK_MODEL or "rerank-english-v3.0"
         logger.info("Using Cohere reranker (model=%s)", model)
-        return CohereReranker(api_key=settings.COHERE_API_KEY, model=model)
+        return CohereReranker(api_key=api_key, model=model)
     else:
         raise ValueError(
             f"Unknown RERANK_PROVIDER: '{provider}'. "

@@ -23,9 +23,31 @@ describe('decodeSourceLabel', () => {
     expect(decodeSourceLabel('vm0047%252520arr%252520v1.0')).toBe('vm0047 arr v1.0');
   });
 
-  it('returns the original label when decoding throws', () => {
-    // % followed by invalid UTF-8 sequence would throw; using a lone % is enough
+  it('preserves a lone broken %', () => {
     expect(decodeSourceLabel('broken%')).toBe('broken%');
+  });
+
+  it('decodes %20 even when the string also contains a broken %', () => {
+    // A single malformed % used to abort decodeURIComponent and return the
+    // whole raw string, which is why %20 stayed visible in the UI.
+    expect(decodeSourceLabel('vm0048%20reducing%')).toBe('vm0048 reducing%');
+    expect(decodeSourceLabel('vm0048%20reducing%20emissions%20v1.0-1-1.pdf%')).toBe(
+      'vm0048 reducing emissions v1.0-1-1.pdf%'
+    );
+  });
+
+  it('decodes %20 in the VM0048 long filename with a broken trailing %', () => {
+    const result = decodeSourceLabel(
+      'vm0048%20reducing%20emissions%20from%20deforestation%20and%20forest%20degradation%20v1.0-1-1.pdf%'
+    );
+    expect(result).toBe(
+      'vm0048 reducing emissions from deforestation and forest degradation v1.0-1-1.pdf%'
+    );
+    expect(result).not.toContain('%20');
+  });
+
+  it('decodes double-encoded values even with a broken %', () => {
+    expect(decodeSourceLabel('vm0048%2520reducing%')).toBe('vm0048 reducing%');
   });
 });
 
@@ -65,6 +87,30 @@ describe('preprocessContent', () => {
   it('removes numberless [Web] markers instead of leaving a gap', () => {
     const result = preprocessContent('Text [Web] more');
     expect(result).toBe('Text  more');
+  });
+
+  it('converts consecutive citation markers without whitespace', () => {
+    const result = preprocessContent('A [cite_kb: 1][Web, cite: 2]');
+    expect(result).toBe(
+      'A [kb](https://citation.internal/kb/1)[web](https://citation.internal/web/2)'
+    );
+  });
+
+  it('converts consecutive legacy source markers', () => {
+    const result = preprocessContent('A [source_1][source_2]');
+    expect(result).toBe(
+      'A [web](https://citation.internal/web/1)[web](https://citation.internal/web/2)'
+    );
+  });
+
+  it('removes empty bracketed citation markers instead of leaving a gap', () => {
+    expect(preprocessContent('Text [cite_kb: ] more')).toBe('Text  more');
+    expect(preprocessContent('Text [Knowledge Base, cite: ] more')).toBe('Text  more');
+    expect(preprocessContent('Text [Web, cite: ] more')).toBe('Text  more');
+  });
+
+  it('leaves plain empty brackets unchanged', () => {
+    expect(preprocessContent('Text [] more')).toBe('Text [] more');
   });
 });
 
