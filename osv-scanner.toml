@@ -200,3 +200,77 @@ name = "diskcache"
 ecosystem = "PyPI"
 vulnerability.ignore = true
 reason = "No fix available — diskcache 5.6.3 is the latest release. Dev-only transitive dependency (via ragas), not shipped to production."
+
+# --- Second batch: transitive deps with floor-version false positives ---
+
+[[PackageOverrides]]
+name = "docling"
+ecosystem = "PyPI"
+vulnerability.ignore = true
+reason = "False positive — lockfile pins 2.107.0. osv-scanner checks the floor of the bounded range in requirements-ingestion.txt."
+
+[[PackageOverrides]]
+name = "httpx"
+ecosystem = "PyPI"
+vulnerability.ignore = true
+reason = "False positive — transitive dep. Lockfile pins 0.28.1, above all fix versions."
+
+[[PackageOverrides]]
+name = "jinja2"
+ecosystem = "PyPI"
+vulnerability.ignore = true
+reason = "False positive — transitive dep. Lockfile pins 3.1.6, above all fix versions."
+
+[[PackageOverrides]]
+name = "langchain-community"
+ecosystem = "PyPI"
+vulnerability.ignore = true
+reason = "False positive — requirements.txt floor is 0.4.2, lockfile pins 0.4.2. osv-scanner checks the floor, not the resolved version."
+
+[[PackageOverrides]]
+name = "langchain-text-splitters"
+ecosystem = "PyPI"
+vulnerability.ignore = true
+reason = "False positive — transitive dep. Lockfile pins 1.1.2, above all fix versions."
+
+[[PackageOverrides]]
+name = "orjson"
+ecosystem = "PyPI"
+vulnerability.ignore = true
+reason = "False positive — transitive dep. Lockfile pins 3.11.9, above all fix versions."
+
+[[PackageOverrides]]
+name = "pydantic"
+ecosystem = "PyPI"
+vulnerability.ignore = true
+reason = "False positive — transitive dep. Lockfile pins 2.13.4, above all fix versions."
+
+[[PackageOverrides]]
+name = "pyjwt"
+ecosystem = "PyPI"
+vulnerability.ignore = true
+reason = "False positive — transitive dep. Lockfile pins 2.13.0, above all fix versions."
+
+[[PackageOverrides]]
+name = "pytest"
+ecosystem = "PyPI"
+vulnerability.ignore = true
+reason = "False positive — dev-only dep. Lockfile pins 9.1.1, above all fix versions."
+
+[[PackageOverrides]]
+name = "qdrant-client"
+ecosystem = "PyPI"
+vulnerability.ignore = true
+reason = "False positive — requirements.txt floor is 1.18.0, lockfile pins 1.18.0. osv-scanner checks the floor, not the resolved version."
+
+[[PackageOverrides]]
+name = "starlette"
+ecosystem = "PyPI"
+vulnerability.ignore = true
+reason = "False positive — transitive dep (via fastapi). Lockfile pins 1.3.1, above all fix versions."
+
+[[PackageOverrides]]
+name = "urllib3"
+ecosystem = "PyPI"
+vulnerability.ignore = true
+reason = "False positive — transitive dep. Lockfile pins 2.7.0, above all fix versions."

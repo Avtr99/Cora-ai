@@ -1,0 +1,18 @@
+# OSV-Scanner ignore list for frontend npm dependencies.
+#
+# osv-scanner checks the floor of semver ranges in package.json (e.g. ^6.26.2)
+# against OSV, not the actual resolved version from package-lock.json.
+# All ignores below are false positives — the pinned versions in
+# package-lock.json are already above the fix versions.
+
+[[PackageOverrides]]
+name = "react-router"
+ecosystem = "npm"
+vulnerability.ignore = true
+reason = "False positive — package.json uses ^6.26.2, package-lock.json pins 6.30.4 (above fix versions). osv-scanner checks the floor, not the resolved version."
+
+[[PackageOverrides]]
+name = "react-router-dom"
+ecosystem = "npm"
+vulnerability.ignore = true
+reason = "False positive — package.json uses ^6.26.2, package-lock.json pins 6.30.4 (above fix versions). osv-scanner checks the floor, not the resolved version."
