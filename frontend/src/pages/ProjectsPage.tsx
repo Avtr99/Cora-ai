@@ -88,6 +88,9 @@ const ProjectsPage: React.FC = () => {
                 totalCount={state.totalCount}
                 searchValue={state.query}
                 onSearchChange={state.setQuery}
+                activity={state.activity}
+                onActivityChange={state.setActivity}
+                activityCounts={state.activityCounts}
               />
             )}
           </>
@@ -108,6 +111,7 @@ const ProjectsPage: React.FC = () => {
         {!state.isLoading && !state.isError && state.filteredCount > 0 && (
           <InlineSplitView
             paginated={state.paginated}
+            allProjects={state.projects}
             filtered={state.filtered}
             activeProject={state.activeProject}
             compareIds={state.compareIds}
@@ -132,6 +136,7 @@ const ProjectsPage: React.FC = () => {
         {state.activeProject && state.mobileDetailOpen && (
           <MobileProjectDetail
             project={state.activeProject}
+            allProjects={state.projects}
             onClose={() => setMobileDetailOpen(false)}
           />
         )}
@@ -165,6 +170,7 @@ const ProjectsPage: React.FC = () => {
       <FullscreenOverlay
         isMapFullscreen={state.isMapFullscreen}
         paginated={state.paginated}
+        allProjects={state.projects}
         filtered={state.filtered}
         activeProject={state.activeProject}
         compareIds={state.compareIds}

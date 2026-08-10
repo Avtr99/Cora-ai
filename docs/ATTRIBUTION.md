@@ -86,6 +86,6 @@ Berkeley.
 
 - **Source:** https://gspp.berkeley.edu/berkeley-carbon-trading-project/offsets-database
 - **License:** Creative Commons Attribution 4.0 International (CC BY 4.0)
-- **Citation:** Pamela Quartson, Barbara K Haya, Tyler Bernard, Aline Abayo, Xinyun Rong, Ivy S So, Micah Elias. (2026). *Voluntary Registry Offsets Database v2026-04*, Berkeley Carbon Trading Project, University of California, Berkeley.
+- **Citation:** Pamela Quartson, Barbara K Haya, Tyler Bernard, Aline Abayo, Xinyun Rong, Ivy S So, Micah Elias. (2026). *Voluntary Registry Offsets Database v2026-06*, Berkeley Carbon Trading Project, University of California, Berkeley.
 - **Processing:** [`frontend/scripts/convert-projects.mjs`](https://github.com/Avtr99/Cora-ai/blob/main/frontend/scripts/convert-projects.mjs) converts the CSV into [`frontend/public/data/projects-summary.json`](https://github.com/Avtr99/Cora-ai/blob/main/frontend/public/data/projects-summary.json) and [`frontend/public/data/projects-detail.json`](https://github.com/Avtr99/Cora-ai/blob/main/frontend/public/data/projects-detail.json).
 - **Display:** [`frontend/src/components/projects/ProjectAttribution.tsx`](https://github.com/Avtr99/Cora-ai/blob/main/frontend/src/components/projects/ProjectAttribution.tsx)

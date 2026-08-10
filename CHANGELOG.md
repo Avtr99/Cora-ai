@@ -11,7 +11,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 * v1.2.0 — LLM config system, document store refactor, async query jobs, citation fixes ([09b0af8](https://github.com/Avtr99/Cora-ai/commit/09b0af845205436817526c8b8b273def7a3f5660))
 
-## [Unreleased]
+## [1.3.0](https://github.com/Avtr99/Cora-ai/compare/v1.2.0...v1.3.0) (2026-08-10)
+
+### Features
+
+- **projects:** redesign the filter panel. Desktop uses a right-side drawer. Mobile uses a bottom sheet.
+- **projects:** add an activity filter. It shows issuing, stalled, and never projects.
+- **projects:** add a certification filter for ICVCM, CORSIA, CCB, and Other.
+- **projects:** add certification badges to the project detail panel.
+- **projects:** add a cohort percentile and developer track record card to the project detail panel.
+- **projects:** compute cohort percentiles and track record on the client. This reduces the detail JSON size.
+- **projects:** add an issuance sparkline to the project detail panel. It shows yearly credits and gaps.
+- **projects:** extract shared filter UI into `FilterPanel`, `FilterDrawer`, `FilterPillList`, and `FilterSearchInput`.
 
 ### Bug Fixes
 

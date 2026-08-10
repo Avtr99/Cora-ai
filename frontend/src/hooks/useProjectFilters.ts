@@ -2,6 +2,14 @@ import { useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { ProjectFilterKey, ProjectFilters, VCMProject } from '@/types/project';
 import { SEARCH_FIELDS } from '@/types/project';
+import type { ProjectActivity } from '@/lib/projectActivity';
+import { getProjectActivity, getReferenceYear } from '@/lib/projectActivity';
+
+const ACTIVITY_VALUES: ProjectActivity[] = ['issuing', 'stalled', 'never'];
+
+function parseActivity(v: string | null): ProjectActivity | undefined {
+  return ACTIVITY_VALUES.find((a) => a === v);
+}
 
 const FILTER_KEYS: ProjectFilterKey[] = [
   'scope',
@@ -11,6 +19,7 @@ const FILTER_KEYS: ProjectFilterKey[] = [
   'registry',
   'status',
   'reductionRemoval',
+  'certification',
 ];
 
 const ITEMS_PER_PAGE = 30;
@@ -36,7 +45,30 @@ export function useProjectFilters(projects: VCMProject[]) {
     return f;
   }, [searchParams]);
 
-  const activeFilterCount = Object.keys(filters).length + (query ? 1 : 0);
+  // Derived filter — not a plain field match, so it is handled separately
+  // from FILTER_KEYS rather than widening ProjectFilterKey.
+  const activity = parseActivity(searchParams.get('activity'));
+
+  const activeFilterCount =
+    Object.keys(filters).length + (query ? 1 : 0) + (activity ? 1 : 0);
+
+  const referenceYear = useMemo(() => getReferenceYear(projects), [projects]);
+
+  const setActivity = useCallback(
+    (value: ProjectActivity | null) => {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        if (value) {
+          next.set('activity', value);
+        } else {
+          next.delete('activity');
+        }
+        next.delete('page');
+        return next;
+      }, { replace: true });
+    },
+    [setSearchParams],
+  );
 
   // Setters that update URL
   const setQuery = useCallback(
@@ -103,6 +135,10 @@ export function useProjectFilters(projects: VCMProject[]) {
         }
       }
 
+      if (activity && getProjectActivity(p, referenceYear) !== activity) {
+        return false;
+      }
+
       // Apply search
       if (lowerQuery) {
         const topMatch = SEARCH_FIELDS.some((f) => {
@@ -114,7 +150,14 @@ export function useProjectFilters(projects: VCMProject[]) {
 
       return true;
     });
-  }, [projects, filters, query]);
+  }, [projects, filters, query, activity, referenceYear]);
+
+  /** Counts per activity bucket, computed over the whole dataset. */
+  const activityCounts = useMemo(() => {
+    const counts: Record<ProjectActivity, number> = { issuing: 0, stalled: 0, never: 0 };
+    for (const p of projects) counts[getProjectActivity(p, referenceYear)]++;
+    return counts;
+  }, [projects, referenceYear]);
 
   // Pagination
   const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
@@ -132,6 +175,7 @@ export function useProjectFilters(projects: VCMProject[]) {
       registry: new Map(),
       status: new Map(),
       reductionRemoval: new Map(),
+      certification: new Map(),
     };
 
     for (const p of projects) {
@@ -160,6 +204,10 @@ export function useProjectFilters(projects: VCMProject[]) {
     setFilter,
     clearAllFilters,
     activeFilterCount,
+    activity,
+    setActivity,
+    activityCounts,
+    referenceYear,
     filtered,
     paginated,
     page: safePage,

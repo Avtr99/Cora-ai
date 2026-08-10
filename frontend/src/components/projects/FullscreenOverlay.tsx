@@ -4,7 +4,7 @@ import { Minimize2, Search, X } from 'lucide-react';
 import { useDebounce } from '@/hooks/useDebounce';
 import { IconWrapper } from '@/components/icons/IconWrapper';
 import XIcon from '@/assets/icons/x.svg?react';
-import { BRAND } from '@/lib/colors';
+import { TEXT } from '@/lib/colors';
 import MapIcon from '@/assets/icons/map.svg?react';
 import FileIcon from '@/assets/icons/file.svg?react';
 import { ProjectListItem } from '@/components/projects/ProjectListItem';
@@ -19,9 +19,9 @@ const ProjectMap = lazy(() =>
 );
 
 /** Reusable detail panel content with empty state fallback */
-const DetailPanelContent: React.FC<{ activeProject: VCMProject | null }> = ({ activeProject }) =>
+const DetailPanelContent: React.FC<{ activeProject: VCMProject | null; allProjects: VCMProject[] }> = ({ activeProject, allProjects }) =>
   activeProject ? (
-    <ProjectDetailPanel project={activeProject} />
+    <ProjectDetailPanel project={activeProject} allProjects={allProjects} />
   ) : (
     <div className="w-full h-full flex items-center justify-center p-8">
       <p className="font-inter text-sm text-text-muted">
@@ -33,6 +33,7 @@ const DetailPanelContent: React.FC<{ activeProject: VCMProject | null }> = ({ ac
 interface FullscreenOverlayProps {
   isMapFullscreen: boolean;
   paginated: VCMProject[];
+  allProjects: VCMProject[];
   filtered: VCMProject[];
   activeProject: VCMProject | null;
   compareIds: string[];
@@ -58,6 +59,7 @@ interface FullscreenOverlayProps {
 const FullscreenOverlay: React.FC<FullscreenOverlayProps> = ({
   isMapFullscreen,
   paginated,
+  allProjects,
   filtered,
   activeProject,
   compareIds,
@@ -201,12 +203,12 @@ const FullscreenOverlay: React.FC<FullscreenOverlayProps> = ({
               <button
                 type="button"
                 onClick={() => onSetFilter('country', null)}
-                className="hidden sm:inline-flex items-center gap-1.5 h-6 px-2 rounded-full bg-brand-100/70 text-brand-700 font-inter text-[10.5px] font-medium hover:bg-brand-100 transition-colors"
+                className="hidden sm:inline-flex items-center gap-1.5 h-6 px-2 rounded-full bg-surface-card border border-border-ui text-text-primary font-inter text-[10.5px] font-medium hover:bg-surface-subtle transition-colors"
                 aria-label={`Clear ${filters.country} filter`}
               >
-                <span className="w-1 h-1 rounded-full bg-brand-500" />
+                <span className="w-1 h-1 rounded-full bg-text-muted" />
                 {filters.country}
-                <IconWrapper Icon={XIcon} size={9} color={BRAND.primary700} aria-hidden={true} />
+                <IconWrapper Icon={XIcon} size={9} color={TEXT.muted} aria-hidden={true} />
               </button>
             )}
             <span className="font-inter text-[10.5px] md:text-[11.5px] text-text-muted tabular-nums">
@@ -279,7 +281,7 @@ const FullscreenOverlay: React.FC<FullscreenOverlayProps> = ({
                   transition={{ duration: 0.2 }}
                   className="hidden lg:flex w-[360px] xl:w-[420px] flex-shrink-0 border-r border-border-ui bg-surface-card overflow-hidden z-10 flex-col"
                 >
-                  <DetailPanelContent activeProject={activeProject} />
+                  <DetailPanelContent activeProject={activeProject} allProjects={allProjects} />
                 </motion.div>
               )}
             </AnimatePresence>
@@ -315,7 +317,7 @@ const FullscreenOverlay: React.FC<FullscreenOverlayProps> = ({
                   rightPanel === 'detail' ? 'opacity-100 z-10' : 'opacity-0 pointer-events-none'
                 }`}
               >
-                <DetailPanelContent activeProject={activeProject} />
+                <DetailPanelContent activeProject={activeProject} allProjects={allProjects} />
               </div>
             </div>
           </div>

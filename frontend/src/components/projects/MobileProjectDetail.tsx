@@ -4,6 +4,7 @@ import { ProjectDetailPanel } from '@/components/projects/ProjectDetailPanel';
 
 interface MobileProjectDetailProps {
   project: VCMProject;
+  allProjects: VCMProject[];
   onClose: () => void;
 }
 
@@ -16,6 +17,7 @@ interface MobileProjectDetailProps {
  */
 export const MobileProjectDetail: React.FC<MobileProjectDetailProps> = ({
   project,
+  allProjects,
   onClose,
 }) => {
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -144,7 +146,7 @@ export const MobileProjectDetail: React.FC<MobileProjectDetailProps> = ({
         tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
       >
-        <ProjectDetailPanel project={project} onClose={onClose} />
+        <ProjectDetailPanel project={project} allProjects={allProjects} onClose={onClose} />
       </div>
     </div>
   );

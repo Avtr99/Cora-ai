@@ -305,9 +305,29 @@ All messages are plain text (no bubbles), centered in a **680px** max-width cont
 
 #### ProjectFiltersV2
 - **File**: `src/components/projects/ProjectFiltersV2.tsx`
-- Primary filters (always visible): Registry, Status, Type — dropdown button `h-8 px-3 rounded-lg`; active `bg-[#403D85] text-white`; inactive `bg-white text-[#5B5B7A] border-[#E5E7EB]`
-- "More filters" button opens secondary pills (Scope, Project Type, Region, Country with search); shows active badge count; active state `bg-[#F5F0FF] text-[#403D85] border-[#E9D5FF]`
-- Result count: `font-inter text-[11px] text-[#6B7280]` right-aligned
+- Primary filters (always visible): Registry, Status, Type, and Activity. Each is a `FilterDropdown`.
+- "Filters" button opens secondary filters in a drawer. It shows an active badge count.
+- Active filter button: `bg-brand-900 text-white border-brand-900`. Inactive: `bg-surface-card text-text-secondary border-border-ui`.
+- Result count: `font-inter text-[11px] text-text-muted` right-aligned.
+
+#### FilterPanel
+- **File**: `src/components/projects/FilterPanel.tsx`
+- Mobile-first filter drawer. It supports `mode="drawer"` and `mode="popover"`.
+- Tabs: `activeTab` shows a list. `FilterPillList` shows active pills with a remove action.
+- A single global `FilterSearchInput` filters options inside each tab.
+
+#### FilterDrawer
+- **File**: `src/components/projects/FilterDrawer.tsx`
+- Desktop right-side drawer for secondary filters. `max-w-[400px]`.
+- It wraps `FilterPanel` with a fixed `mode="drawer"`.
+
+#### FilterPillList
+- **File**: `src/components/projects/FilterPillList.tsx`
+- Horizontal list of selected filter pills. Each pill has a close icon.
+
+#### FilterSearchInput
+- **File**: `src/components/projects/FilterSearchInput.tsx`
+- Search input for filter option lists. Clear button shows when the value is not empty.
 
 #### ProjectListItem
 - **File**: `src/components/projects/ProjectListItem.tsx`
@@ -318,9 +338,16 @@ All messages are plain text (no bubbles), centered in a **680px** max-width cont
 
 #### ProjectDetailPanel
 - **File**: `src/components/projects/ProjectDetailPanel.tsx`
-- Full-height flex column: sticky header + scrollable content
-- Sections: Credits 2×2 grid, Overview, Location, Stakeholders, Methodology, Timeline, Regulatory, Links, Description, Notes
-- Credit cards: `bg-[#F8F9FA] rounded-xl p-3.5`; section headings Inter 10px semibold `#6B7280` uppercase tracking-0.6px
+- Full-height flex column: sticky header + scrollable content.
+- Sections: Credits, Overview, Location, Stakeholders, Methodology, Timeline, Regulatory, Links, Description, Notes.
+- Certification badges and a Cohort & Track Record card show below the header.
+- Credit cards: `bg-surface-base rounded-xl p-3.5`; section headings Inter 10px semibold `text-text-muted` uppercase tracking-0.6px.
+
+#### Cohort & Track Record
+- **File**: `src/components/projects/ProjectDetailPanel.tsx`
+- Card: `bg-surface-base rounded-xl p-4`.
+- Shows percentiles by type, country, and type + country.
+- Shows the project developer's total projects, total credits, and average retirement rate.
 
 #### Split View Layout
 - Container: `flex border border-[#E5E7EB] rounded-2xl overflow-hidden bg-white`
@@ -389,6 +416,39 @@ import ChatIcon from '@/assets/icons/chat.svg?react';
 ```
 
 ---
+
+### ProjectListItem
+- **File**: `src/components/projects/ProjectListItem.tsx`
+- **Background states**:
+  - Default: `bg-surface-card`
+  - Hover: `hover:bg-surface-base`
+  - Active/selected: `bg-surface-subtle`
+  - Country-synchronized highlight: `bg-surface-base`
+  - Long-press flash: `bg-surface-subtle`
+- **Compare checkbox**: appears on `group-hover`; selected `border-text-primary bg-text-primary`; unselected `border-border-ui bg-surface-card`
+
+### Country Filter Chip
+- **Files**: `src/components/projects/InlineSplitView.tsx`, `src/components/projects/FullscreenOverlay.tsx`
+- **Active**: `bg-surface-card border border-border-ui text-text-primary`
+- **Dot**: `bg-text-muted`
+- **Clear icon**: `TEXT.muted` (`#6B7280`)
+- **Hover**: `hover:bg-surface-subtle`
+
+### Certification Badges
+- **File**: `src/components/projects/ProjectDetailPanel.tsx`
+- **Base**: `inline-flex items-center px-2.5 py-1 rounded-md font-inter text-xs font-medium`
+- **ICVCM**: `bg-text-primary text-white border border-text-primary`
+- **CORSIA**: `bg-surface-subtle text-text-primary border border-border-ui`
+- **CCB**: `bg-surface-subtle text-text-primary border border-border-ui`
+- **Other**: `bg-surface-subtle text-text-secondary border border-border-ui`
+
+### IssuanceSparkline
+- **File**: `src/components/projects/IssuanceSparkline.tsx`
+- **Multi-year**: 64px flex bar chart
+- **Issuance bars**: `bg-semantic-success-icon`, hover `bg-semantic-success-button`
+- **Gap/empty years**: `bg-border-ui/50`, hover `bg-border-ui`
+- **Single-year fallback**: `bg-surface-subtle` metric badge with `bg-semantic-success-icon` dot
+- **Empty/no data**: `null`
 
 ## Patterns
 

@@ -1,3 +1,3 @@
 """Single-source package version, synced from root package.json by release-it."""
 
-__version__ = "1.2.0"
+__version__ = "1.3.0"
