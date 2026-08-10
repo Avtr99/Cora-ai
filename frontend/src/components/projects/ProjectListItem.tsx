@@ -31,9 +31,9 @@ function getItemBgClass({
   isActive: boolean;
   isCountryHighlighted: boolean;
 }): string {
-  if (longPressFlash) return 'bg-brand-100/40';
-  if (isActive) return 'bg-brand-100/30';
-  if (isCountryHighlighted) return 'bg-brand-100/20';
+  if (longPressFlash) return 'bg-surface-subtle';
+  if (isActive) return 'bg-surface-subtle';
+  if (isCountryHighlighted) return 'bg-surface-base';
   return 'bg-surface-card hover:bg-surface-base';
 }
 

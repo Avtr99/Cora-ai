@@ -17,6 +17,7 @@ async function fetchProjects(): Promise<ProjectsData> {
 export interface ProjectsPageState {
   // Data
   projects: VCMProject[];
+  projects: VCMProject[];
   isLoading: boolean;
   isError: boolean;
   refetch: () => void;
@@ -28,6 +29,10 @@ export interface ProjectsPageState {
   setFilter: ReturnType<typeof useProjectFilters>['setFilter'];
   clearAllFilters: () => void;
   activeFilterCount: number;
+  activity: ReturnType<typeof useProjectFilters>['activity'];
+  setActivity: ReturnType<typeof useProjectFilters>['setActivity'];
+  activityCounts: ReturnType<typeof useProjectFilters>['activityCounts'];
+  referenceYear: number;
   filtered: VCMProject[];
   paginated: VCMProject[];
   page: number;
@@ -98,6 +103,10 @@ export function useProjectsPageState(): ProjectsPageState {
     setFilter,
     clearAllFilters,
     activeFilterCount,
+    activity,
+    setActivity,
+    activityCounts,
+    referenceYear,
     filtered,
     paginated,
     page,
@@ -275,6 +284,10 @@ export function useProjectsPageState(): ProjectsPageState {
     setFilter,
     clearAllFilters,
     activeFilterCount,
+    activity,
+    setActivity,
+    activityCounts,
+    referenceYear,
     filtered,
     paginated,
     page,

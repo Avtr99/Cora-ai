@@ -74,7 +74,7 @@ Content and data
   License: Creative Commons Attribution 4.0 International (CC BY 4.0)
   Citation: Pamela Quartson, Barbara K Haya, Tyler Bernard, Aline Abayo,
             Xinyun Rong, Ivy S So, Micah Elias. (2026).
-            Voluntary Registry Offsets Database v2026-04,
+            Voluntary Registry Offsets Database v2026-06,
             Berkeley Carbon Trading Project, University of California, Berkeley.
   Processing: https://github.com/Avtr99/Cora-ai/blob/main/frontend/scripts/convert-projects.mjs
   Display: https://github.com/Avtr99/Cora-ai/blob/main/frontend/src/components/projects/ProjectAttribution.tsx

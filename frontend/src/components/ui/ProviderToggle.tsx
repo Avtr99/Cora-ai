@@ -40,7 +40,7 @@ export const ProviderToggle: React.FC = () => {
   // settings change that switches the active provider).
   useEffect(() => {
     if (data?.current) setCurrent(data.current);
-  }, [data?.current]);
+  }, [data]);
 
   // Close dropdown on outside click
   useEffect(() => {

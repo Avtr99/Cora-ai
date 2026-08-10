@@ -2,7 +2,7 @@ import React, { Suspense, lazy, useCallback } from 'react';
 import { Maximize2 } from 'lucide-react';
 import { IconWrapper } from '@/components/icons/IconWrapper';
 import XIcon from '@/assets/icons/x.svg?react';
-import { BRAND } from '@/lib/colors';
+import { TEXT } from '@/lib/colors';
 import MapIcon from '@/assets/icons/map.svg?react';
 import FileIcon from '@/assets/icons/file.svg?react';
 import { ProjectListItem } from '@/components/projects/ProjectListItem';
@@ -19,6 +19,7 @@ const ProjectMap = lazy(() =>
 
 interface InlineSplitViewProps {
   paginated: VCMProject[];
+  allProjects: VCMProject[];
   filtered: VCMProject[];
   activeProject: VCMProject | null;
   compareIds: string[];
@@ -40,6 +41,7 @@ interface InlineSplitViewProps {
 
 const InlineSplitView: React.FC<InlineSplitViewProps> = ({
   paginated,
+  allProjects,
   filtered,
   activeProject,
   compareIds,
@@ -136,11 +138,11 @@ const InlineSplitView: React.FC<InlineSplitViewProps> = ({
             <button
               type="button"
               onClick={() => onSetFilter('country', null)}
-              className="inline-flex items-center gap-1.5 h-6 px-2 rounded-full bg-brand-100/70 text-brand-700 font-inter text-[10.5px] font-medium hover:bg-brand-100 transition-colors"
+              className="inline-flex items-center gap-1.5 h-6 px-2 rounded-full bg-surface-card border border-border-ui text-text-primary font-inter text-[10.5px] font-medium hover:bg-surface-subtle transition-colors"
             >
-              <span className="w-1 h-1 rounded-full bg-brand-500" />
+              <span className="w-1 h-1 rounded-full bg-text-muted" />
               {filters.country}
-              <IconWrapper Icon={XIcon} size={9} color={BRAND.primary700} aria-hidden={true} />
+              <IconWrapper Icon={XIcon} size={9} color={TEXT.muted} aria-hidden={true} />
             </button>
           )}
           <span className="font-inter text-[10.5px] text-text-muted tabular-nums">
@@ -200,7 +202,7 @@ const InlineSplitView: React.FC<InlineSplitViewProps> = ({
           }`}
         >
           {activeProject ? (
-            <ProjectDetailPanel project={activeProject} />
+            <ProjectDetailPanel project={activeProject} allProjects={allProjects} />
           ) : (
             <div className="w-full h-full flex items-center justify-center p-8">
               <p className="font-inter text-sm text-text-muted">

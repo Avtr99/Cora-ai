@@ -2,8 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { X, SlidersHorizontal, Search } from 'lucide-react';
 import { FilterDropdown } from '@/components/ui/FilterDropdown';
 import { FilterPanel } from '@/components/projects/FilterPanel';
+import { FilterDrawer } from '@/components/projects/FilterDrawer';
 import { useDebounce } from '@/hooks/useDebounce';
 import type { ProjectFilterKey } from '@/types/project';
+import type { ProjectActivity } from '@/lib/projectActivity';
+import { ACTIVITY_LABELS } from '@/lib/projectActivity';
 
 interface FilterOption {
   value: string;
@@ -20,7 +23,12 @@ interface ProjectFiltersV2Props {
   totalCount: number;
   searchValue: string;
   onSearchChange: (value: string) => void;
+  activity: ProjectActivity | undefined;
+  onActivityChange: (value: ProjectActivity | null) => void;
+  activityCounts: Record<ProjectActivity, number>;
 }
+
+const ACTIVITY_ORDER: ProjectActivity[] = ['issuing', 'stalled', 'never'];
 
 const PRIMARY_FILTERS: { key: ProjectFilterKey; label: string }[] = [
   { key: 'registry', label: 'Registry' },
@@ -29,6 +37,7 @@ const PRIMARY_FILTERS: { key: ProjectFilterKey; label: string }[] = [
 ];
 
 const SECONDARY_FILTERS: { key: ProjectFilterKey; label: string }[] = [
+  { key: 'certification', label: 'Certification' },
   { key: 'scope', label: 'Scope' },
   { key: 'type', label: 'Project Type' },
   { key: 'region', label: 'Region' },
@@ -45,6 +54,9 @@ export const ProjectFiltersV2: React.FC<ProjectFiltersV2Props> = ({
   totalCount,
   searchValue,
   onSearchChange,
+  activity,
+  onActivityChange,
+  activityCounts,
 }) => {
   const [showMore, setShowMore] = useState(false);
   const [showPrimaryMobile, setShowPrimaryMobile] = useState(false);
@@ -77,12 +89,18 @@ export const ProjectFiltersV2: React.FC<ProjectFiltersV2Props> = ({
     0
   );
 
+  const activityOptions = ACTIVITY_ORDER.map((key) => ({
+    value: key,
+    label: ACTIVITY_LABELS[key],
+    count: activityCounts[key],
+  }));
+
   return (
     <div className="mb-3">
       {/* Unified toolbar: search + filters + count */}
       <div className="flex items-center gap-2 flex-wrap">
         {/* Inline search */}
-        <div className="relative flex-shrink-0 w-full sm:w-[300px] md:w-[280px] lg:w-[380px]">
+        <div className="relative flex-shrink-0 w-full sm:w-[280px] md:w-[260px] lg:w-[320px]">
           <Search
             className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-muted pointer-events-none"
             aria-hidden="true"
@@ -113,7 +131,7 @@ export const ProjectFiltersV2: React.FC<ProjectFiltersV2Props> = ({
         {/* Divider */}
         <div className="hidden sm:block w-px h-5 bg-border-ui" />
 
-        {/* Primary filters container — desktop shows 3 dropdowns, mobile shows unified button */}
+        {/* Primary filters container — desktop shows dropdowns, mobile shows unified button */}
         <div className="flex items-center gap-2 flex-wrap">
           {/* Desktop: individual dropdowns */}
           <div className="hidden md:flex items-center gap-2">
@@ -130,46 +148,59 @@ export const ProjectFiltersV2: React.FC<ProjectFiltersV2Props> = ({
                 onChange={(value) => onFilterChange(key, value)}
               />
             ))}
+            <FilterDropdown
+              label="Activity"
+              value={activity || null}
+              options={activityOptions}
+              onChange={(value) => onActivityChange(value as ProjectActivity | null)}
+            />
           </div>
 
-          {/* Mobile: unified button with tabbed panel */}
-          <div className="md:hidden relative">
-            <button
-              type="button"
-              onClick={() => setShowPrimaryMobile(!showPrimaryMobile)}
-              className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-lg font-inter text-xs font-medium transition-all
-                border focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2
-                ${showPrimaryMobile || primaryActiveCount > 0
-                  ? 'bg-brand-900 text-white border-brand-900'
-                  : 'bg-surface-card text-text-secondary border-border-ui hover:border-border-ui'
-                }`}
-            >
-              <SlidersHorizontal className="w-3 h-3" />
-              <span>Registry & Type</span>
-              {primaryActiveCount > 0 && (
-                <span className="w-4 h-4 rounded-full bg-white/25 text-white text-xs font-bold flex items-center justify-center">
-                  {primaryActiveCount}
-                </span>
-              )}
-            </button>
+          {/* Mobile: unified button with tabbed panel + activity dropdown */}
+          <div className="md:hidden flex items-center gap-2">
+            <FilterDropdown
+              label="Activity"
+              value={activity || null}
+              options={activityOptions}
+              onChange={(value) => onActivityChange(value as ProjectActivity | null)}
+            />
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowPrimaryMobile(!showPrimaryMobile)}
+                className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-lg font-inter text-xs font-medium transition-all
+                  border focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2
+                  ${showPrimaryMobile || primaryActiveCount > 0
+                    ? 'bg-brand-900 text-white border-brand-900'
+                    : 'bg-surface-card text-text-secondary border-border-ui hover:border-border-ui'
+                  }`}
+              >
+                <SlidersHorizontal className="w-3 h-3" />
+                <span>Registry & Type</span>
+                {primaryActiveCount > 0 && (
+                  <span className="w-4 h-4 rounded-full bg-white/25 text-white text-xs font-bold flex items-center justify-center">
+                    {primaryActiveCount}
+                  </span>
+                )}
+              </button>
 
-            {showPrimaryMobile && (
-              <FilterPanel
-                isOpen={showPrimaryMobile}
-                onClose={() => setShowPrimaryMobile(false)}
-                filterDefs={PRIMARY_FILTERS}
-                filters={filters}
-                filterOptions={filterOptions}
-                onFilterChange={onFilterChange}
-                onClearAll={() =>
-                  PRIMARY_FILTERS.forEach((f) => onFilterChange(f.key, null))
-                }
-                clearLabel="Clear"
-                ariaLabel="Primary filter categories"
-                idPrefix="primary"
-                mode="drawer"
-              />
-            )}
+              {showPrimaryMobile && (
+                <FilterPanel
+                  isOpen={showPrimaryMobile}
+                  onClose={() => setShowPrimaryMobile(false)}
+                  filterDefs={PRIMARY_FILTERS}
+                  filters={filters}
+                  filterOptions={filterOptions}
+                  onFilterChange={onFilterChange}
+                  onClearAll={() =>
+                    PRIMARY_FILTERS.forEach((f) => onFilterChange(f.key, null))
+                  }
+                  clearLabel="Clear"
+                  ariaLabel="Primary filter categories"
+                  idPrefix="primary"
+                />
+              )}
+            </div>
           </div>
 
           {/* More filters — floating popover, never displaces layout */}
@@ -181,7 +212,7 @@ export const ProjectFiltersV2: React.FC<ProjectFiltersV2Props> = ({
                 border focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2
                 ${showMore || secondaryActiveCount > 0
                   ? 'bg-brand-900 text-white border-brand-900'
-                  : 'bg-surface-card text-text-secondary border-border-ui hover:border-border-ui'
+                  : 'bg-surface-card text-text-secondary border-border-ui hover:border-text-muted hover:bg-surface-subtle'
                 }`}
             >
               <SlidersHorizontal className="w-3 h-3" />
@@ -194,7 +225,7 @@ export const ProjectFiltersV2: React.FC<ProjectFiltersV2Props> = ({
             </button>
 
             {showMore && (
-              <FilterPanel
+              <FilterDrawer
                 isOpen={showMore}
                 onClose={() => setShowMore(false)}
                 filterDefs={SECONDARY_FILTERS}
@@ -207,7 +238,6 @@ export const ProjectFiltersV2: React.FC<ProjectFiltersV2Props> = ({
                 clearLabel="Clear filters"
                 ariaLabel="Filter categories"
                 idPrefix="secondary"
-                mode="popover"
               />
             )}
           </div>

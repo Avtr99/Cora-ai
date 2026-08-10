@@ -5,7 +5,9 @@
  *
  * Usage: node scripts/convert-projects.mjs
  *
- * Input:  data/Voluntary-Registry-Offsets-Database--v2025-*.csv (most recent)
+ * Input:  frontend/data/Voluntary-Registry-Offsets-Database--v*.csv (most recent)
+ *         The CSV is gitignored — download the current release from the
+ *         Berkeley Carbon Trading Project and drop it in frontend/data/.
  * Output:
  *   public/data/projects-summary.json  — lightweight (no _detail, developer promoted)
  *   public/data/projects-detail.json   — { id: _detail } map for lazy loading
@@ -14,6 +16,7 @@
 import { readFileSync, writeFileSync, readdirSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { derivePrimaryCertification } from '../src/lib/certificationRules.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -29,7 +32,11 @@ const csvFiles = readdirSync(DATA_DIR)
   .sort();
 
 if (csvFiles.length === 0) {
-  console.error('No CSV file found in data/ directory.');
+  console.error(
+    'No Berkeley CSV found in frontend/data/.\n' +
+    'Download the latest "Voluntary Registry Offsets Database" release and save it there as\n' +
+    '  frontend/data/Voluntary-Registry-Offsets-Database--vYYYY-MM.csv'
+  );
   process.exit(1);
 }
 
@@ -131,13 +138,96 @@ console.log(`Parsed ${rows.length - 1} data rows, ${headers.length} columns`);
 const col = {};
 headers.forEach((h, i) => { col[h.replace(/\s*\n\s*/g, ' ').trim()] = i; });
 
+// ---------------------------------------------------------------------------
+// 3a. Locate the four year-column blocks
+//
+// The workbook repeats the year headers (1996…) four times, so they CANNOT be
+// looked up by name — `col` only keeps the last occurrence of each. Instead we
+// detect runs of consecutive year headers positionally, which also survives
+// Berkeley appending a new year each release.
+//
+// Expected order: issued-by-vintage, retired-by-vintage, remaining-by-vintage,
+// issued-by-issuance-year. That order is asserted below, not assumed.
+// ---------------------------------------------------------------------------
+// The first three blocks are adjacent with no separating header, so a plain
+// "run of year columns" scan merges them. Start a new block whenever the year
+// sequence restarts (i.e. does not continue from the previous column).
+const yearRuns = [];
+let prev = null;
+for (let i = 0; i < headers.length; i++) {
+  const h = headers[i].trim();
+  if (!/^(19|20)\d{2}$/.test(h)) { prev = null; continue; }
+  const year = Number(h);
+  if (prev === null || year !== prev + 1) {
+    yearRuns.push({ start: i, years: [] });
+  }
+  yearRuns[yearRuns.length - 1].years.push(year);
+  prev = year;
+}
+
+if (yearRuns.length !== 4) {
+  throw new Error(
+    `Expected 4 blocks of year columns in the Berkeley CSV, found ${yearRuns.length}. ` +
+    `The workbook layout has changed — re-check the column mapping before trusting the output.`
+  );
+}
+
+const [issuedByVintage, retiredByVintage, remainingByVintage, issuedByYear] = yearRuns;
+
+/** Sum one year block for a row. */
+function sumBlock(row, block) {
+  let total = 0;
+  for (let i = 0; i < block.years.length; i++) total += parseNumber(row[block.start + i]);
+  return total;
+}
+
+/** Sparse { year: credits } map, omitting zero years to keep the payload small. */
+function yearMap(row, block) {
+  const out = {};
+  for (let i = 0; i < block.years.length; i++) {
+    const v = parseNumber(row[block.start + i]);
+    if (v !== 0) out[block.years[i]] = v;
+  }
+  return out;
+}
+
 const projects = [];
+// Block-identity check: each block must reconcile against its total column.
+const blockMismatch = { issued: 0, retired: 0, remaining: 0, issuanceYear: 0 };
+let reconciled = 0;
 
 for (let r = 1; r < rows.length; r++) {
   const row = rows[r];
   if (!row || row.length < 5 || !row[col['Project ID']]) continue;
 
-  const get = (name) => row[col[name]] || '';
+  const get = (name) => {
+    if (!(name in col)) throw new Error(`Column not found in CSV header: "${name}"`);
+    return row[col[name]] || '';
+  };
+
+  const totalIssued = parseNumber(get('Total Credits Issued'));
+  const totalRetired = parseNumber(get('Total Credits Retired'));
+  const totalRemaining = parseNumber(get('Total Credits Remaining'));
+
+  // Verify each block means what we think it means (see 3a).
+  reconciled++;
+  if (sumBlock(row, issuedByVintage) !== totalIssued) blockMismatch.issued++;
+  if (sumBlock(row, retiredByVintage) !== totalRetired) blockMismatch.retired++;
+  if (sumBlock(row, remainingByVintage) !== totalRemaining) blockMismatch.remaining++;
+  if (sumBlock(row, issuedByYear) !== totalIssued) blockMismatch.issuanceYear++;
+
+  // Issuance activity. `neverIssued` is not stored — it is exactly
+  // creditsIssued === 0, which the summary already carries.
+  const issuance = yearMap(row, issuedByYear);
+  const activeYears = Object.keys(issuance).map(Number).sort((a, b) => a - b);
+  const lastIssuanceYear = activeYears.length ? activeYears[activeYears.length - 1] : undefined;
+  // A gap means the project skipped one or more years mid-life.
+  const span = activeYears.length
+    ? activeYears[activeYears.length - 1] - activeYears[0] + 1
+    : 0;
+  const hasIssuanceGap = activeYears.length > 1 && span > activeYears.length ? true : undefined;
+
+  const rawCertifications = cleanString(get('Certifications'));
 
   projects.push({
     id: cleanString(get('Project ID')),
@@ -149,10 +239,17 @@ for (let r = 1; r < rows.length; r++) {
     reductionRemoval: cleanString(get('Reduction / Removal')),
     country: cleanString(get('Country')),
     region: cleanString(get('Region')),
-    creditsIssued: parseNumber(get('Total Credits Issued')),
-    creditsRetired: parseNumber(get('Total Credits Retired')),
-    creditsRemaining: parseNumber(get('Total Credits Remaining')),
+    creditsIssued: totalIssued,
+    creditsRetired: totalRetired,
+    creditsRemaining: totalRemaining,
+    // Stored as a year, not a derived "stalled" boolean — a boolean baked at
+    // build time would silently rot as the release ages. The UI compares it
+    // against the current year instead.
+    lastIssuanceYear,
+    hasIssuanceGap,
+    certification: derivePrimaryCertification(rawCertifications),
     _detail: {
+      issuedByYear: issuance,
       methodology: cleanString(get('Methodology / Protocol')),
       methodologyVersion: cleanString(get('Methodology Version')),
       state: cleanString(get('State')),
@@ -173,8 +270,8 @@ for (let r = 1; r < rows.length; r++) {
       poaStatus: cleanString(get('PoA / VPA Status')),
       listed: cleanString(get('Project Listed')),
       registered: cleanString(get('Project Registered')),
-      firstIssuanceYear: cleanString(get('1st issuance year (no hard code, hide)')),
-      certifications: cleanString(get('Sustainability Certifications')),
+      firstIssuanceYear: cleanString(get('1st issuance yr (no hard code, hide)')),
+      certifications: rawCertifications,
       registryType: cleanString(get('Project Type From the Registry')),
       registryDocs: cleanString(get('Registry Documents')),
       projectWebsite: cleanString(get('Project Website')),
@@ -192,10 +289,28 @@ for (let r = 1; r < rows.length; r++) {
 function compactDetail(detail) {
   const compact = {};
   for (const [k, v] of Object.entries(detail)) {
-    if (v === '' || v === 0) continue;
+    if (v === '' || v === 0 || v === undefined) continue;
+    if (typeof v === 'object' && Object.keys(v).length === 0) continue;
     compact[k] = v;
   }
   return compact;
+}
+
+// ---------------------------------------------------------------------------
+// Fail loudly if a year block no longer reconciles with its total column.
+// A few rows legitimately disagree in Berkeley's own data, so allow 1%.
+// ---------------------------------------------------------------------------
+const TOLERANCE = 0.01;
+for (const [name, count] of Object.entries(blockMismatch)) {
+  const rate = count / reconciled;
+  if (rate > TOLERANCE) {
+    throw new Error(
+      `Year block "${name}" failed to reconcile for ${count}/${reconciled} rows ` +
+      `(${(rate * 100).toFixed(1)}%). The four year blocks may have been reordered ` +
+      `in this release — verify before publishing charts built on them.`
+    );
+  }
+  if (count > 0) console.log(`  note: "${name}" block differs from its total on ${count} row(s)`);
 }
 
 const compactProjects = projects.map(p => {

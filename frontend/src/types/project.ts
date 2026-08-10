@@ -33,6 +33,11 @@ export interface VCMProjectDetail {
   description: string;
   registryNotes: string;
   berkeleyNotes: string;
+  /**
+   * Credits issued per calendar year of issuance, sparse (zero years omitted).
+   * Absent for the ~48% of projects that have never issued a credit.
+   */
+  issuedByYear?: Record<string, number>;
 }
 
 export interface VCMProject {
@@ -50,6 +55,16 @@ export interface VCMProject {
   creditsRemaining: number;
   /** Promoted from _detail for search without loading detail file */
   developer?: string;
+  /** Primary certification category, promoted from _detail for filtering. */
+  certification?: string;
+  /**
+   * Most recent calendar year in which the project issued credits.
+   * Absent when the project has never issued. Stored as a year rather than a
+   * precomputed "stalled" flag, which would rot as the release ages.
+   */
+  lastIssuanceYear?: number;
+  /** True when the project skipped one or more years between issuances. */
+  hasIssuanceGap?: true;
   /** Only present when detail data has been loaded */
   _detail?: VCMProjectDetail;
 }
@@ -69,7 +84,8 @@ export type ProjectFilterKey =
   | 'country'
   | 'registry'
   | 'status'
-  | 'reductionRemoval';
+  | 'reductionRemoval'
+  | 'certification';
 
 /** Shape of active filters — key absent (undefined) means "all"; present string is the selected value */
 export type ProjectFilters = Partial<Record<ProjectFilterKey, string>>;
