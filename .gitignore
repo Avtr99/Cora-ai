@@ -35,6 +35,10 @@ wheels/
 sdist/
 .Python
 
+# Crash / debug artifacts
+*.stackdump
+nul
+
 # Virtual environments
 .venv/
 venv/
@@ -167,3 +171,11 @@ docs/OPEN_SOURCE_PLAN.md
 docs/ROADMAP_RELIABILITY_HARDENING.md
 docs/TICKETS.md
 docs/ROADMAP_FRAGILITY_AUDIT.md
+
+# ------------------------------------------------------------------------------
+# Previous-iteration screenshots / temp artifacts (kept locally for reference)
+# ------------------------------------------------------------------------------
+frontend/screenshots/
+frontend/.screenshots/
+
+docs/SCALING_INGESTION.md

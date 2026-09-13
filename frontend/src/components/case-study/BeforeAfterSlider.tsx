@@ -80,15 +80,15 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
           keyboardIncrement="5%"
           className="absolute inset-0 [&_[data-rcs='handle-root']]:focus-visible:ring-2 [&_[data-rcs='handle-root']]:focus-visible:ring-inset [&_[data-rcs='handle-root']]:focus-visible:ring-white"
         />
-        <span className="absolute top-2 left-2 z-10 px-2 py-1 rounded-md text-xs font-semibold font-inter bg-black/60 text-white backdrop-blur-sm pointer-events-none">
+        <span className="absolute top-2 3xl:top-3 left-2 3xl:left-3 z-10 px-2 3xl:px-3 py-1 3xl:py-1.5 rounded-md text-xs 3xl:text-sm 4xl:text-base font-semibold font-inter bg-surface-overlay/60 text-white backdrop-blur-sm pointer-events-none">
           {beforeLabel}
         </span>
-        <span className="absolute top-2 right-2 z-10 px-2 py-1 rounded-md text-xs font-semibold font-inter bg-black/60 text-white backdrop-blur-sm pointer-events-none">
+        <span className="absolute top-2 3xl:top-3 right-2 3xl:right-3 z-10 px-2 3xl:px-3 py-1 3xl:py-1.5 rounded-md text-xs 3xl:text-sm 4xl:text-base font-semibold font-inter bg-surface-overlay/60 text-white backdrop-blur-sm pointer-events-none">
           {afterLabel}
         </span>
       </div>
       {(caption || attribution) && (
-        <figcaption className="mt-2 font-inter text-xs text-text-muted leading-normal">
+        <figcaption className="mt-2 3xl:mt-3 font-inter text-xs 3xl:text-sm 4xl:text-base text-text-muted leading-normal">
           {caption}
           {caption && attribution && ' · '}
           {attribution}

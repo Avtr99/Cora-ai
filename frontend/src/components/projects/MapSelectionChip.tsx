@@ -36,10 +36,10 @@ export const MapSelectionChip: React.FC<MapSelectionChipProps> = ({
               className="w-1.5 h-1.5 rounded-full"
               style={{ backgroundColor: SELECTED_FILL }}
             />
-            <span className="font-inter text-[11.5px] text-text-primary font-medium">
+            <span className="font-inter text-[11.5px] 3xl:text-sm 4xl:text-base text-text-primary font-medium">
               {selectedCountry}
             </span>
-            <span className="font-inter text-2xs text-text-muted tabular-nums">
+            <span className="font-inter text-2xs 3xl:text-xs 4xl:text-sm text-text-muted tabular-nums">
               {aggByCountry.get(selectedCountry)?.projectCount ?? 0}
             </span>
             <svg

@@ -33,7 +33,7 @@ export const InlineCitationPill: React.FC<{
     <button
       type="button"
       onClick={handleClick}
-      className="inline-flex items-baseline gap-0.5 ml-0.5 align-super text-[10px] font-medium leading-none text-text-muted hover:text-brand-600 hover:underline focus:outline-none focus:ring-1 focus:ring-brand-500 rounded-sm transition-colors"
+      className="inline-flex items-baseline gap-0.5 ml-0.5 align-super text-micro 3xl:text-xs 4xl:text-sm font-medium leading-none text-text-muted hover:text-brand-500 hover:underline focus:outline-none focus:ring-1 focus:ring-brand-500 rounded-sm transition-colors"
       title={title}
       aria-label={`Citation ${label}`}
     >

@@ -22,11 +22,14 @@
 
 | Token | Hex Value | Usage |
 |-------|-----------|-------|
+| `brand-primary-950` | `#2E1065` | Deepest brand shade |
 | `brand-primary-900` | `#403D85` | Primary buttons, CTAs |
 | `brand-primary-700` | `#4A2AA3` | Scroll-to-top icon, strong accent |
 | `brand-primary-500` | `#6F4ECB` | Hover states, active icons, secondary actions |
+| `brand-primary-300` | `#C4B5FD` | Light brand accents |
 | `brand-primary-200` | `#E9D5FF` | Brand borders, subtle dividers |
 | `brand-primary-100` | `#F3E8FF` | Light brand backgrounds, bot bubbles |
+| `brand-primary-50` | `#FAF5FF` | Faintest brand tint |
 
 
 ### Neutral Scale & Surfaces
@@ -35,11 +38,13 @@
 |-------|-----------|-------|
 | `neutral-0` | `#FFFFFF` | Base background |
 | `neutral-25` | `#FAFAFA` | Cards, secondary surfaces |
+| `neutral-50` | `#F8F9FA` | Table headers, muted panels |
+| `neutral-100` | `#F3F4F6` | Dividers, row alternation |
 | `neutral-150` | `#E5E7EB` | Subtle borders, sidebar dividers |
 | `neutral-200` | `#D6D6D6` | Strong borders, separators |
 | `neutral-300` | `#B8BEC8` | Disabled buttons, inactive send button |
 | `neutral-400` | `#6B7280` | Default icon color, input borders |
-| `neutral-600` | `#6B7280` | Muted text, agent reasoning content |
+| `neutral-600` | `#4B5563` | Muted text, agent reasoning content |
 | `neutral-800` | `#525252` | Secondary body text |
 | `neutral-900` | `#171717` | Headings, high emphasis text |
 
@@ -51,6 +56,7 @@
 | `text-body` | `#525252` | Card and paragraph content |
 | `text-muted` | `#6B7280` | Secondary labels, metadata |
 | `text-disabled` | `#B8BEC8` | Disabled controls |
+| `text-inverse` | `#FFFFFF` | Text on dark/brand/colored backgrounds |
 
 ### Interactive States
 
@@ -79,78 +85,27 @@
 | Warning | `accent-warning-100` | `#FFF9E6` | Warning/alert cards |
 | Warning | `accent-warning-200` | `#FFE7A3` | Warning card borders |
 | Warning | `accent-warning-700` | `#F59E0B` | Alert icons |
-| Trend Rising | `accent-trend-rising-100` | `#E3F6D6` | Rising badge background in `SBTImpact.tsx` |
-| Trend Rising | `accent-trend-rising-500` | `#2F4F2F` | Rising badge text in `SBTImpact.tsx` |
-| Trend Rising | `accent-trend-rising-icon` | `#E8F5E0` | Rising icon container in `SBTImpact.tsx` |
-| Trend Declining | `accent-trend-declining-100` | `#FDE6C9` | Declining badge background in `SBTImpact.tsx` |
-| Trend Declining | `accent-trend-declining-500` | `#7C2D00` | Declining badge text in `SBTImpact.tsx` |
-| Trend Declining | `accent-trend-declining-icon` | `#FFE8CC` | Declining icon container in `SBTImpact.tsx` |
-| Note | `accent-note-100` | `#FFFBF0` | Note background in `SBTImpact.tsx` |
-| Note | `accent-note-200` | `#F5E6C3` | Note border in `SBTImpact.tsx` |
-| Note | `accent-note-700` | `#92400E` | Note text in `SBTImpact.tsx` |
+
+
 | Info | `accent-info-200` | `#B4DBFF` | Methodology tag backgrounds |
 | Info | `accent-info-600` | `#00689D` | SDG 14 indicator |
 | Info | `accent-info-700` | `#0A558C` | Methodology tag text |
-| Info | `accent-info-icon` | `#D97706` | Info icon in `SBTImpact.tsx` note |
-| Trend Icon | `accent-trend-icon` | `#A65B00` | Trending-down icon in `SBTImpact.tsx` |
+
 | Purple | `accent-purple-100` | `#DBD9FF` | Purple pill backgrounds |
 
-### Pricing Data Series Colors
+> **Naming note**: `accent-*` names in the table above are Figma-side token names, not Tailwind classes. In code, use `src/lib/colors.ts` (`SEMANTIC`, `CHIP`, `CASE_STUDY`, `SDG_COLORS`) or the `semantic-*` / `brand-*` / `text-*` / `surface-*` / `border-*` Tailwind utilities from `tailwind.config.ts`.
 
-| Token | Hex Value | Usage |
-|-------|-----------|-------|
-| `pricing-household-stroke` | `#4F46E5` | Household Devices line in `PricingChart.tsx` |
-| `pricing-agriculture-stroke` | `#2098D8` | Agriculture line in `PricingChart.tsx` |
-| `pricing-renewable-stroke` | `#F59E0B` | Renewable Energy line in `PricingChart.tsx` |
-| `pricing-redd-stroke` | `#EF4444` | REDD+ line in `PricingChart.tsx` |
-
-### Pricing Category Surfaces
-
-| Category | Token | Hex Value | Usage |
-|----------|-------|-----------|-------|
-| Household Devices | `pricing-household-surface` | `#F3E8FF` | Card/icon background in `PricingDrivers.tsx` |
-| Household Devices | `pricing-household-accent` | `#6F4ECB` | Icon color in `PricingDrivers.tsx` |
-| Household Devices | `pricing-household-text` | `#403D85` | Heading text in `PricingDrivers.tsx` |
-| Renewable Energy | `pricing-renewable-surface` | `#F9DBB6` | Card/icon background in `PricingDrivers.tsx` |
-| Renewable Energy | `pricing-renewable-accent` | `#BF7E2B` | Icon color in `PricingDrivers.tsx` |
-| Renewable Energy | `pricing-renewable-text` | `#A65B00` | Heading text in `PricingDrivers.tsx` |
-| REDD+ | `pricing-redd-surface` | `#FAD1C1` | Card/icon background in `PricingDrivers.tsx` |
-| REDD+ | `pricing-redd-accent` | `#A13D15` | Icon/text color in `PricingDrivers.tsx` |
-| Agriculture | `pricing-agriculture-surface` | `#DBEAFE` | Card/icon background in `PricingDrivers.tsx` |
-| Agriculture | `pricing-agriculture-accent` | `#294C7B` | Icon/text color in `PricingDrivers.tsx` |
 
 > **Note**: When a component needs both semantic and base tokens, reference the semantic alias first (e.g., `text-muted` → `neutral-600`).
-
-### Document Type Colors (Knowledge Base)
-
-| Type | Background | Text | Usage |
-|------|------------|------|-------|
-| Methodologies | `#E8F4FD` | `#1E6BB8` | Methodology badges in `TypeBadge.tsx` |
-| Policy | `#E8F5E9` | `#2E7D32` | Policy document badges |
-| Research | `#F3E8FD` | `#6F4ECB` | Research document badges |
-| Projects | `#FFF3E0` | `#E65100` | Project document badges |
-| Co-benefits | `#FFF8E1` | `#B45309` | Co-benefits badges |
-| PDD | `#E0F2F1` | `#00695C` | Project Developer Documentation badges |
-
-### Notice/Alert Card Colors
-
-| Context | Background | Border | Text | Usage |
-|---------|------------|--------|------|-------|
-| Research Preview | `#FFFBEB` | `#FEF3C7` | `#92400E` | TermsOfServicePopup research notice |
-| Research Preview (hover) | - | `#FDE68A` | - | Hover state |
-| Research Icon Container | `#FEF3C7` | `#FDE68A` | - | Alert icon background |
-| Data Privacy | `#F5F3FF` | `#EDE9FE` | `#5B21B6` | TermsOfServicePopup privacy notice |
-| Data Privacy (hover) | - | `#DDD6FE` | - | Hover state |
-| Privacy Icon Container | `#EDE9FE` | `#DDD6FE` | - | Shield icon background |
-| Cancelled Message | `#F3F0FF` | `#DAD6FF` | `#2F2A72` | ChatMessage cancelled state |
 
 ### Border Tokens
 
 | Token | References | Usage |
 |-------|------------|-------|
-| `border-default` | `neutral-150` | Subtle borders, agent reasoning cards |
-| `border-muted` | `neutral-400` | Input focus rings, SearchBar border |
-| `border-brand` | `brand-primary-200` | Brand-specific dividers |
+| `border-ui` | `neutral-150` (`#E5E7EB`) | Standard borders, agent reasoning cards (Tailwind: `border-border-ui`) |
+| `border-strong` | `#D1D5DB` | Stronger borders for tables and hover states (Tailwind: `border-border-strong`) |
+| `border-muted` | `neutral-400` (`#6B7280`) | Muted/secondary borders, input focus rings (Tailwind: `border-border-muted`) |
+| `border-brand` | `brand-200` (`#E9D5FF`) | Brand-specific dividers (Tailwind: `border-brand-200`) |
 
 ### Sidebar Colors
 
@@ -176,11 +131,11 @@
 | Family | Weights Available | Usage |
 |--------|-------------------|-------|
 | **Poppins** | 300, 400, 500, 600, 700 | Headings, buttons, labels, navigation |
-| **Inter** | 300, 400, 500, 600 | Body text, descriptions, form fields |
+| **Inter** | 300, 400, 500, 600, 700 | Body text, descriptions, form fields |
 
 **Import:**
 ```html
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 ```
 
 ### Heading Hierarchy (Poppins)
@@ -210,6 +165,23 @@
 |-------|------|------|-------------|----------------|--------|-----------|----------------|
 | **Button Text** | Inter | 10px | 9px | 0.1px | SemiBold (600) | - | `font-inter font-semibold text-[10px] leading-[9px] tracking-[0.1px]` |
 | **Subtitle/Label** | Poppins | 10px | normal | 0 | SemiBold (600) | UPPERCASE | `font-poppins font-semibold text-[10px] leading-normal uppercase` |
+
+### App Type Scale (`tailwind.config.ts` `fontSize`)
+
+Marketing H1–H6 above are for hero/page titles. In-app UI uses these utilities instead:
+
+| Token | Size / Line-height | Usage |
+|-------|--------------------|-------|
+| `text-display` | 28px / 1.10, -0.02em | Large in-app headings |
+| `text-heading-1` | 22px / 1.20 | Panel / page headings |
+| `text-heading-2` | 18px / 1.25 | Section headings |
+| `text-heading-3` | 16px / 1.30 | Sub-section headings |
+| `text-body` | 16px / 1.60 | Default body |
+| `text-body-sm` | 14px / 1.50 | Compact body |
+| `text-ui` | 13px / 1.35 | UI labels, table cells |
+| `text-caption` | 12px / 1.40 | Captions, metadata |
+| `text-overline` | 11px / 1.30 | Uppercase micro labels |
+| `text-micro` / `text-2xs` | 10px / 1.25 | Superscripts, footnotes (`micro` adds 0.05em tracking; `2xs` is the legacy alias) |
 
 ### Chat Interface Typography
 
@@ -253,6 +225,8 @@
 | **SearchBar (Homepage)** | 708px | Large homepage variant |
 | **Modal** | 512px (max-w-lg) | Welcome popup, dialogs |
 | **Container 2xl** | 1400px | Main content container |
+| **Breakpoint 3xl** | 1920px | Ultra-wide screens (`tailwind.config.ts` `screens`) |
+| **Breakpoint 4xl** | 2400px | Ultra-wide screens (`tailwind.config.ts` `screens`) |
 
 ### Component Dimensions
 
@@ -293,7 +267,7 @@ All shadows are defined as CSS custom properties in `src/index.css` and exposed 
 
 | Usage | Value |
 |-------|-------|
-| Card hover lift | `0 6px 18px rgba(17,17,26,0.08)` via `shadow-sm-hover` custom class |
+| Card hover lift | `hover:shadow-sm` (Tailwind default shadow) |
 | Send button glow (large) | `0 0 20px rgba(111,78,203,0.25)` |
 | Send button glow (composer) | `0 0 12px rgba(111,78,203,0.2)` |
 | Prompt card hover | `0 8px 16px rgba(111,78,203,0.12)` |
@@ -302,8 +276,8 @@ All shadows are defined as CSS custom properties in `src/index.css` and exposed 
 
 | Component | Default | Hover | Active |
 |-----------|---------|-------|--------|
-| **Category / Project Card** | `shadow-xs` | `shadow-sm-hover + -translate-y-0.5` | - |
-| **Pills** | `shadow-xs` | `shadow-sm-hover + scale-1.03` | - |
+| **Category / Project Card** | `shadow-xs` | `hover:shadow-sm + -translate-y-0.5` | - |
+| **Pills** | `shadow-xs` | `hover:shadow-sm + scale-1.03` | - |
 | **SearchBar (large)** | `shadow-card-md` | - | - |
 | **SearchBar (composer)** | `shadow-card-sm` | - | - |
 | **Prompt Cards** | `shadow-card` | glow variant | - |
@@ -323,6 +297,7 @@ All shadows are defined as CSS custom properties in `src/index.css` and exposed 
 | **lg** | 8px | `var(--radius)` | Large elements |
 | **md** | 6px | `calc(var(--radius) - 2px)` | Medium elements |
 | **sm** | 4px | `calc(var(--radius) - 4px)` | Small elements |
+| **xs** | 2px | — (`tailwind.config.ts` `borderRadius.xs`) | Tiny elements, focus rings |
 
 ### Component-Specific Radius
 
@@ -392,40 +367,26 @@ import ChatIcon from '@/assets/icons/chat.svg?react';
 
 | Icon Name | File | Default Size | Usage |
 |-----------|------|--------------|-------|
-| **alert** | alert.svg | 24px | Warning indicators |
 | **arrow-up** | arrow-up.svg | 20px | Send button |
-| **back** | back.svg | 24px | Navigation back button |
 | **book** | book.svg | 24px | Knowledge Base navigation |
-| **calendar** | calender.svg | 24px | Date/time indicators, PricingDrivers |
+| **calender** | calender.svg | 24px | Date/time indicators |
 | **chat** | chat.svg | 24px | Chat navigation |
-| **check-circle** | check-circle.svg | 24px | Success indicators |
-| **chevron-down** | chevron-down.svg | 16px | Dropdowns, accordions |
-| **chevron-first** | chevron-first.svg | 24px | Collapsible sidebar toggle |
 | **chevron-left** | chevron-left.svg | 16px | Back navigation |
-| **chevron-up** | chevron-up.svg | 16px | Scroll up, collapse |
-| **complex** | complex.svg | 24px | Complex topics |
-| **cookie** | cookie.svg | 24px | Cookie consent |
 | **cora** | cora.svg | 40px/42px | Logo, branding (fill-based) |
-| **database** | database.svg | 24px | Data-related features |
-| **date** | date.svg | 24px | Date indicators |
 | **explore** | explore.svg | 24px | Explore Projects navigation |
-| **external-link** | external-link.svg | 24px | External links |
+| **file** | file.svg | 24px | Document/file references |
 | **globe** | globe.svg | 24px | Global/world references |
-| **info** | info.svg | 16px | Information/help, SBTImpact note |
+| **info** | info.svg | 16px | Information/help |
 | **lightbulb** | lightbulb.svg | 24px | Tips and insights |
-| **location** | location.svg | 24px | Geographic indicators, PricingDrivers |
-| **mail** | mail.svg | 24px | Email/contact |
+| **location** | location.svg | 24px | Geographic indicators |
+| **map** | map.svg | 24px | Map/geography views |
 | **plus-circle** | plus-circle.svg | 24px | New chat button |
-| **pricing** | pricing.svg | 29px | Pricing navigation, SBTImpact |
-| **refresh** | refresh.svg | 24px | Refresh/retry actions |
-| **scale** | scale.svg | 24px | Legal/compliance |
-| **search** | search.svg | 20px | Search functionality |
-| **shield** | shield.svg | 24px | Privacy/security |
-| **tag** | tag.svg | 24px | Tags, categories |
+| **pricing** | pricing.svg | 29px | Pricing navigation |
+| **sidebar-close** | sidebar-close.svg | 24px | Collapse sidebar toggle |
 | **target** | target.svg | 24px | Goals/targets |
 | **trash** | trash.svg | 24px | Delete actions |
-| **tree** | tree.svg | 24px | Nature, environmental, PricingDrivers |
-| **trending-down** | trending-down.svg | 24px | Decreasing trends, SBTImpact |
+| **tree** | tree.svg | 24px | Nature, environmental |
+| **trending-down** | trending-down.svg | 24px | Decreasing trends |
 | **users** | users.svg | 24px | User-related features |
 | **x** | x.svg | 24px | Close/dismiss |
 
@@ -462,7 +423,7 @@ import ChatIcon from '@/assets/icons/chat.svg?react';
    - Background: white
    - Border: rgba(224,224,224,1)
    - Shadow: shadow-xs
-   - Hover: shadow-sm-hover, -translate-y-0.5
+   - Hover: shadow-sm, -translate-y-0.5
    
 2. **Recommendation Card** (Homepage)
    - Two-column grid (desktop), stacked (mobile)
@@ -482,7 +443,7 @@ import ChatIcon from '@/assets/icons/chat.svg?react';
    - Text: white
    - Font: Poppins
    - Radius: full
-   - Hover: shadow-sm-hover, scale-1.03
+   - Hover: shadow-sm, scale-1.03
 
 2. **Tag Badges** (Cards)
    - **Project**: #C8E6A5 bg, #496731 text
@@ -506,20 +467,11 @@ import ChatIcon from '@/assets/icons/chat.svg?react';
    - Send button glow: shadow-[0_0_12px_rgba(111,78,203,0.2)]
    - Typography: Inter 12px
 
-#### Modals
-1. **Research Preview Popup**
-   - Container: max-w-lg (512px), rounded-2xl, shadow-2xl
-   - Backdrop: black/60 with blur
-   - Content cards with colored backgrounds:
-     - Research: #FFF9E6 bg, #FFE7A3 border
-     - Privacy: #F3E8FF bg, #E9D5FF border
-     - Terms: #FBFBFB bg, #E5E5E5 border
-
 ### Layout Components
 
 #### Sidebar
 - Width: 250px (expanded), 60px (collapsed)
-- Background: gradient from-gray-50 to-white
+- Background: `bg-surface-base` (#FAFAFA)
 - Animation: 200ms easeOut
 - Search input with filter functionality
 - Pinned/Recent sections
@@ -541,16 +493,13 @@ import ChatIcon from '@/assets/icons/chat.svg?react';
 5. **BenefitCard**: Project benefits display
 
 #### Pricing Components
-1. **PricingChart**: Interactive line chart, Recharts
-2. **PricingDrivers**: 4-card grid layout
-3. **MethodologyExplanation**: Sticky sidebar info
-4. **SBTImpact**: Trend comparison cards
+1. **PricingPage**: Pricing education page shell
+2. **PricingFactorTabs**: Accessible factor pill tabs
+3. **PricingExplorer**: Shared factor panel with transitions
+4. **FactorComparison**: Force-specific comparison cards
 
 #### Utility Components
 - **ScrollToTop**: Fixed bottom-right, circular button
-- **RateLimitAlert**: Warning display for query limits
-- **CookieConsent**: GDPR compliance banner
-- **TermsOfServicePopup**: First-time user modal
 
 ---
 

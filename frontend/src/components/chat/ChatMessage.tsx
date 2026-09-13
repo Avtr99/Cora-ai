@@ -154,11 +154,11 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAgentReas
 
   return (
     <div className="flex w-full justify-center">
-      <div className="flex flex-col w-full max-w-2xl">
+      <div className="flex flex-col w-full max-w-2xl 3xl:max-w-3xl 4xl:max-w-4xl">
         {/* User message comes first */}
         {isUser && (
           <div>
-            <p className="font-inter font-semibold text-lg md:text-xl leading-[1.2] md:leading-[30px] text-text-primary mb-0">{message.content}</p>
+            <p className="font-inter font-semibold text-lg md:text-xl 3xl:text-2xl 4xl:text-3xl leading-7 md:leading-8 3xl:leading-9 4xl:leading-10 text-text-primary mb-0">{message.content}</p>
           </div>
         )}
 
@@ -173,22 +173,22 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAgentReas
               className="relative">
 
               {isErrorMessage ? (
-                <div className="flex flex-col items-start gap-2 bg-semantic-error-bg border border-semantic-error-border rounded-md p-3 text-semantic-error-text">
-                  <p className="font-inter text-sm leading-relaxed">{message.content}</p>
+                <div className="flex flex-col items-start gap-2 3xl:gap-3 4xl:gap-4 bg-semantic-error-bg border border-semantic-error-border rounded-md p-3 3xl:p-4 4xl:p-5 text-semantic-error-text">
+                  <p className="font-inter text-sm 3xl:text-base 4xl:text-lg leading-relaxed">{message.content}</p>
                   <RetryButton onClick={handleRetry} disabled={isRetrying} />
                 </div>
               ) : isCancelledMessage ? (
-                <div className="flex flex-col items-start gap-2 bg-brand-50 border border-brand-200 rounded-md p-3 text-brand-900">
-                  <p className="font-inter text-sm leading-relaxed">{message.content}</p>
+                <div className="flex flex-col items-start gap-2 3xl:gap-3 4xl:gap-4 bg-brand-50 border border-brand-200 rounded-md p-3 3xl:p-4 4xl:p-5 text-brand-900">
+                  <p className="font-inter text-sm 3xl:text-base 4xl:text-lg leading-relaxed">{message.content}</p>
                   <RetryButton onClick={handleRetry} disabled={isRetrying} />
                 </div>
               ) : isPending ? (
-                <div className="flex items-center gap-2 py-2 mt-1">
-                  <span className="relative flex h-4 w-4 items-center justify-center">
-                    <span className="animate-pulse-dot absolute inline-flex h-2 w-2 rounded-full bg-text-muted opacity-50"></span>
-                    <span className="relative inline-flex h-2 w-2 rounded-full bg-text-muted"></span>
+                <div className="flex items-center gap-2 3xl:gap-3 py-2 3xl:py-3 mt-1 3xl:mt-2">
+                  <span className="relative flex h-4 w-4 3xl:h-5 3xl:w-5 4xl:h-6 4xl:w-6 items-center justify-center">
+                    <span className="animate-pulse-dot absolute inline-flex h-2 w-2 3xl:h-2.5 3xl:w-2.5 4xl:h-3 4xl:w-3 rounded-full bg-text-muted opacity-50"></span>
+                    <span className="relative inline-flex h-2 w-2 3xl:h-2.5 3xl:w-2.5 4xl:h-3 4xl:w-3 rounded-full bg-text-muted"></span>
                   </span>
-                  <span className="font-inter font-normal text-sm text-text-muted">
+                  <span className="font-inter font-normal text-sm 3xl:text-base 4xl:text-lg text-text-muted">
                     {message.content || 'Analyzing request...'}
                   </span>
                 </div>
@@ -205,7 +205,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAgentReas
 
             {/* Action bar: feedback (left) + copy (right) */}
             {!isErrorMessage && !isCancelledMessage && !isPending && (
-              <div className="flex items-start justify-between mt-1">
+              <div className="flex items-start justify-between mt-1 3xl:mt-2 gap-2 3xl:gap-3">
                 <MessageFeedback
                   messageId={message.id}
                   chatId={activeChat?.id}
@@ -220,7 +220,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAgentReas
                     setCopied(true);
                     setTimeout(() => setCopied(false), 2000);
                   }}
-                  className={`flex items-center text-xs font-medium flex-shrink-0 px-2.5 py-1 rounded-md border transition-all duration-150 active:scale-[0.97] min-w-[72px] justify-center ${
+                  className={`flex items-center text-xs 3xl:text-sm 4xl:text-base font-medium flex-shrink-0 px-2.5 3xl:px-3.5 4xl:px-4 py-1 3xl:py-1.5 4xl:py-2 rounded-md border transition-all duration-150 active:scale-[0.97] min-w-[72px] justify-center ${
                     copied 
                       ? 'text-text-primary bg-surface-subtle border-border-ui' 
                       : 'text-text-muted bg-transparent border-transparent hover:text-text-secondary hover:bg-surface-subtle hover:border-border-ui/50'
@@ -238,7 +238,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAgentReas
                         exit={{ opacity: 0, scale: 0.95 }}
                         transition={{ duration: 0.1 }}
                       >
-                        <Check className="h-3 w-3 stroke-[2.5] text-semantic-success-icon" />
+                        <Check className="h-3 w-3 3xl:h-4 3xl:w-4 4xl:h-5 4xl:w-5 stroke-[2.5] text-semantic-success-icon" />
                         <span>Copied</span>
                       </motion.span>
                     ) : (
@@ -250,7 +250,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAgentReas
                         exit={{ opacity: 0, scale: 0.95 }}
                         transition={{ duration: 0.1 }}
                       >
-                        <Copy className="h-3 w-3 stroke-[2]" />
+                        <Copy className="h-3 w-3 3xl:h-4 3xl:w-4 4xl:h-5 4xl:w-5 stroke-[2]" />
                         <span>Copy</span>
                       </motion.span>
                     )}
@@ -277,7 +277,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAgentReas
         {/* Recommendations based solely on triggeredRecommendations (deduped by ChatContext) */}
         {shouldShowRecommendations && recommendationsToShow.length > 0 && (
           <div className="mt-4 w-full mb-4">
-            <p className="font-inter text-xs font-normal text-text-muted mb-2">You might also be interested in</p>
+            <p className="font-inter text-xs 3xl:text-sm 4xl:text-base font-normal text-text-muted mb-2 3xl:mb-3 4xl:mb-4">You might also be interested in</p>
             <div className="flex flex-col gap-2">
               {recommendationsToShow.map(recommendation => (
                 <div key={recommendation.id}>
@@ -297,13 +297,13 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAgentReas
 export const TypingIndicator: React.FC = () => {
   return (
     <div className="flex w-full justify-center mb-4 mt-4">
-      <div className="flex max-w-2xl w-full">
+      <div className="flex max-w-2xl 3xl:max-w-3xl 4xl:max-w-4xl w-full">
         <div className="pl-2" aria-live="polite" aria-atomic="true">
           <div className="flex items-center">
-            <div className="flex space-x-1">
-              <div className="w-2 h-2 bg-brand-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-              <div className="w-2 h-2 bg-brand-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-              <div className="w-2 h-2 bg-brand-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+            <div className="flex space-x-1 3xl:space-x-1.5 4xl:space-x-2">
+              <div className="w-2 h-2 3xl:w-2.5 3xl:h-2.5 4xl:w-3 4xl:h-3 bg-brand-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+              <div className="w-2 h-2 3xl:w-2.5 3xl:h-2.5 4xl:w-3 4xl:h-3 bg-brand-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+              <div className="w-2 h-2 3xl:w-2.5 3xl:h-2.5 4xl:w-3 4xl:h-3 bg-brand-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
             </div>
           </div>
         </div>

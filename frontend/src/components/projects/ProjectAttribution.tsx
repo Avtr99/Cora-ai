@@ -9,8 +9,8 @@ export const ProjectAttribution: React.FC<ProjectAttributionProps> = ({
   version,
   lastUpdated,
 }) => (
-  <footer className="mt-10 pt-6 border-t border-border-ui">
-    <p className="font-inter text-xs text-text-muted leading-relaxed mb-1.5">
+  <footer className="mt-10 3xl:mt-12 pt-6 3xl:pt-8 border-t border-border-ui">
+    <p className="font-inter text-xs 3xl:text-[13px] 4xl:text-sm text-text-muted leading-relaxed mb-1.5">
       <span className="font-semibold">Data source:</span>{' '}
       Pamela Quartson, Barbara K Haya, Tyler Bernard, Aline Abayo, Xinyun Rong, Ivy S So, Micah Elias. (2026).{' '}
       <em>Voluntary Registry Offsets Database {version}</em>, Berkeley Carbon Trading Project, University of California, Berkeley.
@@ -25,7 +25,7 @@ export const ProjectAttribution: React.FC<ProjectAttributionProps> = ({
         <span className="sr-only"> (opens in new tab)</span>
       </a>
     </p>
-    <p className="font-inter text-xs text-text-muted">
+    <p className="font-inter text-xs 3xl:text-[13px] 4xl:text-sm text-text-muted">
       <span className="font-semibold">Last updated:</span> {lastUpdated} ({version})
     </p>
   </footer>

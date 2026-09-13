@@ -74,7 +74,7 @@ const PrivacyPolicyPage: React.FC = () => {
           type-tagged placeholders (e.g. <code>[NAME]</code>, <code>[EMAIL]</code>).
         </p>
 
-        <p className="text-xs text-text-muted pt-1">
+        <p className="text-xs 3xl:text-sm 4xl:text-base text-text-muted pt-1">
           <strong>Note:</strong> Cora AI does not collect IP addresses, browser fingerprints, or
           location data. No analytics or tracking are included in the default deployment.
         </p>
@@ -102,7 +102,7 @@ const PrivacyPolicyPage: React.FC = () => {
           conversion) to keep all data on-machine. See the <code>.env.example</code> file and
           project documentation for configuration details.
         </p>
-        <p className="text-xs text-text-muted pt-1">
+        <p className="text-xs 3xl:text-sm 4xl:text-base text-text-muted pt-1">
           <strong>Important:</strong> When external API providers are enabled, the operator is
           responsible for reviewing the privacy policy and data handling practices of those
           providers and ensuring compliance with applicable laws.
@@ -142,7 +142,7 @@ const PrivacyPolicyPage: React.FC = () => {
           <li><strong>Input sanitization:</strong> All user inputs are sanitized to prevent
             injection attacks. HTML content in responses is sanitized via nh3.</li>
         </ul>
-        <p className="text-xs text-text-muted pt-1">
+        <p className="text-xs 3xl:text-sm 4xl:text-base text-text-muted pt-1">
           <strong>Note:</strong> Because Cora AI is self-hosted, physical and network security of
           the deployment machine is the operator's responsibility. We recommend running the
           application behind a reverse proxy with TLS encryption if exposed to a network.

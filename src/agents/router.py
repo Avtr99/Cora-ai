@@ -14,7 +14,10 @@ from datetime import datetime
 from typing import Optional, List, Dict
 from enum import Enum
 
-from ..registry_config.registry_patterns import REGISTRY_PATTERNS, RegistryPattern
+from ..registry_config.registry_patterns import (
+    RegistryPattern,
+    get_merged_registry_patterns,
+)
 from ..config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -23,55 +26,6 @@ logger = logging.getLogger(__name__)
 # ------------------------------------------------------------------
 # Registry-pattern helpers
 # ------------------------------------------------------------------
-
-def _load_custom_registry_patterns(path: Optional[str]) -> List[RegistryPattern]:
-    """Load extra registry patterns from a JSON file.
-
-    The JSON file should contain a list of objects with the same fields as
-    RegistryPattern: name, content_markers, id_patterns, version_patterns.
-    """
-    if not path:
-        return []
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        if not isinstance(data, list):
-            logger.warning("CUSTOM_REGISTRY_PATTERNS file must contain a JSON list")
-            return []
-        patterns = []
-        for item in data:
-            if not isinstance(item, dict):
-                continue
-            patterns.append(
-                RegistryPattern(
-                    name=item.get("name", "Custom"),
-                    content_markers=item.get("content_markers", []) or [],
-                    id_patterns=item.get("id_patterns", []) or [],
-                    version_patterns=item.get("version_patterns", []) or [],
-                )
-            )
-        logger.info("Loaded %d custom registry patterns from %s", len(patterns), path)
-        return patterns
-    except FileNotFoundError:
-        logger.warning("CUSTOM_REGISTRY_PATTERNS file not found: %s", path)
-        return []
-    except Exception as e:
-        logger.warning("Failed to load CUSTOM_REGISTRY_PATTERNS: %s", e)
-        return []
-
-
-def _merge_registry_patterns() -> List[RegistryPattern]:
-    """Return built-in VCM patterns merged with optional custom patterns."""
-    merged = list(REGISTRY_PATTERNS)
-    try:
-        custom_path = get_settings().CUSTOM_REGISTRY_PATTERNS
-    except Exception:
-        custom_path = None
-    custom = _load_custom_registry_patterns(custom_path)
-    if custom:
-        merged = merged + custom
-    return merged
-
 
 def _build_kb_keywords(patterns: List[RegistryPattern]) -> set[str]:
     """Build KB keywords from the given registry patterns.
@@ -248,7 +202,7 @@ class RouterAgent:
 
         # Built-in VCM patterns merged with optional custom patterns. Custom
         # patterns are loaded once at router initialization time.
-        self._registry_patterns: List[RegistryPattern] = _merge_registry_patterns()
+        self._registry_patterns: List[RegistryPattern] = get_merged_registry_patterns()
         self.kb_keywords: set[str] = (
             _build_kb_keywords(self._registry_patterns) | _ROUTING_ONLY_KB_KEYWORDS
         )

@@ -118,13 +118,18 @@ class StreamingRAGWrapper:
                 except Exception as cache_exc:
                     logger.debug(f"Failed to invalidate stale query cache entry: {cache_exc}")
 
+            structured_mode = vector_results.get("structured_mode")
+            record_count = self._base._structured_record_count(vector_results)
+
             prompt = build_query_prompt(
                 query,
                 context_text,
                 summaries,
                 include_quiz=False,
                 include_suggested_prompts=False,
+                structured_mode=structured_mode,
                 resolved_query=resolved_query,
+                record_count=record_count,
             )
 
             accumulated_answer = ""
@@ -134,21 +139,29 @@ class StreamingRAGWrapper:
                 chars_out += len(chunk)
                 yield {"type": "token", "chunk": chunk}
 
-            answer_text, was_truncated = postprocess_answer(accumulated_answer)
+            answer_text, was_truncated = postprocess_answer(
+                accumulated_answer, structured_mode=structured_mode
+            )
 
             # Verify and deduplicate citations in the final streamed answer.
             if sources:
                 answer_text, _ = verify_citations(answer_text, sources)
                 answer_text = deduplicate_inline_citations(answer_text)
 
-            result = {
-                "answer": answer_text,
-                "sources": sources if sources else ["knowledge_base"],
-                "coverage_score": self._base._calculate_coverage_score(
+            coverage_score = (
+                1.0
+                if structured_mode and not vector_results.get("structured_partial")
+                else self._base._calculate_coverage_score(
                     context_length=len(context_text),
                     answer_length=len(answer_text),
                     summaries_count=len(summaries),
-                ),
+                )
+            )
+
+            result = {
+                "answer": answer_text,
+                "sources": sources if sources else ["knowledge_base"],
+                "coverage_score": coverage_score,
                 "truncated": was_truncated,
                 "meta": {
                     "model": self._base.model_main,

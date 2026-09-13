@@ -56,7 +56,7 @@ export const MobileSidebarControls: React.FC<MobileSidebarControlsProps> = ({
 
       {isMobile && mobileOpen && (
         <div
-          className="fixed inset-0 bg-black/20 backdrop-blur-[1px] z-40"
+          className="fixed inset-0 bg-surface-overlay/20 backdrop-blur-[1px] z-40"
           aria-hidden="true"
           onClick={() => setMobileOpen(false)}
         />

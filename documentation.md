@@ -49,6 +49,21 @@ answers are passed to the retrieval-aware relevance validator with the retrieved
 source chunks. Web supplementation occurs only for an explicit non-answer or a
 high-confidence irrelevant verdict; relevant KB answers remain KB-only.
 
+### Structured dataset queries
+
+`retrieve_kb_results()` detects complete-list and dataset-count queries before
+vector retrieval. It uses Qdrant payload scrolling when the query matches a
+configured registry pattern.
+
+- Enumeration mode returns every matching record until the scroll or character cap.
+- Aggregate mode computes counts and totals in Python, then shows a small sample.
+- Supplement mode adds dataset facts before normal vector results.
+
+The retriever marks capped counts as lower bounds. It falls back to vector
+retrieval when a structured scroll returns no records or the retriever lacks the
+optional structured interface. Existing documents need re-ingestion to receive
+row metadata and document-type indexes.
+
 ## Frontend
 
 ### `useChatReadiness` hook
@@ -166,6 +181,19 @@ npm run build
 - `frontend/src/components/chat/ChatReadinessBanner.test.tsx`
 
 ## Removal of Hardcoded Starter Prompt Answers
+
+## Carbon Credit Pricing & Valuation Page Redesign (SOVCM 2025 Dataset)
+
+### Overview
+The Pricing page (`frontend/src/pages/PricingPage.tsx`) presents five interactive factor lenses over verified **Ecosystem Marketplace State of the Voluntary Carbon Market 2025 (SOVCM 2025)** figures. The design retains side-by-side comparison on desktop while placing each factor inside one shared learning surface. It deliberately avoids logarithmic price maps and scatter plots.
+
+### Key Components & Upgrades
+- **`PricingFactorTabs.tsx`**: Accessible text tabs with one ink-filled active state, roving keyboard focus, and horizontal scrolling on small screens.
+- **`PricingExplorer.tsx`**: One shared app-style panel with a reduced-motion-aware factor transition.
+- **`FactorComparison.tsx`**: Animated linear price bars for removal type and vintage, a balanced Landfill Gas and methodology comparison for integrity, and a shared three-stop milestone rail plus a two-up lane card for SBTi claim eligibility and CORSIA authorization. The lane card carries only the outer border and the rule between lanes - the detail groups inside each lane are separated by spacing alone. Dark neutral context panels add contrast without expanding the brand-purple footprint.
+- **`pricingFactorContent.ts`**: Primary-source wording, methodology examples, exact report values, and official source links used by the active page.
+- **`public/pricing-visual-atlas.html`**: Standalone Visual Atlas concept used to evaluate a more expressive information hierarchy without changing the production route.
+
 
 The three frontend starter prompts (VM0048, VCM pricing, COP 30) were previously
 short-circuited by the orchestrator to static answers in

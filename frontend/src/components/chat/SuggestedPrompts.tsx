@@ -32,20 +32,20 @@ export const SuggestedPrompts: React.FC<SuggestedPromptsProps> = ({ prompts, mes
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1], delay: 0.1 }}
-      className="mt-6 pt-5 border-t border-surface-subtle w-full"
+      className="mt-6 3xl:mt-8 4xl:mt-10 pt-5 3xl:pt-7 4xl:pt-8 border-t border-surface-subtle w-full"
     >
       {/* Label row */}
-      <div className="flex items-center gap-2 mb-3">
-        <div className="flex items-center justify-center w-5 h-5 rounded-md bg-brand-500/[0.08]">
+      <div className="flex items-center gap-2 3xl:gap-2.5 4xl:gap-3 mb-3 3xl:mb-4 4xl:mb-5">
+        <div className="flex items-center justify-center w-5 h-5 3xl:w-6 3xl:h-6 4xl:w-7 4xl:h-7 rounded-md bg-brand-500/[0.08]">
           <IconWrapper Icon={ChatIcon} size={12} color="currentColor" className="text-brand-700" />
         </div>
-        <span className="font-inter text-xs font-semibold text-brand-700 uppercase tracking-wider">
+        <span className="font-inter text-xs 3xl:text-sm 4xl:text-base font-semibold text-brand-700 uppercase tracking-wider">
           Follow-up questions
         </span>
       </div>
 
       {/* Prompt chips */}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 3xl:gap-2.5 4xl:gap-3">
         {prompts.map((prompt, index) => (
           <motion.button
             key={`${messageId}-prompt-${index}`}
@@ -60,19 +60,19 @@ export const SuggestedPrompts: React.FC<SuggestedPromptsProps> = ({ prompts, mes
             whileTap={isTyping ? {} : { scale: 0.98 }}
             onClick={() => handlePromptClick(prompt)}
             disabled={isTyping}
-            className={`group flex items-center gap-2 px-3.5 py-2 rounded-xl border text-left transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 ${
+            className={`group flex items-center gap-2 3xl:gap-2.5 4xl:gap-3 px-3.5 3xl:px-4 4xl:px-5 py-2 3xl:py-2.5 4xl:py-3 rounded-xl border text-left transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 ${
               isTyping
                 ? 'border-border-ui bg-surface-subtle/50 cursor-not-allowed opacity-50'
                 : 'border-border-ui bg-surface-card hover:bg-surface-subtle hover:shadow-sm hover:border-border-ui'
             }`}
           >
-            <span className={`font-inter text-sm leading-snug ${
+            <span className={`font-inter text-sm 3xl:text-base 4xl:text-lg leading-snug ${
               isTyping ? 'text-text-muted' : 'text-text-secondary'
             }`}>
               {prompt}
             </span>
             <svg
-              className="w-3.5 h-3.5 flex-shrink-0 text-text-muted"
+              className="w-3.5 h-3.5 3xl:w-4 3xl:h-4 4xl:w-5 4xl:h-5 flex-shrink-0 text-text-muted"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"

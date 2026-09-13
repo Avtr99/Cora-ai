@@ -3,7 +3,7 @@ Result post-processing for retrieval.
 
 Handles formatting LangChain Documents into the dict shape expected by
 the orchestrator, Voyage reranking, source diversification, and
-VCM methodology-code boosting.
+registry-specific document-code boosting.
 """
 
 import logging
@@ -11,15 +11,15 @@ import os
 import re
 from typing import Any, Dict, List
 
+from qdrant_client.common.client_exceptions import QdrantException
+from qdrant_client.http.exceptions import ResponseHandlingException, UnexpectedResponse
+
+from ..registry_config.registry_patterns import find_document_codes
+
 logger = logging.getLogger(__name__)
 
-# Separators used to split methodology codes from descriptive filename titles.
+# Separators used to split document codes from descriptive filename titles.
 FILENAME_SEPARATOR_RE = re.compile(r"[-_.\s]+")
-
-METHODOLOGY_CODE_PATTERN = re.compile(
-    r'\b(VM\d{4}|VMD\d{4}|ACM\d{4}|AMS-[IVX]+\.[A-Z]|CDM-[A-Z]+\d*|GS-[A-Z]+\d*|VT\d{4})\b',
-    re.IGNORECASE
-)
 
 
 def format_results(docs_with_scores: List) -> Dict[str, Any]:
@@ -59,6 +59,18 @@ def empty_result() -> Dict[str, Any]:
         "distances": [],
         "scores": [],
     }
+
+
+#: Failures a caller can reasonably retry or degrade around: the vector store
+#: is unreachable, slow, or returned an error response. Anything outside this
+#: tuple is a bug or a misconfiguration and must propagate.
+RETRIEVAL_FALLBACK_EXCEPTIONS = (
+    ConnectionError,
+    TimeoutError,
+    QdrantException,
+    ResponseHandlingException,
+    UnexpectedResponse,
+)
 
 
 def rerank_results(
@@ -121,15 +133,15 @@ def diversify_by_source(
 ) -> Dict[str, Any]:
     """Cap chunks per source to prevent single-source dominance.
 
-    Applied after reranking but before methodology boosting.
-    Methodology-matched chunks bypass the cap so that targeted
-    VCM queries retain all relevant chunks from the correct source.
+    Applied after reranking but before document-code boosting.
+    Document-code-matched chunks bypass the cap so that targeted
+    queries retain all relevant chunks from the correct source.
     """
     documents = results.get("documents", [])
     if not documents:
         return results
 
-    query_codes = set(m.upper() for m in METHODOLOGY_CODE_PATTERN.findall(query))
+    query_codes = set(m.upper() for m in find_document_codes(query))
 
     source_counts: Dict[str, int] = {}
     keep_indices: List[int] = []
@@ -138,12 +150,12 @@ def diversify_by_source(
         meta = results["metadatas"][i] if i < len(results.get("metadatas", [])) else {}
         source = (meta or {}).get("source", "") or (meta or {}).get("file_name", "") or (meta or {}).get("original_filename", "") or "unknown"
 
-        # Methodology-matched chunks bypass the per-source cap
+        # Document-code-matched chunks bypass the per-source cap
         bypassed = False
         if query_codes:
             doc_text = documents[i]
-            doc_codes = set(m.upper() for m in METHODOLOGY_CODE_PATTERN.findall(doc_text))
-            source_codes = set(m.upper() for m in METHODOLOGY_CODE_PATTERN.findall(source))
+            doc_codes = set(m.upper() for m in find_document_codes(doc_text))
+            source_codes = set(m.upper() for m in find_document_codes(source))
             doc_codes.update(source_codes)
             if query_codes & doc_codes:
                 bypassed = True
@@ -168,7 +180,7 @@ def diversify_by_source(
     }
 
 
-def boost_methodology_matches(
+def boost_document_code_matches(
     results: Dict[str, Any],
     query: str,
 ) -> Dict[str, Any]:
@@ -194,7 +206,7 @@ def boost_methodology_matches(
               (legacy +0.3 boost for relevance signalling.)
       tier 0: no code match (untouched score)
     """
-    query_codes = set(match.upper() for match in METHODOLOGY_CODE_PATTERN.findall(query))
+    query_codes = set(match.upper() for match in find_document_codes(query))
 
     if not query_codes or not results.get("documents"):
         return results
@@ -203,8 +215,8 @@ def boost_methodology_matches(
         """True when the basename without extension starts with the code.
 
         File names in the KB are long, hyphenated titles like
-        ``VM0048-Reducing-Emissions-...v1.0.pdf``. The leading methodology
-        code may itself contain hyphens (e.g. ``AMS-III.D`` or ``CDM-AM0010``),
+        ``VM0048-Reducing-Emissions-...v1.0.pdf``. The leading document code
+        may itself contain hyphens (e.g. ``AMS-III.D`` or ``CDM-AM0010``),
         so we compare the leading token sequence against the code instead of
         splitting on the first separator.
         """
@@ -227,8 +239,8 @@ def boost_methodology_matches(
         doc_type = (metadata.get("doc_type") or "").lower()
         document_id = (metadata.get("document_id") or "").upper()
 
-        text_codes = set(m.upper() for m in METHODOLOGY_CODE_PATTERN.findall(doc))
-        source_codes = set(m.upper() for m in METHODOLOGY_CODE_PATTERN.findall(source))
+        text_codes = set(m.upper() for m in find_document_codes(doc))
+        source_codes = set(m.upper() for m in find_document_codes(source))
         doc_codes = text_codes | source_codes
         if document_id:
             doc_codes.add(document_id)
@@ -271,8 +283,8 @@ def apply_post_processing(
     query: str,
     max_per_source: int,
 ) -> Dict[str, Any]:
-    """Apply source diversification and methodology boosting in sequence."""
+    """Apply source diversification and document code boosting in sequence."""
     if max_per_source > 0:
         results = diversify_by_source(results, max_per_source, query)
-    results = boost_methodology_matches(results, query)
+    results = boost_document_code_matches(results, query)
     return results

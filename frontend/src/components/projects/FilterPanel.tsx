@@ -139,8 +139,8 @@ export const FilterPanel: React.FC<FilterPanelProps> = ({
                 aria-selected={isActive}
                 aria-controls={`${idPrefix}-panel-${key}`}
                 tabIndex={isActive ? 0 : -1}
-                className={`px-3 py-2.5 font-inter text-xs font-medium transition-colors relative flex-shrink-0
-                  ${isActive ? 'text-text-primary' : 'text-text-muted hover:text-text-muted'}`}
+                className={`px-3 py-2.5 font-inter text-xs 3xl:text-[13px] 4xl:text-sm font-medium transition-colors relative flex-shrink-0
+                  ${isActive ? 'text-text-primary' : 'text-text-muted hover:text-text-primary'}`}
               >
                 <span className="flex items-center gap-1.5">
                   {label}
@@ -159,7 +159,7 @@ export const FilterPanel: React.FC<FilterPanelProps> = ({
               <button
                 type="button"
                 onClick={onClearAll}
-                className="font-inter text-xs text-destructive hover:text-destructive/80 transition-colors"
+                className="font-inter text-xs 3xl:text-[13px] 4xl:text-sm text-destructive hover:text-destructive/80 transition-colors"
               >
                 {clearLabel}
               </button>

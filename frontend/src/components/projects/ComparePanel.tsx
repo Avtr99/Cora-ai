@@ -56,7 +56,7 @@ export const ComparePanel: React.FC<ComparePanelProps> = ({ projects, onClose })
         <div className="flex items-center justify-center py-12">
           <div className="flex items-center gap-3">
             <div className="w-5 h-5 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
-            <span className="font-inter text-sm text-text-muted">Loading project details...</span>
+            <span className="font-inter text-sm 3xl:text-[15px] 4xl:text-base text-text-muted">Loading project details...</span>
           </div>
         </div>
       </div>
@@ -90,10 +90,10 @@ export const ComparePanel: React.FC<ComparePanelProps> = ({ projects, onClose })
             <ArrowLeftRight className="w-4 h-4 text-text-muted" />
           </div>
           <div>
-            <h2 className="font-poppins font-semibold text-sm text-text-primary">
+            <h2 className="font-poppins font-semibold text-sm 3xl:text-base 4xl:text-lg text-text-primary">
               Comparing projects
             </h2>
-            <span className="font-inter text-xs text-text-muted">
+            <span className="font-inter text-[11px] 3xl:text-[13px] 4xl:text-sm text-text-muted">
               {diffCount} differences found
             </span>
           </div>
@@ -104,7 +104,7 @@ export const ComparePanel: React.FC<ComparePanelProps> = ({ projects, onClose })
             onClick={() => setShowDetails(!showDetails)}
             aria-label="Toggle details"
             aria-expanded={showDetails}
-            className="inline-flex items-center gap-1 font-inter text-xs font-medium px-3 py-1.5 rounded-lg transition-colors border bg-surface-card text-text-secondary border-border-ui hover:bg-surface-base"
+            className="inline-flex items-center gap-1 font-inter text-xs 3xl:text-[13px] 4xl:text-sm font-medium px-3 3xl:px-4 py-1.5 3xl:py-2 rounded-lg transition-colors border bg-surface-card text-text-secondary border-border-ui hover:bg-surface-base"
           >
             {showDetails ? (
               <><ChevronUp className="w-3.5 h-3.5" /> Less details</>
@@ -129,10 +129,10 @@ export const ComparePanel: React.FC<ComparePanelProps> = ({ projects, onClose })
           <div key={project.id} className="bg-surface-card rounded-xl border border-border-ui overflow-hidden">
             {/* Project Header */}
             <div className="px-4 py-3 bg-surface-base border-b border-border-ui">
-              <h3 className="font-poppins font-semibold text-sm text-text-primary leading-tight line-clamp-2">
+              <h3 className="font-poppins font-semibold text-sm 3xl:text-base 4xl:text-lg text-text-primary leading-tight line-clamp-2">
                 {project.name}
               </h3>
-              <span className="font-inter text-xs text-text-muted mt-0.5 block">
+              <span className="font-inter text-[11px] 3xl:text-[13px] 4xl:text-sm text-text-muted mt-0.5 block">
                 {project.id} · {project.registry}
               </span>
             </div>
@@ -145,10 +145,10 @@ export const ComparePanel: React.FC<ComparePanelProps> = ({ projects, onClose })
                     key={row.label}
                     className={`p-2.5 rounded-lg ${isDifferent(row) ? 'bg-surface-base' : 'bg-surface-subtle'}`}
                   >
-                    <span className="font-inter text-2xs text-text-muted block mb-1">
+                    <span className="font-inter text-2xs 3xl:text-xs 4xl:text-[13px] text-text-muted block mb-1">
                       {row.label}
                     </span>
-                    <span className={`font-poppins font-semibold text-sm ${
+                    <span className={`font-poppins font-semibold text-sm 3xl:text-base 4xl:text-lg ${
                       isDifferent(row) ? 'text-brand-900' : 'text-text-primary'
                     }`}>
                       {formatValue(row, row.getValue(project))}
@@ -163,8 +163,8 @@ export const ComparePanel: React.FC<ComparePanelProps> = ({ projects, onClose })
                   const isDiff = isDifferent(row);
                   return (
                     <div key={row.label} className="flex justify-between items-baseline">
-                      <span className="font-inter text-xs text-text-muted">{row.label}</span>
-                      <span className={`font-inter text-xs ${
+                      <span className="font-inter text-[11px] 3xl:text-[13px] 4xl:text-sm text-text-muted">{row.label}</span>
+                      <span className={`font-inter text-xs 3xl:text-[13px] 4xl:text-sm ${
                         isDiff ? 'text-brand-900 font-medium' : 'text-text-muted'
                       }`}>
                         {formatValue(row, row.getValue(project))}
@@ -181,8 +181,8 @@ export const ComparePanel: React.FC<ComparePanelProps> = ({ projects, onClose })
                     const isDiff = isDifferent(row);
                     return (
                       <div key={row.label} className="flex justify-between items-baseline">
-                        <span className="font-inter text-xs text-text-muted">{row.label}</span>
-                        <span className={`font-inter text-xs text-right max-w-[60%] ${
+                        <span className="font-inter text-[11px] 3xl:text-[13px] 4xl:text-sm text-text-muted">{row.label}</span>
+                        <span className={`font-inter text-xs 3xl:text-[13px] 4xl:text-sm text-right max-w-[60%] ${
                           isDiff ? 'text-brand-900 font-medium' : 'text-text-muted'
                         }`}>
                           {formatValue(row, row.getValue(project))}
@@ -200,7 +200,7 @@ export const ComparePanel: React.FC<ComparePanelProps> = ({ projects, onClose })
                     href={project._detail?.registryDocs}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 font-inter text-xs text-brand-500 hover:text-brand-900 transition-colors"
+                    className="inline-flex items-center gap-1 font-inter text-xs 3xl:text-[13px] 4xl:text-sm text-brand-500 hover:text-brand-900 transition-colors"
                   >
                     View on Registry <ExternalLink className="w-3 h-3" />
                   </a>

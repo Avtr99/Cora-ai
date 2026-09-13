@@ -43,7 +43,7 @@ export const ChatMessageItem = React.memo(({
         backfaceVisibility: 'hidden',
         contain: 'layout paint',
       }}
-      className="pb-2"
+      className="pb-6 3xl:pb-8 4xl:pb-10"
     >
       <div className={isHighlighted ? 'pt-4' : ''}>
         <ChatMessage message={message} />

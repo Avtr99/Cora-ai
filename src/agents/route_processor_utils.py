@@ -13,7 +13,7 @@ import logging
 import time
 from typing import Any, AsyncGenerator, Dict, List, Optional, Union
 
-from .protocols import AnswerGeneratorProtocol, RelevanceCheckerProtocol
+from .protocols import AnswerGeneratorProtocol, RelevanceCheckerProtocol, RetrieverProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -155,20 +155,43 @@ def kb_top_relevance(vector_results: Dict[str, Any]) -> float:
     Reranked results are sorted by relevance, but we take ``max`` defensively
     in case ordering changed during post-processing. Falls back to deriving a
     score from ``distances`` (``1 - min_distance``) when ``scores`` are absent.
+    Synthetic facts prepended for supplement-mode structured queries are
+    excluded because they describe the dataset but do not establish relevance
+    to the user's question.
 
     Returns 0.0 when there are no documents or scores cannot be parsed, which
     callers treat as "KB has nothing confidently relevant".
     """
+    metadatas = vector_results.get("metadatas") or []
+    excluded_indices = {
+        index
+        for index, metadata in enumerate(metadatas)
+        if isinstance(metadata, dict) and metadata.get("structured_mode") == "supplement"
+    }
+
     scores = vector_results.get("scores") or []
     if scores:
         try:
-            return float(max(scores))
+            candidates = [
+                float(score)
+                for index, score in enumerate(scores)
+                if index not in excluded_indices
+            ]
+            if candidates:
+                return max(candidates)
         except (TypeError, ValueError):
             return 0.0
+
     distances = vector_results.get("distances") or []
     if distances:
         try:
-            return 1.0 - float(min(distances))
+            candidates = [
+                1.0 - float(distance)
+                for index, distance in enumerate(distances)
+                if index not in excluded_indices
+            ]
+            if candidates:
+                return max(candidates)
         except (TypeError, ValueError):
             return 0.0
     return 0.0
@@ -404,6 +427,100 @@ def extract_source_chunks(
             prefix += f" ({source_name})"
         chunks.append(f"{prefix}:\n{text}")
     return chunks
+
+
+async def retrieve_kb_results(
+    retriever: RetrieverProtocol,
+    query: str,
+    original_query: str,
+    metadata_filters: Optional[Dict[str, Any]] = None,
+    sub_queries: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    """Detect a structured dataset query and retrieve, otherwise use vector/fusion.
+
+    Empty structured scrolls fall through to dense retrieval. Expected Qdrant
+    and transport failures fall through to a single vector retrieve; a second
+    expected failure returns an empty result. Programming and configuration
+    errors propagate to the caller. This is the single implementation shared
+    by the sync and streaming KB route handlers.
+
+    Heavy retrieval imports are deferred to this function so the agents layer
+    does not pay the ``qdrant_client`` import cost on module load.
+    """
+    from ..retrieval.result_processor import RETRIEVAL_FALLBACK_EXCEPTIONS, empty_result
+    from ..retrieval.structured_queries import detect_structured_list_query_any
+
+    structured_spec = detect_structured_list_query_any(original_query, query)
+    structured_retrieve = getattr(retriever, "retrieve_structured", None)
+    fusion_retrieve = getattr(retriever, "retrieve_with_fusion", None)
+    log = logging.getLogger(__name__)
+
+    try:
+        facts_results = None
+        if structured_spec and callable(structured_retrieve):
+            if structured_spec.mode == "supplement":
+                # The question needs the methodology document and possibly the
+                # web; the dataset only grounds a premise. Scroll the facts, then
+                # continue with normal retrieval.
+                facts_results = await structured_retrieve(structured_spec)
+                vector_results = None
+            else:
+                vector_results = await structured_retrieve(structured_spec)
+                if not vector_results.get("documents"):
+                    log.info(
+                        "Structured scroll empty for filter=%s; falling back to vector retrieval",
+                        structured_spec.qdrant_filter,
+                    )
+                    vector_results = None
+        else:
+            vector_results = None
+
+        if vector_results is None:
+            if sub_queries and callable(fusion_retrieve):
+                vector_results = await fusion_retrieve(
+                    query=query,
+                    sub_queries=sub_queries,
+                    where=metadata_filters,
+                    allow_unfiltered_fallback=True,
+                    original_query=original_query,
+                )
+            else:
+                vector_results = await retriever.retrieve(
+                    query=query,
+                    where=metadata_filters,
+                    allow_unfiltered_fallback=True,
+                    original_query=original_query,
+                )
+
+        if facts_results and facts_results.get("documents"):
+            # Prepend, never append. Context preparation stops at
+            # MAX_DOCUMENTS_FOR_ANSWER and MAX_CONTEXT_CHARS, so a facts block
+            # placed after a full page of reranked chunks is silently dropped
+            # before it ever reaches the prompt.
+            for key in ("ids", "documents", "metadatas", "distances", "scores"):
+                vector_results[key] = facts_results.get(key, []) + vector_results.get(key, [])
+    except RETRIEVAL_FALLBACK_EXCEPTIONS as retrieval_error:
+        log.warning(
+            "Structured or vector retrieval failed with %s; retrying plain vector retrieval",
+            type(retrieval_error).__name__,
+            exc_info=True,
+        )
+        try:
+            vector_results = await retriever.retrieve(
+                query=query,
+                where=metadata_filters,
+                allow_unfiltered_fallback=True,
+                original_query=original_query,
+            )
+        except RETRIEVAL_FALLBACK_EXCEPTIONS as fallback_error:
+            log.error(
+                "Plain vector retrieval failed with %s after fallback",
+                type(fallback_error).__name__,
+                exc_info=True,
+            )
+            vector_results = empty_result()
+
+    return vector_results
 
 
 async def check_answer_relevance(

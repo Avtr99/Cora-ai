@@ -11,6 +11,7 @@ import json
 import os
 import tempfile
 from pathlib import Path
+from typing import Any
 
 from .models import DocumentRecord
 from .schema import document_root
@@ -45,6 +46,41 @@ def _atomic_write_text(path: Path, content: str) -> None:
         raise
 
 
+def row_data_path(record: DocumentRecord) -> Path:
+    return document_root() / "rows" / f"{record.id}.json"
+
+
+def write_row_data_file(
+    record: DocumentRecord,
+    row_records: list[dict[str, Any]],
+    *,
+    truncated: bool = False,
+) -> Path:
+    path = row_data_path(record)
+    _atomic_write_text(
+        path,
+        json.dumps({"rows": row_records, "truncated": truncated}, ensure_ascii=False),
+    )
+    return path
+
+
+def read_row_data_file(record: DocumentRecord) -> tuple[list[dict[str, Any]], bool]:
+    """Return ``(row_records, truncated)`` from the row sidecar.
+
+    ``truncated`` is True when the source file exceeded the ingestion row
+    limit, so the rows are a prefix of the dataset rather than the whole
+    thing. Sidecars written before the flag existed are plain JSON lists;
+    they predate truncation tracking and read as ``(rows, False)``.
+    """
+    path = row_data_path(record)
+    if not path.exists():
+        return [], False
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if isinstance(data, list):
+        return data, False
+    return data.get("rows", []), bool(data.get("truncated"))
+
+
 def write_metadata_file(record: DocumentRecord) -> None:
     root = document_root()
     metadata_path = root / "metadata" / f"{record.id}.json"
@@ -57,3 +93,4 @@ def remove_document_files(record: DocumentRecord) -> None:
             Path(value).unlink(missing_ok=True)
     root = document_root()
     (root / "metadata" / f"{record.id}.json").unlink(missing_ok=True)
+    row_data_path(record).unlink(missing_ok=True)

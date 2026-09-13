@@ -178,8 +178,8 @@ export default defineConfig(({ mode }) => {
         output: {
           // Minimal manual chunks: only pin the small, shared utilities that
           // Rollup's auto-chunker otherwise absorbs into heavy library chunks
-          // (e.g. clsx being dragged into the recharts chunk, which would then
-          // force recharts to be <link rel="modulepreload">-loaded on every
+          // (e.g. clsx being dragged into a heavy lazy chunk, which would then
+          // force that chunk to be <link rel="modulepreload">-loaded on every
           // page). Everything else auto-splits based on the dynamic-import
           // graph, which is what Vite is good at.
           manualChunks(id) {
@@ -203,10 +203,10 @@ export default defineConfig(({ mode }) => {
             if (/[\\/]node_modules[\\/]lucide-react[\\/]/.test(id)) {
               return 'lucide';
             }
-            // recharts + d3 deps are huge and only used on the pricing page.
-            // Pin them so they don't bloat whichever page chunk imports PricingChart.
-            if (/[\\/]node_modules[\\/](recharts|d3-(?:array|color|format|interpolate|path|scale|shape|time|time-format|voronoi)|internmap|decimal\.js-light)[\\/]/.test(id)) {
-              return 'recharts-vendor';
+            // react-simple-maps + d3 deps are only used by the projects map
+            // (lazy route). Pin them so they stay out of eager page chunks.
+            if (/[\\/]node_modules[\\/](react-simple-maps|topojson-client|d3-(?:array|color|dispatch|drag|ease|geo|interpolate|selection|timer|transition|zoom)|internmap)[\\/]/.test(id)) {
+              return 'map-vendor';
             }
             return undefined;
           },

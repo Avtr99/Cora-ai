@@ -3,15 +3,11 @@ import { X, SlidersHorizontal, Search } from 'lucide-react';
 import { FilterDropdown } from '@/components/ui/FilterDropdown';
 import { FilterPanel } from '@/components/projects/FilterPanel';
 import { FilterDrawer } from '@/components/projects/FilterDrawer';
+import type { FilterOption } from '@/components/projects/filterTypes';
 import { useDebounce } from '@/hooks/useDebounce';
 import type { ProjectFilterKey } from '@/types/project';
 import type { ProjectActivity } from '@/lib/projectActivity';
 import { ACTIVITY_LABELS } from '@/lib/projectActivity';
-
-interface FilterOption {
-  value: string;
-  count: number;
-}
 
 interface ProjectFiltersV2Props {
   filters: Partial<Record<ProjectFilterKey, string>>;
@@ -96,11 +92,11 @@ export const ProjectFiltersV2: React.FC<ProjectFiltersV2Props> = ({
   }));
 
   return (
-    <div className="mb-3">
+    <div className="mb-3 3xl:mb-5 4xl:mb-6">
       {/* Unified toolbar: search + filters + count */}
-      <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex items-center gap-2 3xl:gap-3 flex-wrap">
         {/* Inline search */}
-        <div className="relative flex-shrink-0 w-full sm:w-[280px] md:w-[260px] lg:w-[320px]">
+        <div className="relative flex-shrink-0 w-full sm:w-[280px] md:w-[260px] lg:w-[320px] 3xl:w-[380px] 4xl:w-[420px]">
           <Search
             className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-muted pointer-events-none"
             aria-hidden="true"
@@ -110,8 +106,8 @@ export const ProjectFiltersV2: React.FC<ProjectFiltersV2Props> = ({
             value={localSearch}
             onChange={handleSearchInput}
             placeholder="Search projects..."
-            className="w-full h-8 pl-8 pr-8 font-inter text-xs text-text-primary placeholder:text-text-muted
-              bg-surface-card border border-border-ui rounded-lg
+            className="w-full h-8 3xl:h-10 4xl:h-11 pl-8 3xl:pl-10 pr-8 font-inter text-xs 3xl:text-sm 4xl:text-[15px] text-text-primary placeholder:text-text-muted
+              bg-surface-card border border-border-ui rounded-lg 3xl:rounded-xl
               focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2
               transition-shadow"
             aria-label="Search projects"
@@ -168,17 +164,17 @@ export const ProjectFiltersV2: React.FC<ProjectFiltersV2Props> = ({
               <button
                 type="button"
                 onClick={() => setShowPrimaryMobile(!showPrimaryMobile)}
-                className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-lg font-inter text-xs font-medium transition-all
+                className={`inline-flex items-center gap-1.5 h-8 3xl:h-10 4xl:h-11 px-3 3xl:px-4 rounded-lg 3xl:rounded-xl font-inter text-xs 3xl:text-[13px] 4xl:text-sm font-medium transition-all
                   border focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2
                   ${showPrimaryMobile || primaryActiveCount > 0
                     ? 'bg-brand-900 text-white border-brand-900'
                     : 'bg-surface-card text-text-secondary border-border-ui hover:border-border-ui'
                   }`}
               >
-                <SlidersHorizontal className="w-3 h-3" />
+                <SlidersHorizontal className="w-3 h-3 3xl:w-4 3xl:h-4 4xl:w-5 4xl:h-5" />
                 <span>Registry & Type</span>
                 {primaryActiveCount > 0 && (
-                  <span className="w-4 h-4 rounded-full bg-white/25 text-white text-xs font-bold flex items-center justify-center">
+                  <span className="w-4 h-4 3xl:w-5 3xl:h-5 rounded-full bg-white/25 text-white text-xs 3xl:text-[13px] font-bold flex items-center justify-center">
                     {primaryActiveCount}
                   </span>
                 )}
@@ -208,17 +204,17 @@ export const ProjectFiltersV2: React.FC<ProjectFiltersV2Props> = ({
             <button
               type="button"
               onClick={() => setShowMore(!showMore)}
-              className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-lg font-inter text-xs font-medium transition-all
+              className={`inline-flex items-center gap-1.5 h-8 3xl:h-10 4xl:h-11 px-3 3xl:px-4 rounded-lg 3xl:rounded-xl font-inter text-xs 3xl:text-[13px] 4xl:text-sm font-medium transition-all
                 border focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2
                 ${showMore || secondaryActiveCount > 0
                   ? 'bg-brand-900 text-white border-brand-900'
                   : 'bg-surface-card text-text-secondary border-border-ui hover:border-text-muted hover:bg-surface-subtle'
                 }`}
             >
-              <SlidersHorizontal className="w-3 h-3" />
+              <SlidersHorizontal className="w-3 h-3 3xl:w-4 3xl:h-4 4xl:w-5 4xl:h-5" />
               <span>Filters</span>
               {secondaryActiveCount > 0 && (
-                <span className="w-4 h-4 rounded-full bg-white/25 text-white text-xs font-bold flex items-center justify-center">
+                <span className="w-4 h-4 3xl:w-5 3xl:h-5 rounded-full bg-white/25 text-white text-xs 3xl:text-[13px] font-bold flex items-center justify-center">
                   {secondaryActiveCount}
                 </span>
               )}
@@ -246,7 +242,7 @@ export const ProjectFiltersV2: React.FC<ProjectFiltersV2Props> = ({
             <button
               type="button"
               onClick={onClearAll}
-              className="inline-flex items-center gap-1 font-inter text-xs text-text-muted hover:text-text-primary transition-colors ml-1"
+              className="inline-flex items-center gap-1 font-inter text-xs 3xl:text-[13px] 4xl:text-sm text-text-muted hover:text-text-primary transition-colors ml-1"
             >
               <X className="h-3 w-3" />
               Clear all
@@ -255,7 +251,7 @@ export const ProjectFiltersV2: React.FC<ProjectFiltersV2Props> = ({
         </div>
 
         {(activeFilterCount > 0 || searchValue) && (
-          <div aria-live="polite" className="font-inter text-xs text-text-muted flex-shrink-0">
+          <div aria-live="polite" className="font-inter text-xs 3xl:text-[13px] 4xl:text-sm text-text-muted flex-shrink-0">
             <span className="font-semibold text-text-primary">{filteredCount.toLocaleString()}</span>
             {' '}of {totalCount.toLocaleString()} projects
           </div>

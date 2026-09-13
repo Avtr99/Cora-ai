@@ -19,3 +19,23 @@ export function formatCredits(n: number): string {
   if (abs >= 1_000) return `${sign}${(abs / 1_000).toFixed(0)}K`;
   return n.toLocaleString();
 }
+
+/**
+ * Retirement percentage and display label for a project.
+ *
+ * Returns `null` when no credits have been issued (the percentage is
+ * undefined). Otherwise clamps to 1-100 and uses "<1%" for sub-0.5% values,
+ * so a project that retired a single credit out of millions doesn't round
+ * down to "0%".
+ */
+export function getRetiredPercentage(
+  creditsIssued: number,
+  creditsRetired: number,
+): { pct: number | null; label: string } {
+  if (creditsIssued <= 0) return { pct: null, label: 'N/A' };
+  const raw = (creditsRetired / creditsIssued) * 100;
+  if (creditsRetired <= 0) return { pct: 0, label: '0%' };
+  const pct = Math.max(1, Math.min(100, Math.round(raw)));
+  const label = raw > 0 && raw < 0.5 ? '<1%' : `${pct}%`;
+  return { pct, label };
+}

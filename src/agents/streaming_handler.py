@@ -19,6 +19,7 @@ from .route_processor_utils import (
     extract_source_titles,
     kb_top_relevance,
     remaining_budget_ms,
+    retrieve_kb_results,
     source_name_from_metadata,
     try_serve_cached_answer,
 )
@@ -104,25 +105,15 @@ class KBStreamingHandler:
                 async for ev in emit_text_as_token_events(text):
                     yield ev
 
-        try:
-            if sub_queries and hasattr(self.retriever, "retrieve_with_fusion"):
-                vector_results = await self.retriever.retrieve_with_fusion(
-                    query=query,
-                    sub_queries=sub_queries,
-                    where=metadata_filters,
-                    allow_unfiltered_fallback=True,
-                    original_query=original_query,
-                )
-            else:
-                vector_results = await self.retriever.retrieve(
-                    query=query,
-                    where=metadata_filters,
-                    allow_unfiltered_fallback=True,
-                    original_query=original_query,
-                )
-        except Exception as e:
-            logger.error("Error during streaming KB retrieval: %s", e, exc_info=True)
-            vector_results = {"documents": [], "metadatas": [], "ids": [], "distances": []}
+        # Enumeration is rare. Detect original first, then rewrite separately;
+        # concatenating them could turn a lookup into a list query.
+        vector_results = await retrieve_kb_results(
+            self.retriever,
+            query,
+            original_query,
+            metadata_filters=metadata_filters,
+            sub_queries=sub_queries,
+        )
 
         retrieval_duration = (time.time() - step_start) * 1000
         doc_count = len(vector_results.get("documents", []))
@@ -149,8 +140,12 @@ class KBStreamingHandler:
         kb_min_top = float(getattr(self.config, "kb_min_top_relevance_score", 0.0) or 0.0)
         kb_not_confident = doc_count > 0 and kb_min_top > 0 and top_relevance < kb_min_top
         web_enabled = getattr(self.config, "enable_web_search", False)
+        # A dataset truncated at the ingestion row limit (structured_partial)
+        # is not self-sufficient: the web fallback/relevance gates below must
+        # treat it like an ordinary result.
+        is_structured = vector_results.get("structured_mode") and not vector_results.get("structured_partial")
 
-        if (doc_count == 0 or kb_not_confident) and web_enabled and web_route_callback:
+        if (doc_count == 0 or kb_not_confident) and not is_structured and web_enabled and web_route_callback:
             # Check cache before falling back to web search.
             # This handles the case where KB retrieval returns 0 results but
             # a previous successful answer is cached (e.g. starter prompts or
@@ -235,7 +230,7 @@ class KBStreamingHandler:
             answer_text = result.get("answer", "")
 
             # Non-answer fallback → supplement with web
-            if _is_explicit_non_answer(answer_text) and web_enabled and web_supplement_callback:
+            if _is_explicit_non_answer(answer_text) and not is_structured and web_enabled and web_supplement_callback:
                 logger.info("Streaming KB (non-stream fallback) returned non-answer; supplementing with web")
                 remaining = remaining_budget_ms(timeout_budget_ms, step_start)
                 web_result = await web_supplement_callback(
@@ -261,6 +256,7 @@ class KBStreamingHandler:
             # Relevance check for non-non-answer results
             if (
                 self.validator
+                and not is_structured
                 and web_enabled
                 and web_supplement_callback
                 and getattr(self.config, "enable_web_supplement_relevance_check", True)
@@ -392,7 +388,7 @@ class KBStreamingHandler:
             if emit_tokens
             else _is_explicit_non_answer(answer_text)
         )
-        if non_answer_detected and web_enabled and web_supplement_callback:
+        if non_answer_detected and not is_structured and web_enabled and web_supplement_callback:
             logger.info("Streaming KB returned non-answer fallback; supplementing with web search")
             remaining = remaining_budget_ms(timeout_budget_ms, step_start)
             web_result = await web_supplement_callback(
@@ -410,6 +406,7 @@ class KBStreamingHandler:
 
         if (
             not emit_tokens
+            and not is_structured
             and self.validator
             and web_enabled
             and web_supplement_callback

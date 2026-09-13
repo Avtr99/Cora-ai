@@ -127,22 +127,22 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onTypingStateChange, varia
   }, [message, rowsLimit]);
 
   const containerClasses = isLarge
-    ? "relative w-full max-w-5xl mx-auto"
+    ? "relative w-full max-w-5xl 3xl:max-w-7xl 4xl:max-w-[1536px] mx-auto"
     : "relative w-full";
 
   const wrapperClasses = isLarge
-    ? `relative flex w-full items-center gap-3 md:gap-4 rounded-2xl md:rounded-3xl border bg-surface-card px-4 md:px-6 py-2.5 md:py-3.5 min-h-touch md:min-h-touch-lg shadow-card-md transition-colors ${inputDisabled ? 'border-border-ui bg-surface-subtle/60 opacity-80' : 'border-border-ui'}`
-    : `relative flex w-full items-center gap-2 md:gap-3 rounded-xl md:rounded-3xl border bg-surface-card px-3 md:px-5 py-2 md:py-3 min-h-touch shadow-card-sm transition-colors ${inputDisabled ? 'border-border-ui bg-surface-subtle/60 opacity-80' : 'border-border-ui'}`;
+    ? `relative flex w-full items-center gap-3 md:gap-4 3xl:gap-5 4xl:gap-6 rounded-2xl md:rounded-3xl border bg-surface-card px-4 md:px-6 3xl:px-8 4xl:px-10 py-2.5 md:py-3.5 3xl:py-5 4xl:py-6 min-h-touch md:min-h-touch-lg 3xl:min-h-[90px] 4xl:min-h-[112px] shadow-card-md transition-colors ${inputDisabled ? 'border-border-ui bg-surface-subtle/60 opacity-80' : 'border-border-ui'}`
+    : `relative flex w-full items-center gap-2 md:gap-3 3xl:gap-4 4xl:gap-5 rounded-xl md:rounded-3xl border bg-surface-card px-3 md:px-5 3xl:px-7 4xl:px-9 py-2 md:py-3 3xl:py-4 4xl:py-5 min-h-touch 3xl:min-h-touch-lg 4xl:min-h-[88px] shadow-card-sm transition-colors ${inputDisabled ? 'border-border-ui bg-surface-subtle/60 opacity-80' : 'border-border-ui'}`;
 
   const textareaClasses = isLarge
-    ? "resize-none font-inter font-normal text-sm md:text-base leading-relaxed text-text-secondary bg-transparent border-none outline-none w-full placeholder:text-text-muted disabled:opacity-60"
-    : "resize-none font-inter font-normal text-sm leading-5 text-text-primary bg-transparent border-none outline-none w-full placeholder:text-text-muted disabled:opacity-60";
+    ? "resize-none font-inter font-normal text-sm md:text-base 3xl:text-xl 4xl:text-[22px] leading-relaxed text-text-secondary bg-transparent border-none outline-none w-full placeholder:text-text-muted disabled:opacity-60"
+    : "resize-none font-inter font-normal text-sm 3xl:text-[17px] 4xl:text-xl leading-5 3xl:leading-7 4xl:leading-8 text-text-primary bg-transparent border-none outline-none w-full placeholder:text-text-muted disabled:opacity-60";
 
   const getButtonStyles = (largeVariant: boolean, typingState: boolean, isEmpty: boolean, isMobile: boolean) => {
     const baseClasses = "relative flex items-center justify-center rounded-xl transition-all duration-200 focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed shrink-0";
     const sizeClasses = largeVariant 
-      ? (isMobile ? "w-11 h-11" : "w-11 h-11 md:w-12 md:h-12")
-      : (isMobile ? "w-11 h-11" : "w-11 h-11");
+      ? (isMobile ? "w-11 h-11" : "w-11 h-11 md:w-12 md:h-12 3xl:w-16 3xl:h-16 4xl:w-20 4xl:h-20")
+      : (isMobile ? "w-11 h-11" : "w-11 h-11 3xl:w-14 3xl:h-14 4xl:w-16 4xl:h-16");
     const focusClasses = "focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-card";
 
     // Stop state (Active typing)
@@ -233,7 +233,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onTypingStateChange, varia
                     transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.15 }}
                     className="flex items-center justify-center"
                   >
-                    <Square className="w-3 h-3 fill-text-muted text-text-muted rounded-sm" />
+                    <Square className="w-3 h-3 3xl:w-4 3xl:h-4 4xl:w-5 4xl:h-5 fill-text-muted text-text-muted rounded-sm" />
                   </motion.span>
                 ) : (
                   <motion.span
@@ -248,6 +248,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onTypingStateChange, varia
                       Icon={ArrowUpIcon}
                       size={20}
                       color={buttonStyles.iconColor}
+                      className="3xl:scale-125 4xl:scale-150"
                     />
                   </motion.span>
                 )}
@@ -257,8 +258,8 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onTypingStateChange, varia
         </div>
       </div>
 
-      <div className="mt-3 md:mt-4 w-full flex items-center justify-center gap-3">
-        <p className="text-text-muted text-2xs md:text-xs font-normal text-center">
+      <div className="mt-3 md:mt-4 3xl:mt-5 4xl:mt-6 w-full flex items-center justify-center gap-3">
+        <p className="text-text-muted text-2xs md:text-xs 3xl:text-sm 4xl:text-base font-normal text-center">
           Cora is still in development and can make mistakes
         </p>
         <ProviderToggle />

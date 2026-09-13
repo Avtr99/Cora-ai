@@ -17,7 +17,6 @@ async function fetchProjects(): Promise<ProjectsData> {
 export interface ProjectsPageState {
   // Data
   projects: VCMProject[];
-  projects: VCMProject[];
   isLoading: boolean;
   isError: boolean;
   refetch: () => void;

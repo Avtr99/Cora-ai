@@ -4,8 +4,6 @@ import { formatCredits } from '@/lib/formatCredits';
 interface IssuanceSparklineProps {
   /** Sparse { year: credits } map from _detail.issuedByYear */
   issuedByYear: Record<string, number>;
-  /** Years with no issuance are rendered as gaps rather than skipped */
-  hasGap?: boolean;
 }
 
 const HEIGHT = 64; // Height of chart area in px

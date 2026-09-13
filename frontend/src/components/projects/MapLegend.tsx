@@ -69,12 +69,12 @@ export const MapLegend: React.FC<MapLegendProps> = ({ aggregates, totalProjects:
             className="w-1.5 h-1.5 rounded-full bg-brand-500"
             aria-hidden="true"
           />
-          <span className="font-poppins font-semibold text-[11.5px] text-text-primary tabular-nums">
+          <span className="font-poppins font-semibold text-[11.5px] 3xl:text-[13px] 4xl:text-sm text-text-primary tabular-nums">
             {legendTotal.toLocaleString()}
           </span>
-          <span className="font-inter text-[10.5px] text-text-muted">projects</span>
+          <span className="font-inter text-[10.5px] 3xl:text-xs 4xl:text-sm text-text-muted">projects</span>
           <span className="w-px h-3 bg-border-ui mx-0.5" aria-hidden="true" />
-          <span className="font-inter text-[10.5px] text-text-muted tabular-nums">
+          <span className="font-inter text-[10.5px] 3xl:text-xs 4xl:text-sm text-text-muted tabular-nums">
             {totalCountries.toLocaleString()} countries
           </span>
           <motion.svg
@@ -101,10 +101,10 @@ export const MapLegend: React.FC<MapLegendProps> = ({ aggregates, totalProjects:
               animate={{ opacity: 1, y: 0, height: 'auto' }}
               exit={{ opacity: 0, y: -4, height: 0 }}
               transition={{ duration: 0.2, ease: 'easeOut' }}
-              className="mt-1.5 w-[220px] overflow-hidden bg-surface-card/95 backdrop-blur-sm border border-border-ui rounded-xl shadow-card-sm"
+              className="mt-1.5 w-[220px] 3xl:w-[260px] overflow-hidden bg-surface-card/95 backdrop-blur-sm border border-border-ui rounded-xl shadow-card-sm"
             >
               <div className="px-3 py-2">
-                <div className="font-poppins text-xs font-semibold text-text-muted uppercase tracking-widest mb-1.5">
+                <div className="font-poppins text-xs 3xl:text-[13px] 4xl:text-sm font-semibold text-text-muted uppercase tracking-widest mb-1.5">
                   Projects by scope
                 </div>
                 <div className="flex flex-col gap-0.5">
@@ -114,10 +114,10 @@ export const MapLegend: React.FC<MapLegendProps> = ({ aggregates, totalProjects:
                         className="w-1.5 h-1.5 rounded-full flex-shrink-0"
                         style={{ backgroundColor: s.color }}
                       />
-                      <span className="font-inter text-[10.5px] text-text-primary leading-tight flex-1 truncate">
+                      <span className="font-inter text-[10.5px] 3xl:text-xs 4xl:text-sm text-text-primary leading-tight flex-1 truncate">
                         {s.scope}
                       </span>
-                      <span className="font-inter text-2xs text-text-muted tabular-nums flex-shrink-0">
+                      <span className="font-inter text-2xs 3xl:text-[11px] 4xl:text-[13px] text-text-muted tabular-nums flex-shrink-0">
                         {s.count.toLocaleString()}
                       </span>
                     </div>
@@ -132,7 +132,7 @@ export const MapLegend: React.FC<MapLegendProps> = ({ aggregates, totalProjects:
                       <circle cx="12" cy="12" r="10"/>
                       <path d="M12 16v-4M12 8h.01"/>
                     </svg>
-                    <span className="font-inter text-2xs text-text-muted leading-snug">
+                    <span className="font-inter text-2xs 3xl:text-[11px] 4xl:text-[13px] text-text-muted leading-snug">
                       {unmappedCount.toLocaleString()} project{unmappedCount === 1 ? '' : 's'} not shown - no specific country assigned.
                     </span>
                   </div>
@@ -140,7 +140,7 @@ export const MapLegend: React.FC<MapLegendProps> = ({ aggregates, totalProjects:
               )}
 
               <div className="px-3 py-2 border-t border-surface-subtle">
-                <div className="font-poppins text-xs font-semibold text-text-muted uppercase tracking-widest mb-1.5">
+                <div className="font-poppins text-xs 3xl:text-[13px] 4xl:text-sm font-semibold text-text-muted uppercase tracking-widest mb-1.5">
                   Density (projects per country)
                 </div>
                 <div className="flex h-2 rounded-full overflow-hidden border border-border-ui">
@@ -148,7 +148,7 @@ export const MapLegend: React.FC<MapLegendProps> = ({ aggregates, totalProjects:
                     <DensitySwatch key={c.color} hex={c.color} />
                   ))}
                 </div>
-                <div className="flex justify-between mt-1 font-inter text-[9.5px] text-text-muted tabular-nums">
+                <div className="flex justify-between mt-1 font-inter text-[9.5px] 3xl:text-xs text-text-muted tabular-nums">
                   <span>1</span>
                   <span>10</span>
                   <span>100</span>

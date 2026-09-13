@@ -33,9 +33,9 @@ export const FileTypeSummary: React.FC<FileTypeSummaryProps> = ({ files }) => {
   }, {});
 
   return (
-    <div className="mt-2 space-y-0.5">
+    <div className="mt-2 3xl:mt-3 space-y-0.5 3xl:space-y-1">
       {Object.entries(counts).map(([desc, count]) => (
-        <p key={desc} className="font-inter text-xs text-text-muted">
+        <p key={desc} className="font-inter text-caption 3xl:text-[13px] 4xl:text-sm text-text-muted">
           · {count} {count === 1 ? 'file' : 'files'}: {desc}
         </p>
       ))}

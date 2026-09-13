@@ -186,7 +186,7 @@ const OnboardingPage = (): JSX.Element => {
   if (loading) {
     return (
       <div className="min-h-screen bg-surface-base flex items-center justify-center">
-        <div className="animate-pulse text-text-muted font-inter text-sm">Loading...</div>
+        <div className="animate-pulse text-text-muted font-inter text-sm 3xl:text-base 4xl:text-lg">Loading...</div>
       </div>
     );
   }
@@ -196,39 +196,39 @@ const OnboardingPage = (): JSX.Element => {
   // have in their .env file).
   if (backendDown) {
     return (
-      <div className="min-h-screen bg-surface-base flex flex-col items-center justify-center px-6 py-10">
-        <div className="w-full max-w-md text-center">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-surface-subtle border border-border-ui mb-4">
-            <ServerOff className="h-5 w-5 text-text-muted" strokeWidth={1.75} />
+      <div className="min-h-screen bg-surface-base flex flex-col items-center justify-center px-6 3xl:px-8 4xl:px-10 py-10 3xl:py-16 4xl:py-20">
+        <div className="w-full max-w-md 3xl:max-w-lg 4xl:max-w-xl text-center">
+          <div className="inline-flex items-center justify-center w-12 h-12 3xl:w-14 3xl:h-14 4xl:w-16 4xl:h-16 rounded-full bg-surface-subtle border border-border-ui mb-4 3xl:mb-5 4xl:mb-6">
+            <ServerOff className="h-5 w-5 3xl:h-6 3xl:w-6 4xl:h-7 4xl:w-7 text-text-muted" strokeWidth={1.75} />
           </div>
-          <h1 className="font-poppins text-xl font-semibold text-text-primary mb-2">
+          <h1 className="font-poppins text-xl 3xl:text-2xl 4xl:text-3xl font-semibold text-text-primary mb-2 3xl:mb-3 4xl:mb-4">
             Backend not reachable
           </h1>
-          <p className="font-inter text-sm text-text-muted mb-6">
+          <p className="font-inter text-sm 3xl:text-base 4xl:text-lg text-text-muted mb-6 3xl:mb-8 4xl:mb-10">
             Cora&apos;s backend server isn&apos;t running. If you&apos;ve already configured your API keys
-            in the backend <code className="px-1 py-0.5 rounded bg-surface-subtle text-text-primary">.env</code>{" "}
+            in the backend <code className="px-1 3xl:px-1.5 py-0.5 3xl:py-1 rounded bg-surface-subtle text-text-primary text-sm 3xl:text-base 4xl:text-lg">.env</code>{" "}
             file, start the backend and refresh — onboarding will skip the steps you&apos;ve already set up.
           </p>
-          <div className="flex flex-col items-center gap-3">
+          <div className="flex flex-col items-center gap-3 3xl:gap-4 4xl:gap-5">
             <button
               type="button"
               onClick={() => window.location.reload()}
-              className="px-6 py-2.5 rounded-lg bg-brand-700 text-white font-poppins text-sm font-semibold shadow-card-md transition-colors hover:bg-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-brand-500"
+              className="px-6 3xl:px-8 py-2.5 3xl:py-3 4xl:py-4 rounded-lg bg-brand-700 text-white font-poppins text-sm 3xl:text-base 4xl:text-lg font-semibold shadow-card-md transition-colors hover:bg-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-brand-500"
             >
               Retry connection
             </button>
             <button
               type="button"
               onClick={skip}
-              className="font-inter text-sm text-text-muted hover:text-text-primary transition-colors"
+              className="font-inter text-sm 3xl:text-base 4xl:text-lg text-text-muted hover:text-text-primary transition-colors"
             >
               Skip to chat anyway
             </button>
           </div>
-          <div className="mt-6 p-3 rounded-xl bg-surface-card border border-border-ui text-left">
-            <p className="font-inter text-xs text-text-muted">
-              <span className="font-medium text-text-primary">To start the backend:</span>{" "}
-              <code className="text-text-primary">python -m src.api.main</code>
+          <div className="mt-6 3xl:mt-8 4xl:mt-10 p-3 3xl:p-4 4xl:p-5 rounded-xl bg-surface-card border border-border-ui text-left">
+            <p className="font-inter text-xs 3xl:text-sm 4xl:text-base text-text-muted">
+              <span className="font-medium text-text-primary text-xs 3xl:text-sm 4xl:text-base">To start the backend:</span>{" "}
+              <code className="text-text-primary text-xs 3xl:text-sm 4xl:text-base">python -m src.api.main</code>
             </p>
           </div>
         </div>
@@ -263,15 +263,15 @@ const OnboardingPage = (): JSX.Element => {
   const isLlmConfigured = detection.llm?.is_configured ?? false;
 
   return (
-    <div className="min-h-screen bg-surface-base flex flex-col items-center justify-center px-6 py-6 md:py-8">
-      <div className="w-full max-w-2xl">
+    <div className="min-h-screen bg-surface-base flex flex-col items-center justify-center px-6 3xl:px-8 4xl:px-10 py-6 md:py-8 3xl:py-10 4xl:py-12">
+      <div className="w-full max-w-2xl 3xl:max-w-3xl 4xl:max-w-4xl">
         {/* Skip link (top-right) — hidden on the final tour step */}
         {currentStep !== "tour" && (
-          <div className="flex justify-end mb-3">
+          <div className="flex justify-end mb-3 3xl:mb-4 4xl:mb-5">
             <button
               type="button"
               onClick={skip}
-              className="font-inter text-xs text-text-muted hover:text-text-primary transition-colors"
+              className="font-inter text-xs 3xl:text-sm 4xl:text-base text-text-muted hover:text-text-primary transition-colors"
             >
               Skip setup &rarr;
             </button>

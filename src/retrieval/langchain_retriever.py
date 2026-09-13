@@ -36,9 +36,20 @@ from .result_processor import (
     format_results,
     rerank_results,
 )
+from .structured_context import build_structured_context
+from .structured_queries import StructuredListSpec
 from .fusion_retrieval import FusionRetriever
 
 logger = logging.getLogger(__name__)
+
+# Enumeration lists are small entity inventories (13 CCP-eligible programs);
+# 500 is far above anything the corpus holds. Aggregates need every matching
+# row or the headline count is a lower bound, and the largest methodology in
+# the corpus (ACM0002) has ~1,500 project rows — measured at ~390ms to scroll
+# payload-only, against a rerank call of comparable cost that it replaces.
+_MAX_ENUMERATE_SCROLL = 500
+_MAX_AGGREGATE_SCROLL = 5000
+_SCROLL_BATCH = 1000
 
 
 class LangChainRetriever(MultiRoundRetrievalMixin):
@@ -278,6 +289,154 @@ class LangChainRetriever(MultiRoundRetrievalMixin):
             original_query=original_query,
         )
     
+    async def retrieve_structured(
+        self,
+        spec: StructuredListSpec,
+    ) -> Dict[str, Any]:
+        """Retrieve matching records by Qdrant metadata scroll rather than vector search.
+
+        Unlike :meth:`retrieve` (top-K semantically similar chunks), this
+        uses ``QdrantClient.scroll`` with a payload filter to visit **every**
+        record matching the filter. Scrolling everything is what makes the
+        counts in the facts header true; how much of it reaches the prompt is
+        decided by ``spec.mode`` in :func:`build_structured_context`, which
+        emits the full list only for ``enumerate``.
+
+        ``enumerate`` and ``aggregate`` results carry
+        ``structured_mode``, which tells downstream code the context is
+        pre-formatted and self-sufficient: skip per-chunk context limits,
+        skip web supplementation, skip quiz generation. ``supplement``
+        results carry no such marker, so the caller prepends the facts block
+        to normal retrieval and web fallback stays available.
+
+        Args:
+            spec: A :class:`StructuredListSpec` produced by
+                :func:`detect_structured_list_query`.
+
+        Returns:
+            Dict with keys ``ids``, ``documents``, ``metadatas``,
+            ``distances``, ``scores``, and — for non-supplement modes —
+            ``structured_mode``.
+        """
+        self._ensure_initialized()
+
+        qdrant_filter = (
+            self._filter_builder.build_filter(spec.qdrant_filter)
+            if spec.qdrant_filter
+            else None
+        )
+
+        client = self._vector_store.client
+        collection = self.collection_name
+        scroll_cap = (
+            _MAX_ENUMERATE_SCROLL if spec.mode == "enumerate" else _MAX_AGGREGATE_SCROLL
+        )
+
+        all_records: list = []
+        offset = None
+        next_offset = None
+
+        while len(all_records) < scroll_cap:
+            records, next_offset = await asyncio.to_thread(
+                client.scroll,
+                collection_name=collection,
+                scroll_filter=qdrant_filter,
+                limit=min(_SCROLL_BATCH, scroll_cap - len(all_records)),
+                offset=offset,
+                with_payload=True,
+                with_vectors=False,
+            )
+
+            for record in records:
+                if not record.payload:
+                    continue
+                payload = record.payload
+                metadata = payload.get("metadata") or {}
+                all_records.append({
+                    "id": str(record.id),
+                    "json_index": metadata.get("json_index", 0),
+                    "metadata": metadata,
+                    "document": payload.get("page_content", ""),
+                })
+
+            if next_offset is None:
+                break
+            offset = next_offset
+
+        if not all_records:
+            logger.info(
+                "Structured scroll returned 0 records for filter=%s; caller should fall back",
+                spec.qdrant_filter,
+            )
+            return empty_result()
+
+        # A non-None next_offset at the cap means more records matched than
+        # were scrolled, so counts become lower bounds and the context says so.
+        hit_scroll_cap = len(all_records) >= scroll_cap and next_offset is not None
+        # Rows can also be partial because the source file was cut at the
+        # ingestion row limit; the indexer flags those rows in the payload.
+        source_truncated = any(
+            bool((record.get("metadata") or {}).get("dataset_truncated"))
+            for record in all_records
+        )
+        # 10% headroom under the prompt limit covers header overhead, so the
+        # prompt-layer truncation stays a backstop that never fires here.
+        # Only enumerate mode can approach it; the other modes emit a fixed
+        # facts block plus a bounded sample.
+        max_chars = (
+            int(get_settings().MAX_COMPLETE_LIST_CHARS * 0.9)
+            if spec.mode == "enumerate"
+            else None
+        )
+        context_text, record_count = build_structured_context(
+            all_records, spec, hit_scroll_cap=hit_scroll_cap, max_chars=max_chars,
+        )
+        if record_count == 0:
+            # Metadata could not identify a single record. Fall back to vector
+            # retrieval rather than present an empty dataset as an answer.
+            logger.info(
+                "Structured scroll produced no identifiable records for filter=%s",
+                spec.qdrant_filter,
+            )
+            return empty_result()
+
+        logger.info(
+            "Structured scroll mode=%s filter=%s scrolled=%d records=%d capped=%s chars=%d",
+            spec.mode, spec.qdrant_filter, len(all_records),
+            record_count, hit_scroll_cap, len(context_text),
+        )
+
+        # This document is synthesised from many rows, so it gets its own
+        # identity. Inheriting an arbitrary row's metadata would caption the
+        # citation for a 1,474-row census with one random project's name.
+        first_source = (
+            (all_records[0].get("metadata") or {}).get("source", "")
+            if all_records
+            else ""
+        )
+        metadata = {
+            "source": first_source or spec.source,
+            "title": spec.display_name,
+            "doc_type": "dataset",
+            "structured_mode": spec.mode,
+            "structured_record_count": record_count,
+        }
+        result = {
+            "ids": [f"structured:{spec.record_type}:{spec.mode}"],
+            "documents": [context_text],
+            "metadatas": [metadata],
+            "distances": [0.0],
+            "scores": [1.0],
+        }
+        if spec.mode != "supplement":
+            result["structured_mode"] = spec.mode
+        if source_truncated:
+            # The indexed rows are a prefix of the source file, so the result
+            # must not claim complete coverage or suppress web supplementation.
+            metadata["structured_partial"] = True
+            result["structured_partial"] = True
+        return result
+
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------

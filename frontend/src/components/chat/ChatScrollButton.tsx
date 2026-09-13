@@ -51,9 +51,9 @@ export const ChatScrollButton: React.FC<ChatScrollButtonProps> = ({ hasMessages 
           onClick={handleClick}
           aria-label={label}
           title={label}
-          className="absolute left-1/2 -translate-x-1/2 -top-12 md:-top-10 z-30 flex items-center justify-center h-11 w-11 md:h-8 md:w-8 rounded-full bg-white/90 backdrop-blur-sm border border-border-ui shadow-scroll-btn text-text-muted transition-all duration-200 hover:shadow-[0_4px_12px_rgba(0,0,0,0.12)] hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+          className="absolute left-1/2 -translate-x-1/2 -top-12 md:-top-10 3xl:-top-14 4xl:-top-16 z-30 flex items-center justify-center h-11 w-11 md:h-8 md:w-8 3xl:h-12 3xl:w-12 4xl:h-14 4xl:w-14 rounded-full bg-white/90 backdrop-blur-sm border border-border-ui shadow-scroll-btn text-text-muted transition-all duration-200 hover:shadow-[0_4px_12px_rgba(0,0,0,0.12)] hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
         >
-          {showDown ? <ArrowDown className="h-5 w-5 md:h-4 md:w-4" aria-hidden="true" /> : <ArrowUp className="h-5 w-5 md:h-4 md:w-4" aria-hidden="true" />}
+          {showDown ? <ArrowDown className="h-5 w-5 md:h-4 md:w-4 3xl:h-6 3xl:w-6 4xl:h-7 4xl:w-7" aria-hidden="true" /> : <ArrowUp className="h-5 w-5 md:h-4 md:w-4 3xl:h-6 3xl:w-6 4xl:h-7 4xl:w-7" aria-hidden="true" />}
         </motion.button>
       )}
     </AnimatePresence>

@@ -3,9 +3,10 @@ import { ExternalLink } from 'lucide-react';
 import type { VCMProject } from '@/types/project';
 import { getProjectTypeColor, getStatusStyle } from '@/lib/colors';
 import { useEnrichedProject } from '@/hooks/useProjectDetail';
-import { formatCredits } from '@/lib/formatCredits';
+import { formatCredits, getRetiredPercentage } from '@/lib/formatCredits';
 import { IssuanceSparkline } from '@/components/projects/IssuanceSparkline';
 import { parseCertifications, type CertificationKind } from '@/lib/certifications';
+import { getProjectActivity, getReferenceYear } from '@/lib/projectActivity';
 
 const CERT_STYLES: Record<CertificationKind, string> = {
   icvcm: 'bg-text-primary text-white border border-text-primary',
@@ -31,8 +32,8 @@ const Field: React.FC<FieldProps> = ({ label, value }) => {
   if (!displayValue) return null;
   return (
     <div className="flex justify-between py-2.5 gap-4 border-b border-surface-subtle last:border-0">
-      <span className="font-inter text-[11px] text-text-muted flex-shrink-0">{label}</span>
-      <span className="font-inter text-[12px] text-text-primary text-right max-w-[60%] break-words font-medium">
+      <span className="font-inter text-2xs 3xl:text-xs 4xl:text-xs text-text-muted flex-shrink-0">{label}</span>
+      <span className="font-inter text-xs 3xl:text-sm 4xl:text-sm text-text-primary text-right max-w-[60%] break-words font-medium">
         {displayValue}
       </span>
     </div>
@@ -42,7 +43,7 @@ const Field: React.FC<FieldProps> = ({ label, value }) => {
 /** Flat section header — always visible, no collapse */
 const SectionHeader: React.FC<{ title: string }> = ({ title }) => (
   <div className="pt-5 pb-2 border-b border-border-ui">
-    <span className="font-inter text-2xs font-semibold text-text-muted uppercase tracking-[0.6px]">
+    <span className="font-inter text-2xs 3xl:text-xs 4xl:text-xs font-semibold text-text-muted uppercase tracking-[0.6px]">
       {title}
     </span>
   </div>
@@ -78,7 +79,6 @@ function arbWaBadge(status: string | undefined): { label: string; style: string 
   if (s.includes('completed')) return { label: 'ARB / WA Completed', style: 'bg-semantic-success-button text-white' };
   if (s.includes('proposed')) return { label: 'ARB / WA Proposed', style: 'bg-semantic-warning-icon text-white' };
   if (s.includes('terminated') || s.includes('inactive')) return { label: 'ARB / WA Inactive', style: 'bg-surface-subtle text-text-secondary border border-border-ui' };
-  if (s.includes('active project')) return { label: 'ARB / WA Active', style: 'bg-semantic-success-icon text-white' };
   return { label: 'ARB / WA', style: 'bg-surface-subtle text-text-secondary border border-border-ui' };
 }
 
@@ -100,26 +100,25 @@ const FieldGroup: React.FC<FieldGroupProps> = ({ title, fields }) => {
   );
 };
 
+/** Minimum cohort size for percentile comparison to be meaningful. */
+const MIN_COHORT_SIZE = 10;
+
 export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({ project, allProjects, onClose }) => {
   const enriched = useEnrichedProject(project);
   const d = enriched?._detail;
   const typeColor = getProjectTypeColor(project.type);
   const statusStyle = getStatusStyle(project.status);
 
-  const totalCredits = project.creditsIssued || 1;
-  const rawRetiredPct = (project.creditsRetired / totalCredits) * 100;
-  const retiredPct = project.creditsRetired > 0
-    ? Math.max(1, Math.min(100, Math.round(rawRetiredPct)))
-    : 0;
-  const remainingPct = 100 - retiredPct;
-  const retiredLabel = rawRetiredPct > 0 && rawRetiredPct < 0.5 ? '<1%' : `${retiredPct}%`;
+  const { pct: retiredPct, label: retiredLabel } = getRetiredPercentage(
+    project.creditsIssued,
+    project.creditsRetired,
+  );
+  const remainingPct = retiredPct === null ? 100 : 100 - retiredPct;
   const isOverRetired = project.creditsRemaining < 0;
   const certifications = React.useMemo(
     () => parseCertifications(d?.certifications),
     [d?.certifications],
   );
-
-  const MIN_COHORT_SIZE = 10;
 
   // Precompute lookup indexes once so each detail open only scans its cohort.
   const projectIndexes = React.useMemo(() => {
@@ -201,35 +200,36 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({ project,
       const total = dev.length;
       if (total > 0) {
         const credits = dev.reduce((sum, p) => sum + p.creditsIssued, 0);
-        const registered = dev.filter((p) => p.status === 'Registered').length;
+        const refYear = getReferenceYear(allProjects);
+        const active = dev.filter((p) => getProjectActivity(p, refYear) === 'issuing').length;
         developerTrackRecord = {
           totalProjects: total,
           totalCredits: credits,
-          registeredShare: Math.round((registered / total) * 100),
+          activeCount: active,
         };
       }
     }
 
     return { cohortPercentiles, developerTrackRecord };
-  }, [projectIndexes, project]);
+  }, [projectIndexes, project, allProjects]);
 
   return (
     <div className="h-full flex flex-col bg-surface-card">
       {/* Header — clean, no accent bar */}
-      <div className="flex-shrink-0 border-b border-border-ui px-5 pt-5 pb-4">
+      <div className="flex-shrink-0 border-b border-border-ui px-5 3xl:px-7 4xl:px-8 pt-5 3xl:pt-6 4xl:pt-7 pb-4 3xl:pb-5">
         <div className="flex items-start justify-between gap-2 mb-2">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="font-inter text-2xs font-medium px-2 py-0.5 rounded bg-surface-subtle text-text-secondary">
+            <span className="font-inter text-2xs 3xl:text-xs 4xl:text-xs font-medium px-2 py-0.5 rounded bg-surface-subtle text-text-secondary">
               {project.id}
             </span>
             <span
-              className="inline-flex items-center gap-1 font-inter text-2xs font-semibold px-2 py-0.5 rounded uppercase"
+              className="inline-flex items-center gap-1 font-inter text-2xs 3xl:text-xs 4xl:text-xs font-semibold px-2 py-0.5 rounded uppercase"
               style={{ backgroundColor: statusStyle.bg, color: statusStyle.text }}
             >
-              <span className="w-1 h-1 rounded-full" style={{ backgroundColor: statusStyle.dot }} />
+              <span className="w-1 h-1 3xl:w-1.5 3xl:h-1.5 rounded-full" style={{ backgroundColor: statusStyle.dot }} />
               {project.status}
             </span>
-            <span className="font-inter text-2xs text-text-muted">{project.registry}</span>
+            <span className="font-inter text-2xs 3xl:text-xs 4xl:text-xs text-text-muted">{project.registry}</span>
           </div>
           {onClose && (
             <button
@@ -244,7 +244,7 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({ project,
             </button>
           )}
         </div>
-        <h2 className="font-poppins font-semibold text-base text-text-primary leading-[1.35]">
+        <h2 className="font-poppins font-semibold text-base 3xl:text-lg 4xl:text-xl text-text-primary leading-[1.35]">
           {project.name}
         </h2>
         <div className="flex items-center gap-1.5 mt-1.5">
@@ -257,27 +257,27 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({ project,
             </span>
           )}
           {project.country && (
-            <span className="font-inter text-xs text-text-muted">{project.country}</span>
+            <span className="font-inter text-xs 3xl:text-sm 4xl:text-sm text-text-muted">{project.country}</span>
           )}
         </div>
       </div>
 
       {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto scrollbar-hide px-5 py-4">
+      <div className="flex-1 overflow-y-auto scrollbar-hide px-5 3xl:px-7 4xl:px-8 py-4 3xl:py-6">
         {/* Horizontal stacked credit bar — uses top-level fields, always visible */}
         <div className="mb-5">
           <div className="flex items-baseline justify-between mb-2">
-            <span className="font-poppins font-semibold text-lg text-text-primary">
+            <span className="font-poppins font-semibold text-lg 3xl:text-xl 4xl:text-2xl text-text-primary">
               {formatCredits(project.creditsIssued)}
             </span>
-            <span className="font-inter text-xs text-text-muted">credits issued</span>
+            <span className="font-inter text-xs 3xl:text-sm 4xl:text-sm text-text-muted">credits issued</span>
           </div>
 
           <div className="h-2 rounded-full bg-surface-subtle overflow-hidden flex mb-2">
             <div
               className="h-full transition-all duration-300 bg-chart-retired"
-              style={{ width: `${retiredPct}%` }}
-              title={`Retired: ${retiredPct}%`}
+              style={{ width: `${retiredPct ?? 0}%` }}
+              title={`Retired: ${retiredLabel}`}
             />
             <div
               className="h-full transition-all duration-300 bg-border-ui"
@@ -289,7 +289,7 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({ project,
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-sm bg-chart-retired" />
-              <span className="font-inter text-2xs text-text-secondary">
+              <span className="font-inter text-2xs 3xl:text-xs 4xl:text-xs text-text-secondary">
                 Retired <span className="font-semibold">{formatCredits(project.creditsRetired)}</span>
                 <span className="text-text-muted ml-0.5">({retiredLabel})</span>
               </span>
@@ -297,7 +297,7 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({ project,
             <div className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-sm bg-border-ui" />
               <span
-                className="font-inter text-2xs text-text-secondary"
+                className="font-inter text-2xs 3xl:text-xs 4xl:text-xs text-text-secondary"
                 title={isOverRetired
                   ? 'Retirements exceed issuances in the source data, so credits remaining is negative.'
                   : undefined}
@@ -310,8 +310,8 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({ project,
 
           {d?.annualReductions ? (
             <div className="flex justify-between mt-2 pt-2 border-t border-surface-subtle">
-              <span className="font-inter text-xs text-text-muted">Est. Annual Reductions</span>
-              <span className="font-inter text-xs text-text-primary font-medium">{formatCredits(d.annualReductions)}</span>
+              <span className="font-inter text-xs 3xl:text-sm 4xl:text-sm text-text-muted">Est. Annual Reductions</span>
+              <span className="font-inter text-xs 3xl:text-sm 4xl:text-sm text-text-primary font-medium">{formatCredits(d.annualReductions)}</span>
             </div>
           ) : null}
         </div>
@@ -319,14 +319,13 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({ project,
         {/* Detail sections — wait for _detail to load */}
         {!d && (
           <div className="flex items-center justify-center py-8">
-            <span className="font-inter text-xs text-text-muted animate-pulse">Loading details…</span>
+            <span className="font-inter text-xs 3xl:text-sm 4xl:text-sm text-text-muted animate-pulse">Loading details…</span>
           </div>
         )}
 
         {d?.issuedByYear && (
           <IssuanceSparkline
             issuedByYear={d.issuedByYear}
-            hasGap={project.hasIssuanceGap}
           />
         )}
 
@@ -337,14 +336,14 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({ project,
                 not a certification and accounts for most raw values. */}
             {(certifications.length > 0 || d.arbWaStatus) && (
               <div className="mb-4">
-                <span className="font-inter text-2xs font-semibold text-text-muted uppercase tracking-[0.5px] block mb-1.5">
+                <span className="font-inter text-2xs 3xl:text-xs 4xl:text-xs font-semibold text-text-muted uppercase tracking-[0.5px] block mb-1.5">
                   Compliance & Certifications
                 </span>
                 <div className="flex flex-wrap gap-2">
                   {(() => {
                     const arb = arbWaBadge(d.arbWaStatus);
                     return arb ? (
-                      <span className={`inline-flex items-center px-2.5 py-1 rounded-md font-inter text-xs font-medium ${arb.style}`}>
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-md font-inter text-xs 3xl:text-sm 4xl:text-sm font-medium ${arb.style}`}>
                         {arb.label}
                       </span>
                     ) : null;
@@ -352,7 +351,7 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({ project,
                   {certifications.map((c) => (
                     <span
                       key={c.label}
-                      className={`inline-flex items-center px-2.5 py-1 rounded-md font-inter text-xs font-medium ${CERT_STYLES[c.kind]}`}
+                      className={`inline-flex items-center px-2.5 py-1 rounded-md font-inter text-xs 3xl:text-sm 4xl:text-sm font-medium ${CERT_STYLES[c.kind]}`}
                     >
                       {c.label}
                     </span>
@@ -363,13 +362,13 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({ project,
 
             {projectContext?.cohortPercentiles && (
               <div className="mb-4 p-3 bg-surface-base rounded-xl flex items-start gap-2.5">
-                <span className="font-poppins font-semibold text-base text-brand-900 leading-none">
+                <span className="font-poppins font-semibold text-base 3xl:text-lg 4xl:text-xl text-brand-900 leading-none">
                   {projectContext.cohortPercentiles.retiredRate}
-                  <span className="text-[10px] font-medium text-text-muted align-super ml-0.5">
+                  <span className="text-micro font-medium text-text-muted align-super ml-0.5">
                     {percentileSuffix(projectContext.cohortPercentiles.retiredRate)}
                   </span>
                 </span>
-                <span className="font-inter text-xs text-text-secondary leading-relaxed pt-0.5">
+                <span className="font-inter text-xs 3xl:text-sm 4xl:text-sm text-text-secondary leading-relaxed pt-0.5">
                   percentile retirement rate among{' '}
                   <span className="font-medium text-text-primary">{projectContext.cohortPercentiles.cohortSize.toLocaleString()}</span>{' '}
                   {projectContext.cohortPercentiles.cohort === 'type+country'
@@ -384,10 +383,10 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({ project,
             {/* Description — promoted to top for context */}
             {d.description && (
               <div className="mb-4 p-3.5 bg-surface-base rounded-xl">
-                <span className="font-inter text-2xs font-semibold text-text-muted uppercase tracking-[0.5px] block mb-1.5">
+                <span className="font-inter text-2xs 3xl:text-xs 4xl:text-xs font-semibold text-text-muted uppercase tracking-[0.5px] block mb-1.5">
                   About this project
                 </span>
-                <p className="font-inter text-xs text-text-secondary leading-[1.65] whitespace-pre-line">
+                <p className="font-inter text-xs 3xl:text-sm 4xl:text-sm text-text-secondary leading-[1.65] whitespace-pre-line">
                   {d.description}
                 </p>
               </div>
@@ -395,26 +394,26 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({ project,
 
             {projectContext?.developerTrackRecord && (
               <div className="mb-4 p-3.5 bg-surface-base rounded-xl">
-                <span className="font-inter text-2xs font-semibold text-text-muted uppercase tracking-[0.5px] block mb-2">
+                <span className="font-inter text-2xs 3xl:text-xs 4xl:text-xs font-semibold text-text-muted uppercase tracking-[0.5px] block mb-2">
                   Developer track record
                 </span>
                 <div className="grid grid-cols-3 gap-3">
                   <div>
-                    <span className="font-inter text-2xs text-text-muted block">Projects</span>
-                    <span className="font-poppins font-semibold text-sm text-text-primary">
+                    <span className="font-inter text-2xs 3xl:text-xs 4xl:text-xs text-text-muted block">Projects</span>
+                    <span className="font-poppins font-semibold text-sm 3xl:text-base 4xl:text-base text-text-primary">
                       {projectContext.developerTrackRecord.totalProjects.toLocaleString()}
                     </span>
                   </div>
                   <div>
-                    <span className="font-inter text-2xs text-text-muted block">Credits issued</span>
-                    <span className="font-poppins font-semibold text-sm text-text-primary">
+                    <span className="font-inter text-2xs 3xl:text-xs 4xl:text-xs text-text-muted block">Credits issued</span>
+                    <span className="font-poppins font-semibold text-sm 3xl:text-base 4xl:text-base text-text-primary">
                       {formatCredits(projectContext.developerTrackRecord.totalCredits)}
                     </span>
                   </div>
                   <div>
-                    <span className="font-inter text-2xs text-text-muted block">Registered</span>
-                    <span className="font-poppins font-semibold text-sm text-text-primary">
-                      {projectContext.developerTrackRecord.registeredShare}%
+                    <span className="font-inter text-2xs 3xl:text-xs 4xl:text-xs text-text-muted block">Active projects</span>
+                    <span className="font-poppins font-semibold text-sm 3xl:text-base 4xl:text-base text-text-primary">
+                      {projectContext.developerTrackRecord.activeCount}
                     </span>
                   </div>
                 </div>
@@ -429,7 +428,7 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({ project,
                     href={d.registryDocs}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex-1 text-center px-3 py-2 rounded-lg border border-border-ui font-inter text-xs font-medium text-text-primary hover:bg-surface-subtle transition-colors inline-flex items-center justify-center gap-1.5"
+                    className="flex-1 text-center px-3 py-2 rounded-lg border border-border-ui font-inter text-xs 3xl:text-sm 4xl:text-sm font-medium text-text-primary hover:bg-surface-subtle transition-colors inline-flex items-center justify-center gap-1.5"
                   >
                     <ExternalLink className="w-3 h-3" /> Registry
                   </a>
@@ -439,7 +438,7 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({ project,
                     href={d.projectWebsite}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex-1 text-center px-3 py-2 rounded-lg border border-border-ui font-inter text-xs font-medium text-text-primary hover:bg-surface-subtle transition-colors inline-flex items-center justify-center gap-1.5"
+                    className="flex-1 text-center px-3 py-2 rounded-lg border border-border-ui font-inter text-xs 3xl:text-sm 4xl:text-sm font-medium text-text-primary hover:bg-surface-subtle transition-colors inline-flex items-center justify-center gap-1.5"
                   >
                     <ExternalLink className="w-3 h-3" /> Website
                   </a>
@@ -497,14 +496,14 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({ project,
                 <div className="py-2 space-y-2">
                   {d.registryNotes && (
                     <div className="p-3 bg-surface-base rounded-lg">
-                      <div className="font-inter text-2xs font-semibold text-text-muted mb-1">From Registry</div>
-                      <p className="font-inter text-xs text-text-secondary leading-relaxed">{d.registryNotes}</p>
+                      <div className="font-inter text-2xs 3xl:text-xs 4xl:text-xs font-semibold text-text-muted mb-1">From Registry</div>
+                      <p className="font-inter text-xs 3xl:text-sm 4xl:text-sm text-text-secondary leading-relaxed">{d.registryNotes}</p>
                     </div>
                   )}
                   {d.berkeleyNotes && (
                     <div className="p-3 bg-surface-base rounded-lg">
-                      <div className="font-inter text-2xs font-semibold text-text-muted mb-1">Berkeley Carbon Trading Project</div>
-                      <p className="font-inter text-xs text-text-secondary leading-relaxed">{d.berkeleyNotes}</p>
+                      <div className="font-inter text-2xs 3xl:text-xs 4xl:text-xs font-semibold text-text-muted mb-1">Berkeley Carbon Trading Project</div>
+                      <p className="font-inter text-xs 3xl:text-sm 4xl:text-sm text-text-secondary leading-relaxed">{d.berkeleyNotes}</p>
                     </div>
                   )}
                 </div>

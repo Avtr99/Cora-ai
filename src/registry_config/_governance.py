@@ -29,6 +29,9 @@ GOVERNANCE_PATTERNS: List[RegistryPattern] = [
         ],
         version_patterns=VERSION_STANDARD,
         is_registry=False,
+        is_standards_body=True,
+        doc_type="standard",
+        approved_status={"program": "CCP-Eligible", "methodology": "CCP-Approved"},
     ),
     RegistryPattern(
         name="SBTi",
@@ -38,6 +41,8 @@ GOVERNANCE_PATTERNS: List[RegistryPattern] = [
         ],
         version_patterns=VERSION_STANDARD,
         is_registry=False,
+        is_standards_body=True,
+        doc_type="standard",
     ),
     RegistryPattern(
         name="CORSIA",
@@ -51,6 +56,7 @@ GOVERNANCE_PATTERNS: List[RegistryPattern] = [
         ],
         version_patterns=VERSION_STANDARD,
         is_registry=False,
+        doc_type="policy",
     ),
     # VCMI — Voluntary Carbon Markets Integrity Initiative. Issues the Claims
     # Code of Practice for corporate use of carbon credits. Complements ICVCM
@@ -65,6 +71,8 @@ GOVERNANCE_PATTERNS: List[RegistryPattern] = [
         id_patterns=[],
         version_patterns=VERSION_STANDARD,
         is_registry=False,
+        is_standards_body=True,
+        doc_type="standard",
     ),
     # GHG Protocol — Greenhouse Gas Protocol. Accounting standard for
     # measuring and reporting emissions (Scope 1, 2, 3). Developed by
@@ -79,6 +87,8 @@ GOVERNANCE_PATTERNS: List[RegistryPattern] = [
         id_patterns=[],
         version_patterns=VERSION_STANDARD,
         is_registry=False,
+        is_standards_body=True,
+        doc_type="standard",
     ),
     # CDP — Carbon Disclosure Project. Global environmental disclosure
     # platform. 25,000+ entities report via CDP in 2025.
@@ -91,6 +101,7 @@ GOVERNANCE_PATTERNS: List[RegistryPattern] = [
         id_patterns=[],
         version_patterns=VERSION_STANDARD,
         is_registry=False,
+        doc_type="standard",
     ),
     # ICROA — International Carbon Reduction and Offset Alliance.
     # Accredits carbon offset service providers and endorses crediting
@@ -105,5 +116,6 @@ GOVERNANCE_PATTERNS: List[RegistryPattern] = [
         id_patterns=[],
         version_patterns=VERSION_STANDARD,
         is_registry=False,
+        doc_type="standard",
     ),
 ]

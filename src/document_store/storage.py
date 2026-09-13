@@ -16,7 +16,14 @@ worker, routes, lifespan, converter, indexer, tests) keep working unchanged.
 
 from __future__ import annotations
 
-from .files import read_markdown, remove_document_files, write_metadata_file
+from .files import (
+    read_markdown,
+    read_row_data_file,
+    remove_document_files,
+    row_data_path,
+    write_metadata_file,
+    write_row_data_file,
+)
 from .jobs_repo import claim_next_job, create_job, get_job, update_job
 from .recovery import recover_interrupted_documents
 from .repository import (
@@ -77,6 +84,9 @@ __all__ = [
     "_validate_upload_mime",
     # files
     "read_markdown",
+    "read_row_data_file",
+    "row_data_path",
     "write_metadata_file",
+    "write_row_data_file",
     "remove_document_files",
 ]

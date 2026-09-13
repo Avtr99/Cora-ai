@@ -97,7 +97,7 @@ def document_root() -> Path:
     if not any(root == allowed or allowed in root.parents for allowed in allowed_dirs):
         raise ValueError("Document store root is outside allowed document directories")
     root.mkdir(parents=True, exist_ok=True)
-    for child in ("originals", "converted", "metadata"):
+    for child in ("originals", "converted", "metadata", "rows"):
         (root / child).mkdir(parents=True, exist_ok=True)
     return root
 

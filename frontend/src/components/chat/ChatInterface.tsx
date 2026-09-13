@@ -39,7 +39,7 @@ export const ChatInterface: React.FC = () => {
     estimateSize: () => DEFAULT_MESSAGE_ESTIMATE_SIZE,
     overscan: 5,
     paddingStart: 0,
-    paddingEnd: 24,
+    paddingEnd: 80,
   });
 
   // Find last user message index
@@ -129,12 +129,12 @@ export const ChatInterface: React.FC = () => {
   // Empty state
   if (!activeChat || activeChat.messages.length === 0) {
     return (
-      <div className="w-full flex-1 py-6 flex flex-col items-center justify-center text-center">
-        <div className="max-w-md space-y-4">
-          <h2 className="font-poppins text-2xl text-text-primary">
+      <div className="w-full flex-1 py-6 3xl:py-10 4xl:py-14 flex flex-col items-center justify-center text-center">
+        <div className="max-w-md 3xl:max-w-lg 4xl:max-w-xl space-y-4 3xl:space-y-5 4xl:space-y-6">
+          <h2 className="font-poppins text-2xl 3xl:text-3xl 4xl:text-4xl text-text-primary">
             {activeChat ? 'Start the conversation' : 'Select or start a chat'}
           </h2>
-          <p className="font-inter text-sm text-text-muted leading-relaxed">
+          <p className="font-inter text-sm 3xl:text-base 4xl:text-lg text-text-muted leading-relaxed">
             {activeChat
               ? "Ask me anything about voluntary carbon markets—methodologies, pricing, project case studies, or best practices. I'll keep track of our conversation here."
               : 'Choose an existing chat from the sidebar or create a new one to begin.'}

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Optional
 
 import asyncio
 import re
@@ -20,8 +20,9 @@ from ..db.revisions import bump_corpus_revision
 from ..db.sqlite_cache import get_sqlite_cache
 from .logging_utils import _log_ingestion_stage
 from .models import DocumentRecord
-from .storage import read_markdown, update_document
+from .storage import read_markdown, read_row_data_file, update_document
 from .title_utils import _extract_first_heading
+from ..registry_config.registry_patterns import find_document_codes, get_merged_registry_patterns
 
 # Payload field indexes created on the dense collection.
 # Must stay in sync with the metadata dict built in chunk_markdown() so the
@@ -39,6 +40,7 @@ _PAYLOAD_INDEX_FIELDS = (
     "metadata.version_number",
     "metadata.registry_document_id",
     "metadata.methodology_codes",
+    "metadata.doc_type",
 )
 
 # Docling's standard-mode Markdown serializer emits ``<!-- image -->`` for every
@@ -65,8 +67,125 @@ _invalidation_lock = asyncio.Lock()
 _vector_store_singleton: Optional[QdrantVectorStore] = None
 _vector_store_lock = threading.Lock()
 
+_ID_FIELD_NAMES = {
+    "id",
+    "identifier",
+    "project id",
+    "projectid",
+    "project number",
+    "record id",
+    "recordid",
+    "issuance id",
+    "issuanceid",
+    "reference id",
+    "referenceid",
+    "document id",
+    "documentid",
+}
+
+
+def _doc_type_for_record(record: DocumentRecord) -> Optional[str]:
+    """Return the document-type label for a non-dataset record, if any."""
+    lookup = {
+        p.name: p.doc_type
+        for p in get_merged_registry_patterns()
+        if p.doc_type
+    }
+    return lookup.get(record.registry) or lookup.get(record.category)
+
+
+def _row_canonical_id(record: DocumentRecord, index: int, row: dict[str, str]) -> str:
+    """Return a stable ID for a dataset row.
+
+    Prefer a natural id column (Project ID, Record ID, etc.) so the same
+    entity stays deduplicated even if row order changes. Fall back to the
+    document id plus row index.
+    """
+    for key, value in row.items():
+        norm = re.sub(r"[^\w]+", " ", str(key)).strip().lower()
+        if norm in _ID_FIELD_NAMES and value and value.strip():
+            return f"{record.id}:{value.strip()}"
+    return f"{record.id}:{index}"
+
+
+def _chunk_dataset_rows(
+    record: DocumentRecord,
+    row_records: list[dict[str, Any]],
+    *,
+    dataset_truncated: bool = False,
+) -> list[Document]:
+    """Create one chunk per dataset row with typed row_data metadata."""
+    title = record.title or Path(record.original_filename).stem
+    shared = {
+        "source": record.original_filename,
+        "doc_store_id": record.id,
+        "original_filename": record.original_filename,
+        "file_type": record.extension.lstrip("."),
+        "tags": record.tags,
+        "document_id": record.document_id,
+        "title": title,
+        "registry": record.registry,
+        "category": record.category,
+        "publisher": record.publisher,
+        "registry_document_id": record.document_id,
+        "version_number": record.version_number,
+        "doc_type": "dataset",
+        "dataset_truncated": dataset_truncated,
+    }
+    chunks: list[Document] = []
+    for index, raw in enumerate(row_records):
+        row = {str(k): (str(v).strip() if v is not None else "") for k, v in raw.items()}
+        formatted = "; ".join(f"{k}: {v}" for k, v in row.items() if v)
+        row_id = _row_canonical_id(record, index, row)
+        search_text = f"{record.original_filename or ''}\n{record.document_id or ''}\n{formatted}"
+        codes = {m.upper() for m in find_document_codes(search_text)}
+        chunk = Document(
+            page_content=formatted,
+            metadata={
+                **shared,
+                "row_data": row,
+                "row_id": row_id,
+                "json_index": index,
+                "chunk_index": index,
+                "source_chunk_index": index,
+                "methodology_codes": sorted(codes) if codes else None,
+            },
+        )
+        chunks.append(chunk)
+    return chunks
+
+
+def _build_chunk_header(record: DocumentRecord) -> str:
+    """Return a short source header to prepend to every chunk's page_content.
+
+    The display title is the preferred source string because the converter
+    already merges the document_id, publisher, version, and content title into
+    it.  If the title is missing, fall back to the original filename; if that
+    is also unavailable, return an empty string and skip the prefix.
+    """
+    return record.title or record.original_filename or ""
+
+
+def _prepend_header(chunks: list[Document], header: str) -> None:
+    """Prepend ``header`` to every chunk's page_content in place.
+
+    A no-op when ``header`` is empty, so callers never need to guard.
+    """
+    if not header:
+        return
+    for chunk in chunks:
+        chunk.page_content = f"{header}\n\n{chunk.page_content}"
+
+
 def chunk_markdown(record: DocumentRecord) -> list[Document]:
     from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+    header = _build_chunk_header(record)
+    row_records, rows_truncated = read_row_data_file(record)
+    if row_records:
+        chunks = _chunk_dataset_rows(record, row_records, dataset_truncated=rows_truncated)
+        _prepend_header(chunks, header)
+        return chunks
 
     text = read_markdown(record)
     # Strip Docling's ``<!-- image -->`` placeholders from standard-mode
@@ -84,14 +203,6 @@ def chunk_markdown(record: DocumentRecord) -> list[Document]:
     # extracted once during conversion and persisted). Fall back to the first
     # heading in the markdown if the record has no title (e.g. pre-migration).
     title = record.title or _extract_first_heading(text) or Path(record.original_filename).stem
-    # Derive methodology_codes from the registry document ID. Verra methodology
-    # IDs (VM0047, ACM0003, etc.) are the canonical "methodology_codes" the
-    # query rewriter filters on. For non-methodology docs this will be None.
-    methodology_codes = None
-    if record.document_id:
-        doc_id_upper = record.document_id.upper()
-        if doc_id_upper.startswith(("VM", "ACM", "AM", "AR-", "AMS")):
-            methodology_codes = record.document_id
     base_doc = Document(
         page_content=text,
         metadata={
@@ -110,13 +221,20 @@ def chunk_markdown(record: DocumentRecord) -> list[Document]:
             "publisher": record.publisher,
             "registry_document_id": record.document_id,
             "version_number": record.version_number,
-            "methodology_codes": methodology_codes,
+            "doc_type": _doc_type_for_record(record),
         },
     )
     chunks = splitter.split_documents([base_doc])
+    # Prepend the source header BEFORE the methodology_codes pass so the
+    # header text (which may contain the document_id) is included in
+    # search_text and its codes are captured.
+    _prepend_header(chunks, header)
     for index, chunk in enumerate(chunks):
         chunk.metadata["chunk_index"] = index
         chunk.metadata["source_chunk_index"] = index
+        search_text = f"{record.original_filename or ''}\n{record.document_id or ''}\n{chunk.page_content or ''}"
+        codes = {m.upper() for m in find_document_codes(search_text)}
+        chunk.metadata["methodology_codes"] = sorted(codes) if codes else None
     return chunks
 
 

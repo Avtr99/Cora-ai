@@ -55,6 +55,7 @@ CATEGORY_PATTERNS: List[RegistryPattern] = [
             r'[Vv]ersion[:\s]+(\d+\.?\d*)',
         ],
         is_registry=False,
+        doc_type="policy",
     ),
     RegistryPattern(
         name="Market Intelligence",
@@ -117,6 +118,7 @@ CATEGORY_PATTERNS: List[RegistryPattern] = [
         id_patterns=[],
         version_patterns=[],
         is_registry=False,
+        doc_type="methodology",
     ),
     RegistryPattern(
         name="Project Development",
@@ -128,6 +130,7 @@ CATEGORY_PATTERNS: List[RegistryPattern] = [
         id_patterns=[],
         version_patterns=[],
         is_registry=False,
+        doc_type="project",
     ),
     RegistryPattern(
         name="SD VISta / SDGs",
@@ -138,6 +141,7 @@ CATEGORY_PATTERNS: List[RegistryPattern] = [
         id_patterns=[],
         version_patterns=[],
         is_registry=False,
+        doc_type="standard",
     ),
 
     # ── Carbon removal pathways ────────────────────────────────────
@@ -207,6 +211,7 @@ CATEGORY_PATTERNS: List[RegistryPattern] = [
         id_patterns=[],
         version_patterns=[],
         is_registry=False,
+        doc_type="policy",
     ),
     # Agriculture / Soil Carbon — Regenerative agriculture, soil organic
     # carbon, enteric fermentation, agroforestry, and livestock management.

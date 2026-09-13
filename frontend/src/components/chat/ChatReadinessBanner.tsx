@@ -31,8 +31,8 @@ export const ChatReadinessBanner: React.FC = () => {
 
   if (!backendUp) {
     return (
-      <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-text-muted">
-        <Info className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
+      <div className="mb-2 3xl:mb-3 flex flex-wrap items-center gap-x-2 3xl:gap-x-2.5 4xl:gap-x-3 gap-y-1 3xl:gap-y-1.5 text-xs 3xl:text-sm 4xl:text-base text-text-muted">
+        <Info className="h-3.5 w-3.5 3xl:h-4 3xl:w-4 4xl:h-5 4xl:w-5 shrink-0" strokeWidth={1.75} />
         <span>Backend is offline — start the server to use chat.</span>
         {webEnabled && (
           <span className="text-text-muted">(Web search is configured and will be ready once the backend is running.)</span>
@@ -43,8 +43,8 @@ export const ChatReadinessBanner: React.FC = () => {
 
   if (!llmConfigured) {
     return (
-      <div className="mb-2 flex items-center gap-2 text-xs text-text-muted">
-        <Info className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
+      <div className="mb-2 3xl:mb-3 flex items-center gap-2 3xl:gap-2.5 text-xs 3xl:text-sm 4xl:text-base text-text-muted">
+        <Info className="h-3.5 w-3.5 3xl:h-4 3xl:w-4 4xl:h-5 4xl:w-5 shrink-0" strokeWidth={1.75} />
         <span>AI model not configured.</span>
         <button
           type="button"
@@ -62,8 +62,8 @@ export const ChatReadinessBanner: React.FC = () => {
   const showEnableWeb = !searchReady;
 
   return (
-    <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-text-muted">
-      <Info className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
+    <div className="mb-2 3xl:mb-3 flex flex-wrap items-center gap-x-2 3xl:gap-x-2.5 4xl:gap-x-3 gap-y-1 3xl:gap-y-1.5 text-xs 3xl:text-sm 4xl:text-base text-text-muted">
+      <Info className="h-3.5 w-3.5 3xl:h-4 3xl:w-4 4xl:h-5 4xl:w-5 shrink-0" strokeWidth={1.75} />
       <span>Chat needs documents or web search enabled to answer.</span>
       {showAddDocs && (
         <button

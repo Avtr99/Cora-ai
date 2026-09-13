@@ -128,6 +128,7 @@ class Settings(BaseSettings):
     # --- Answer generation ---
     MAX_CONTEXT_CHARS: int = 16000
     MAX_DOCUMENTS_FOR_ANSWER: int = 10
+    MAX_COMPLETE_LIST_CHARS: int = 30000
 
     # --- Prompt repetition (RAG accuracy vs cost) ---
     ENABLE_VALIDATOR_PROMPT_REPETITION: bool = True
