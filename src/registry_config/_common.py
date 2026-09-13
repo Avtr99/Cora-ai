@@ -8,7 +8,7 @@ can import the dataclass without creating a circular dependency.
 """
 
 from dataclasses import dataclass
-from typing import List
+from typing import Dict, List, Optional
 
 
 # ── Reusable version-pattern constants ──────────────────────────────
@@ -46,9 +46,36 @@ class RegistryPattern:
             False, the metadata extractor stores the name under
             ``category`` instead of ``registry`` so the ``registry``
             field is never polluted with non-registry values.
+        is_standards_body: True if this is a standard/governance body whose
+            entity inventories should be filtered by ``metadata.standard``
+            rather than ``metadata.registry`` (e.g. ICVCM, SBTi, VCMI,
+            GHG Protocol). Defaults to False.
+        approved_status: Optional mapping from entity type to the value used
+            in ``metadata.status`` for approved / eligible lists. Used by the
+            structured-query detector to answer "list all <body> approved
+            <entities>" queries. Example: ``{"program": "CCP-Eligible",
+            "methodology": "CCP-Approved"}``.
+        doc_type: Optional document-type label written into Qdrant chunk
+            metadata. Used for typed retrieval (``methodology``, ``standard``,
+            ``policy``, ``project``). Defaults to None.
+        row_entity: The singular name of a row in this registry's tabular
+            dataset (e.g. "project", "allowance", "offset"). Used by the
+            structured-query detector to recognize when a user is asking for
+            a census over dataset rows. Defaults to "project".
+        row_entity_plural: The plural of ``row_entity``. Defaults to appending
+            an "s", but can be overridden for irregular plurals.
     """
     name: str
     content_markers: List[str]
     id_patterns: List[str]
     version_patterns: List[str]
     is_registry: bool = True
+    is_standards_body: bool = False
+    approved_status: Optional[Dict[str, str]] = None
+    doc_type: Optional[str] = None
+    row_entity: str = "project"
+    row_entity_plural: Optional[str] = None
+
+    def __post_init__(self) -> None:
+        if self.row_entity_plural is None:
+            self.row_entity_plural = self.row_entity + "s"

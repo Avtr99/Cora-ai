@@ -26,3 +26,17 @@ def _reset_settings_singleton(monkeypatch):
     monkeypatch.setenv("SECRET_KEY", "test-secret-key-for-ci-testing")
     monkeypatch.setenv("JWT_SECRET_KEY", "test-jwt-secret-key-for-ci-testing")
     reset_settings_singleton()
+
+
+@pytest.fixture()
+def document_store_env(tmp_path, monkeypatch):
+    """Set up an isolated in-memory document store for one test."""
+    data_dir = tmp_path / "data"
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'cora.db'}")
+    monkeypatch.setenv("DOCUMENT_STORE_ROOT", str(data_dir / "documents"))
+    monkeypatch.setenv("ALLOWED_DOCUMENT_DIRS", str(data_dir))
+    monkeypatch.setenv("DOCUMENT_ALLOWED_EXTENSIONS", ".pdf,.md,.txt,.csv,.json,.jsonl")
+    monkeypatch.setenv("DOCUMENT_UPLOAD_MAX_BYTES", str(1024 * 1024))
+    reset_settings_singleton()
+    yield data_dir
+    reset_settings_singleton()

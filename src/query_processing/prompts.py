@@ -8,12 +8,15 @@ Optimized for:
 - Security without false positives on legitimate content
 """
 import html
+import logging
 import re
 from datetime import datetime, timezone
 from typing import List, Optional
 from .quiz_utils import build_quiz_instruction
 from .suggested_prompts import build_suggested_prompts_instruction
 from ..config import get_settings
+
+logger = logging.getLogger(__name__)
 
 # Maximum query length to prevent token-stuffing attacks
 MAX_QUERY_LENGTH = 3000
@@ -65,31 +68,62 @@ The current date is {current_date}. When reference data mentions future events, 
 6. For comparative or analytical questions, explore trade-offs, differences, and implications.
 7. Use professional markdown formatting with descriptive headers and bullet points for clarity.
 8. Cite your sources for key claims. Use ONLY bracketed citations at the end of the relevant paragraph or key claim. If the entire answer comes from a single source, cite it once at the end of the first relevant paragraph. Do not repeat the same citation within a paragraph or on every sentence. Use the format `[cite_kb: N]` where N is the source number from the `<source index="N">` tag surrounding the retrieved chunk (e.g., "Carbon offsets must be verifiable [cite_kb: 1]."). NEVER use narrative citations (e.g., Do NOT say "According to...").
-9. Keep answers focused and well-structured under 600 words. Avoid reproducing full document text.
+9. Keep answers focused and well-structured under 600 words. Do not reproduce full lists or full document text by default; the mode-specific instructions below will explicitly request a complete list when the user asks for one.
 </output_rules>"""
 
-
-# Default VCM expertise block that may be replaced for non-VCM collections.
+_VCM_IDENTITY = "You are an expert VCM (Voluntary Carbon Markets) Assistant."
+_COLLECTION_IDENTITY = "You are an expert assistant for the configured collection."
 _VCM_EXPERTISE_BLOCK = "Carbon credits (Gold Standard, Verra VCS, ACR, CAR), Project types, Verification, Policies, Carbon accounting, Market dynamics, Regulatory frameworks, CORSIA, Nature-based solutions."
+_VCM_SCOPE_GUARD = "I can only help with questions about voluntary carbon markets."
+_COLLECTION_SCOPE_GUARD = "I can only help with questions related to the configured collection."
+
+
+# One instruction per structured mode. The context and the instruction must
+# never disagree about whether the model is listing records or summarising
+# them — a prompt that says both produces whichever the model weights higher.
+_STRUCTURED_INSTRUCTIONS = {
+    "aggregate": (
+        "The reference data is a 'Dataset facts' block computed in code over every "
+        "matching row in the dataset{count_phrase}. Those numbers are the answer: "
+        "quote them directly and never recount from the example rows, which are a small "
+        "illustrative sample. "
+        "Answer in this shape: (1) lead with the number the user asked for, "
+        "(2) one or two sentences of the relevant breakdown, "
+        "(3) two or three example records, "
+        "(4) close by asking which slice they want next — by status, category, "
+        "or a specific record. "
+        "Keep it under 250 words. Do not paste the full list; offer it as a next step instead."
+    ),
+    "enumerate": (
+        "The reference data is a complete filtered dataset{count_phrase} and the user asked "
+        "for the list itself. Reproduce every record, one per line or as a table. "
+        "Do not summarise, sample, or truncate it. The 600-word limit does not apply here. "
+        "If the data carries a note saying it was cut off, say so plainly and give the "
+        "count as a lower bound."
+    ),
+}
 
 
 def get_system_instruction() -> str:
-    """Return the system instruction, allowing collection-specific override.
+    """Return the system instruction with an optional collection expertise override.
 
-    VCM remains the default domain. If COLLECTION_SYSTEM_INSTRUCTION is set,
-    it replaces the VCM expertise block so the LLM can answer from other
-    document collections without VCM bias.
+    The collection setting replaces the VCM expertise and scope wording while
+    preserving the shared security, temporal-awareness, and output rules.
     """
-    instruction = VCM_SYSTEM_INSTRUCTION
-    try:
-        settings = get_settings()
-        if settings.COLLECTION_SYSTEM_INSTRUCTION:
-            instruction = instruction.replace(
-                _VCM_EXPERTISE_BLOCK, settings.COLLECTION_SYSTEM_INSTRUCTION
-            )
-    except Exception:
-        pass
-    return instruction
+    settings = get_settings()
+    collection_instruction = (settings.COLLECTION_SYSTEM_INSTRUCTION or "").strip()
+    if not collection_instruction:
+        return VCM_SYSTEM_INSTRUCTION
+    return VCM_SYSTEM_INSTRUCTION.replace(
+        _VCM_IDENTITY,
+        _COLLECTION_IDENTITY,
+    ).replace(
+        _VCM_EXPERTISE_BLOCK,
+        collection_instruction,
+    ).replace(
+        _VCM_SCOPE_GUARD,
+        _COLLECTION_SCOPE_GUARD,
+    )
 
 
 # Maximum summary length to prevent abuse
@@ -147,8 +181,10 @@ def build_query_prompt(
     summaries: List[str],
     include_quiz: bool = False,
     include_suggested_prompts: bool = False,
+    structured_mode: Optional[str] = None,
     current_date: Optional[str] = None,
     resolved_query: Optional[str] = None,
+    record_count: Optional[int] = None,
 ) -> str:
     """
     Build an XML-structured prompt optimized for Gemini Flash.
@@ -175,6 +211,11 @@ def build_query_prompt(
             history). Included so the model can interpret follow-ups like
             "what is its effect?" whose subject only exists in an earlier turn.
             Treated as untrusted and dropped if it fails injection checks.
+        structured_mode: ``"aggregate"`` or ``"enumerate"`` when the context
+            was built by ``retrieve_structured``; ``None`` for ordinary
+            semantic context. Selects the matching instruction and, for
+            ``enumerate``, the larger context budget.
+        record_count: Number of records in the dataset, when known.
 
     Returns:
         XML-formatted prompt string
@@ -201,8 +242,27 @@ def build_query_prompt(
     sanitized_query = _sanitize_input(query, MAX_QUERY_LENGTH)
     
     # 2. Process context (trusted retrieval, sandboxed via XML)
-    # No injection check on context - avoids DoS on valid docs containing keywords
-    sanitized_context = _sanitize_input(context, MAX_CONTEXT_LENGTH)
+    # Only enumerate mode can produce a context larger than the semantic cap;
+    # aggregate emits a fixed facts block plus a bounded sample.
+    context_limit = (
+        get_settings().MAX_COMPLETE_LIST_CHARS
+        if structured_mode == "enumerate"
+        else MAX_CONTEXT_LENGTH
+    )
+    context_was_cut = len(context) > context_limit
+    sanitized_context = _sanitize_input(context, context_limit)
+    if context_was_cut and structured_mode == "enumerate":
+        # build_structured_context already caps at whole-record boundaries, so
+        # this is a backstop for any other producer of enumerate context.
+        logger.warning(
+            "Enumerate context exceeds MAX_COMPLETE_LIST_CHARS; truncating from %d to %d",
+            len(context),
+            context_limit,
+        )
+        sanitized_context += (
+            "\nNote: this dataset was cut off at a size cap and is partial; "
+            "state that the list is incomplete and give counts as lower bounds."
+        )
     
     # 3. Process summaries with length limits
     sanitized_summaries = []
@@ -252,6 +312,11 @@ def build_query_prompt(
 
     quiz_instruction = build_quiz_instruction(include_quiz)
     suggested_prompts_instruction = build_suggested_prompts_instruction(include_suggested_prompts)
+    structured_instruction = ""
+    if structured_mode in _STRUCTURED_INSTRUCTIONS:
+        structured_instruction = _STRUCTURED_INSTRUCTIONS[structured_mode].format(
+            count_phrase=f" ({record_count} records)" if record_count is not None else "",
+        )
 
     interpretation_instruction = ""
     if interpretation_block:
@@ -275,6 +340,7 @@ def build_query_prompt(
 
 <instruction>
 Answer the question using ONLY the data above. Match depth to the question: concise for simple lookups, thorough for conceptual questions. Explain key concepts and their significance. Structure your answer clearly. No preamble. Use markdown formatting. If reference data mentions future events or deadlines that have already passed as of the current date, contextualize them accordingly.{interpretation_instruction}
+{structured_instruction}
 {quiz_instruction}
 {suggested_prompts_instruction}
 </instruction>

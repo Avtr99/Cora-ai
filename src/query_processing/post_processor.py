@@ -9,7 +9,7 @@ Applied after text extraction and quiz splitting, before caching.
 """
 
 import re
-from typing import Tuple
+from typing import Optional, Tuple
 
 # ---------------------------------------------------------------------------
 # Preamble patterns – phrases where the model narrates its sources
@@ -132,6 +132,7 @@ def postprocess_answer(
     *,
     max_words: int = 650,
     strip_preamble: bool = True,
+    structured_mode: Optional[str] = None,
 ) -> Tuple[str, bool]:
     """Run the full post-processing pipeline on an LLM answer.
 
@@ -140,6 +141,10 @@ def postprocess_answer(
         max_words: Word budget. Defaults to 650 (buffer over the 600-word
             prompt rule to avoid cutting answers that are only slightly over).
         strip_preamble: Whether to remove source-narrating preambles.
+        structured_mode: Skip word-limit enforcement for ``"enumerate"``,
+            where the list is the answer and cutting it mid-record would be
+            worse than a long response. ``"aggregate"`` answers are short
+            summaries and stay under the limit.
 
     Returns:
         (cleaned_text, was_truncated): The post-processed answer and a flag
@@ -150,6 +155,9 @@ def postprocess_answer(
 
     if strip_preamble:
         text = strip_preambles(text)
+
+    if structured_mode == "enumerate":
+        return text.strip(), False
 
     text, was_truncated = enforce_word_limit(text, max_words=max_words)
 

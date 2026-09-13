@@ -241,8 +241,13 @@ class BaseRAGClient:
                 except Exception as cache_exc:
                     logger.debug(f"Failed to invalidate stale query cache entry: {cache_exc}")
 
-            include_quiz = should_generate_quiz(query)
-            include_suggested_prompts = should_generate_suggested_prompts(query)
+            structured_mode = vector_results.get("structured_mode")
+            record_count = self._structured_record_count(vector_results)
+
+            # Structured dataset answers are self-contained; do not append
+            # quiz or suggested prompts, which would dilute the instructions.
+            include_quiz = False if structured_mode else should_generate_quiz(query)
+            include_suggested_prompts = False if structured_mode else should_generate_suggested_prompts(query)
 
             prompt = build_query_prompt(
                 query,
@@ -250,7 +255,9 @@ class BaseRAGClient:
                 summaries,
                 include_quiz=include_quiz,
                 include_suggested_prompts=include_suggested_prompts,
+                structured_mode=structured_mode,
                 resolved_query=resolved_query,
+                record_count=record_count,
             )
 
             # Prepend system instruction (same as GeminiClient._generate_async)
@@ -260,7 +267,7 @@ class BaseRAGClient:
             answer_text, usage = await self._generate_for_rag(full_prompt)
             answer_text, quiz_payload = split_answer_and_quiz(answer_text)
             answer_text, suggested_prompts = split_answer_and_suggested_prompts(answer_text)
-            answer_text, was_truncated = postprocess_answer(answer_text)
+            answer_text, was_truncated = postprocess_answer(answer_text, structured_mode=structured_mode)
 
             # Citation verification: ensure every [source] in the answer
             # matches a retrieved source. Repairs fuzzy matches, removes
@@ -270,14 +277,24 @@ class BaseRAGClient:
                 answer_text = deduplicate_inline_citations(answer_text)
                 answer_text = normalize_kb_citations(answer_text, sources)
 
-            result = {
-                "answer": answer_text,
-                "sources": sources if sources else ["knowledge_base"],
-                "coverage_score": self._calculate_coverage_score(
+            # A structured scroll already enumerates the full matching dataset;
+            # the response is fully covered by the retrieved records — unless
+            # the source file was truncated at the ingestion row limit, in
+            # which case coverage is computed like an ordinary result.
+            coverage_score = (
+                1.0
+                if structured_mode and not vector_results.get("structured_partial")
+                else self._calculate_coverage_score(
                     context_length=len(context_text),
                     answer_length=len(answer_text),
                     summaries_count=len(summaries),
-                ),
+                )
+            )
+
+            result = {
+                "answer": answer_text,
+                "sources": sources if sources else ["knowledge_base"],
+                "coverage_score": coverage_score,
                 "truncated": was_truncated,
                 "meta": {
                     "model": self.model_main,
@@ -322,6 +339,11 @@ class BaseRAGClient:
 
         if not docs:
             return "", [], []
+
+        if vector_results.get("structured_mode"):
+            # Structured dataset context is already formatted by the retriever.
+            # Do not wrap it in per-source tags or apply per-chunk limits.
+            return docs[0], [], []
 
         settings = get_settings()
         max_context_chars = getattr(settings, "MAX_CONTEXT_CHARS", MAX_CONTEXT_LENGTH)
@@ -385,6 +407,15 @@ class BaseRAGClient:
 
         full_context = "\n\n".join(context_parts)
         return full_context, summaries, sources
+
+    @staticmethod
+    def _structured_record_count(vector_results: Dict[str, Any]) -> Optional[int]:
+        """Return the record count carried by a structured-mode retrieval result."""
+        metadatas = vector_results.get("metadatas", []) or []
+        for meta in metadatas:
+            if isinstance(meta, dict) and "structured_record_count" in meta:
+                return int(meta["structured_record_count"])
+        return None
 
     @staticmethod
     def _build_context_fingerprint(

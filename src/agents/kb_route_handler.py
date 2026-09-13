@@ -12,7 +12,6 @@ from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from .protocols import (
     AnswerGeneratorProtocol,
-    FusionRetrieverProtocol,
     RelevanceCheckerProtocol,
     RetrieverProtocol,
 )
@@ -24,6 +23,7 @@ from .route_processor_utils import (
     extract_source_titles,
     kb_top_relevance,
     remaining_budget_ms,
+    retrieve_kb_results,
     source_name_from_metadata,
     try_serve_cached_answer,
 )
@@ -147,29 +147,15 @@ class KBRouteHandler:
         """
         step_start = time.time()
         
-        # Retrieve from KB (use fusion retrieval when sub-queries are available)
-        # allow_unfiltered_fallback=True: if the rewriter extracted filters for
-        # fields that aren't payload-indexed in Qdrant, silently drop them and
-        # search unfiltered rather than returning 0 results.
-        try:
-            if sub_queries and isinstance(self.retriever, FusionRetrieverProtocol):
-                vector_results = await self.retriever.retrieve_with_fusion(
-                    query=query,
-                    sub_queries=sub_queries,
-                    where=metadata_filters,
-                    allow_unfiltered_fallback=True,
-                    original_query=original_query,
-                )
-            else:
-                vector_results = await self.retriever.retrieve(
-                    query=query,
-                    where=metadata_filters,
-                    allow_unfiltered_fallback=True,
-                    original_query=original_query,
-                )
-        except Exception as e:
-            logger.error("Error during knowledge base retrieval: %s", e, exc_info=True)
-            vector_results = {"documents": [], "metadatas": [], "ids": [], "distances": []}
+        # Enumeration is rare. Detect original first, then rewrite separately;
+        # concatenating them could turn a lookup into a list query.
+        vector_results = await retrieve_kb_results(
+            self.retriever,
+            query,
+            original_query,
+            metadata_filters=metadata_filters,
+            sub_queries=sub_queries,
+        )
 
         if vector_results.get("relaxed_fields"):
             logger.info(
@@ -300,10 +286,19 @@ class KBRouteHandler:
         )
         result["citations"] = kb_citations
         
-        # Check if supplementation needed
-        should_supplement, supplement_reason = await self._check_supplementation_needed(
-            result, original_query, vector_results,
-        )
+        # A structured scroll already visited every matching row, and the
+        # answer generator has set coverage accordingly. Web search can only
+        # dilute it with unrelated or stale records. A source file cut at the
+        # ingestion row limit (structured_partial) is an exception: the scroll
+        # saw only a prefix of the dataset, so supplementation stays available.
+        if vector_results.get("structured_mode") and not vector_results.get("structured_partial"):
+            should_supplement = False
+            supplement_reason = "Structured dataset scroll"
+        else:
+            # Check if supplementation needed
+            should_supplement, supplement_reason = await self._check_supplementation_needed(
+                result, original_query, vector_results,
+            )
         
         if should_supplement and self.config.enable_web_search and web_supplement_callback:
             logger.info("Supplementing with web search: %s", supplement_reason)

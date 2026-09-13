@@ -477,3 +477,35 @@ class TestHistorySignatureRoundTrip:
             "Turn 3 history verification failed: the signature must cover the "
             "history as the client holds it, not the truncated prompt copy."
         )
+
+
+class TestDocumentStoreRoutes:
+    """Tests for document store API endpoints."""
+
+    @pytest.mark.asyncio
+    async def test_conversion_info_worker_status_down(self, monkeypatch):
+        """In worker-dispatch mode, /conversion-info reports worker_status.alive=False
+        when no ingest-worker heartbeat is detected, so the frontend can warn the user
+        *before* uploading that their documents will queue but not process."""
+        from src.api.document_store_routes import get_conversion_info
+        from src.config import reset_settings_singleton
+
+        monkeypatch.setenv("INGESTION_DISPATCH", "worker")
+        reset_settings_singleton()
+
+        with patch("src.document_store.worker.is_worker_alive", return_value=False):
+            response = await get_conversion_info()
+
+        assert response["worker_status"]["dispatch_mode"] == "worker"
+        assert response["worker_status"]["alive"] is False
+
+    @pytest.mark.asyncio
+    async def test_conversion_info_worker_status_in_process_alive(self):
+        """In in_process mode, worker_status.alive is True because the API process
+        itself handles ingestion -- it is trivially alive if the endpoint responds."""
+        from src.api.document_store_routes import get_conversion_info
+
+        response = await get_conversion_info()
+
+        assert response["worker_status"]["dispatch_mode"] == "in_process"
+        assert response["worker_status"]["alive"] is True
