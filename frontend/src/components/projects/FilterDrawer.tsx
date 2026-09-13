@@ -92,7 +92,7 @@ export const FilterDrawer: React.FC<FilterDrawerProps> = ({
       <div className="fixed z-40 flex flex-col bg-surface-card shadow-2xl inset-x-0 bottom-0 rounded-t-2xl max-h-[80vh] lg:fixed lg:inset-y-0 lg:right-0 lg:left-auto lg:top-0 lg:w-[400px] lg:max-h-none lg:rounded-none lg:border-l lg:border-border-ui">
         {/* Drawer header */}
         <div className="flex items-center justify-between p-3 border-b border-surface-subtle flex-shrink-0">
-          <span className="font-poppins font-semibold text-sm text-text-primary">
+          <span className="font-poppins font-semibold text-sm 3xl:text-base 4xl:text-lg text-text-primary">
             {ariaLabel}
           </span>
           <div className="flex items-center gap-3">
@@ -100,7 +100,7 @@ export const FilterDrawer: React.FC<FilterDrawerProps> = ({
               <button
                 type="button"
                 onClick={onClearAll}
-                className="font-inter text-xs text-destructive hover:text-destructive/80 transition-colors"
+                className="font-inter text-xs 3xl:text-sm 4xl:text-base text-destructive hover:text-destructive/80 transition-colors"
               >
                 {clearLabel}
               </button>
@@ -142,7 +142,7 @@ export const FilterDrawer: React.FC<FilterDrawerProps> = ({
                   key={key}
                   className="border-b border-surface-subtle last:border-0 p-3"
                 >
-                  <div className="font-inter text-xs font-medium text-text-primary mb-2">
+                  <div className="font-inter text-xs 3xl:text-sm 4xl:text-base font-medium text-text-primary mb-2">
                     {label}
                   </div>
                   <FilterPillList
@@ -172,7 +172,7 @@ export const FilterDrawer: React.FC<FilterDrawerProps> = ({
                     id={`${idPrefix}-tab-${key}`}
                     className="w-full flex items-center justify-between px-3 py-3 text-left transition-colors hover:bg-surface-subtle"
                   >
-                    <span className="flex items-center gap-1.5 font-inter text-xs font-medium text-text-primary">
+                    <span className="flex items-center gap-1.5 font-inter text-xs 3xl:text-sm 4xl:text-base font-medium text-text-primary">
                       {label}
                       {hasValue && (
                         <span className="w-1.5 h-1.5 rounded-full bg-brand-900" />

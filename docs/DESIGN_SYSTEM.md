@@ -11,7 +11,7 @@ Design system for the Cora VCM application. Single source of truth — one entry
 **Setup** — Google Fonts imported in `index.html`; Tailwind configured with `font-poppins` and `font-inter` utility classes.
 
 ```html
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 ```
 
 ```js
@@ -53,17 +53,14 @@ Several tokens intentionally share the same value in light mode but diverge in d
 
 | Export | Purpose |
 |---|---|
-| `BRAND` | Brand purple scale: `primary900` (#403D85), `primary700` (#4A2AA3), `primary500` (#6F4ECB), `primary200` (#E9D5FF), `primary100` (#F3E8FF) |
-| `NEUTRAL` | Neutral gray scale: 0 (#FFF) → 900 (#171717) |
-| `TEXT` | Semantic text: `primary` #171717, `body` #525252, `muted` #6B7280, `disabled` #B8BEC8 |
+| `BRAND` | Brand purple scale: `primary950` (#2E1065), `primary900` (#403D85), `primary700` (#4A2AA3), `primary500` (#6F4ECB), `primary300` (#C4B5FD), `primary200` (#E9D5FF), `primary100` (#F3E8FF), `primary50` (#FAF5FF) |
+| `NEUTRAL` | Neutral gray scale: 0 (#FFFFFF), 25 (#FAFAFA), 50 (#F8F9FA), 100 (#F3F4F6), 150 (#E5E7EB), 200 (#D6D6D6), 300 (#B8BEC8), 400 (#6B7280), 600 (#4B5563), 800 (#525252), 900 (#171717) |
+| `TEXT` | Semantic text: `primary` #171717, `body` #525252, `muted` #6B7280, `disabled` #B8BEC8, `inverse` #FFFFFF |
 | `INTERACTIVE` | States: `default` #6B7280, `hover/active` #6F4ECB, `focusRing` rgba(74,42,163,0.35) |
 | `ICON_STATE` | Icon states: `default` #6B7280, `active/selected` #6F4ECB |
 | `getProjectTypeColor(type)` | Returns `{ accent, bg, text }` for Forest/REDD+, Renewable, Agriculture, Cookstove/Household, Landfill/Industrial, default purple |
 | `getStatusStyle(status)` | Returns `{ bg, text, dot }` for registered/active (green), completed (blue), cancelled (red), under development (amber), crediting period ended (gray) |
-| `DOCUMENT_TYPE_COLORS` | Knowledge Base badge colors keyed by type (see TypeBadge section) |
-| `CATEGORY_THEMES` | Pricing page icon/bg colors for Agriculture, Household Devices, Renewable Energy, REDD+ |
-| `NOTICE_COLORS` | Modal notice card colors: research (amber), privacy (purple), cancelled, error |
-| `TREND_COLORS` | SBTImpact badge colors: rising (green), declining (orange), note (amber) |
+| `TREND_COLORS` | Trend badges / icon colors: rising (green), declining (orange), note (amber) |
 
 #### Semantic Quick Reference
 
@@ -72,16 +69,16 @@ Several tokens intentionally share the same value in light mode but diverge in d
 | Text primary | `#171717` | Headings, key labels |
 | Text body | `#525252` | Card content, descriptions |
 | Text muted | `#6B7280` | Captions, metadata, section labels |
-| Page bg | `#FFFFFF` | Full-page background |
+| Page bg | `#FAFAFA` (`surface-base`) | App shell background; data pages use `surface-page` `#F7F8FB` |
 | Surface base | `#FAFAFA` | Panels, alt table rows |
 | Surface subtle | `#F3F4F6` | Input bg, dividers |
-| Border | `#E5E7EB` | All borders (unifies #E5E5E5, #ECECF0, #E7E7E7) |
+| Border | `#E5E7EB` (`border-ui`) | All borders (unifies #E5E5E5, #ECECF0, #E7E7E7) |
 | Brand primary | `#403D85` | Buttons, main actions |
 | Brand secondary | `#6F4ECB` | Hover states, active icons |
 | Brand link | `#4A2AA3` | Nav links, back buttons |
-| Warning bg | `#FFF9E6` | Alert / notice cards |
-| Warning border | `#FFE7A3` | Alert / notice cards |
-| Warning icon | `#F59E0B` | Alert icons |
+| Warning bg | `#FFFBEB` (`semantic-warning-bg`) | Alert / notice cards |
+| Warning border | `#FEF3C7` (`semantic-warning-border`) | Alert / notice cards |
+| Warning icon | `#F59E0B` (`semantic-warning-icon`) | Alert icons |
 
 ---
 
@@ -95,8 +92,25 @@ Several tokens intentionally share the same value in light mode but diverge in d
 ### Border Radius
 
 CSS variable `--radius: 0.5rem` (8px). Derived:
-- `rounded-lg` → 8px, `rounded-md` → 6px, `rounded-sm` → 4px
+- `rounded-lg` → 8px, `rounded-md` → 6px, `rounded-sm` → 4px, `rounded-xs` → 2px
 - Custom: `rounded-[20px]` pills, `rounded-2xl` cards, `rounded-full` badges
+
+### App Type Scale (`tailwind.config.ts` `fontSize`)
+
+Marketing H1–H6 above are for hero/page titles. In-app UI uses these utilities instead:
+
+| Token | Size / Line-height | Use |
+|---|---|---|
+| `text-display` | 28px / 1.10, -0.02em | Large in-app headings |
+| `text-heading-1` | 22px / 1.20 | Panel / page headings |
+| `text-heading-2` | 18px / 1.25 | Section headings |
+| `text-heading-3` | 16px / 1.30 | Sub-section headings |
+| `text-body` | 16px / 1.60 | Default body |
+| `text-body-sm` | 14px / 1.50 | Compact body |
+| `text-ui` | 13px / 1.35 | UI labels, table cells |
+| `text-caption` | 12px / 1.40 | Captions, metadata |
+| `text-overline` | 11px / 1.30 | Uppercase micro labels |
+| `text-micro` / `text-2xs` | 10px / 1.25 | Superscripts, footnotes (`micro` adds 0.05em tracking; `2xs` is the legacy alias) |
 
 ### Elevation (Shadows)
 
@@ -111,7 +125,6 @@ Defined as CSS custom properties in `src/index.css` and Tailwind utilities in `t
 | `shadow-bottom-bar` | `0 -4px 16px rgba(0,0,0,0.08)` | Cookie consent bar |
 | `shadow-modal` | `0 32px 64px -12px rgba(0,0,0,0.14)` | Modals |
 | `shadow-scroll-btn` | `0 2px 8px rgba(0,0,0,0.08)` | Scroll-to-top button |
-| `shadow-sm-hover` | `0 6px 18px rgba(17,17,26,0.08)` | Card/pill hover lift |
 
 Glow effects (inline, single-use): send button large `0 0 20px rgba(111,78,203,0.25)`, composer `0 0 12px rgba(111,78,203,0.2)`.
 
@@ -143,7 +156,7 @@ Placeholder text: `placeholder:text-muted-foreground/70`
 - **Nav items**: Chat, Knowledge Base, Pricing, Explore Projects, About
 
 ### SearchBar
-- **File**: `src/components/chat/SearchBar.tsx`
+- **File**: `src/components/ui/SearchBar.tsx`
 - **Large variant** (main page): blurred gradient glow behind composer — `linear-gradient(135deg, rgba(147,51,234,0.15), rgba(236,72,153,0.15))` at `opacity-40 blur-2xl z-[-1]`; send button glow `shadow-[0_0_20px_rgba(111,78,203,0.25)]`; shadow `shadow-card-md`
 - **Composer variant** (chat page): compact, no gradient bg; send button glow `shadow-[0_0_12px_rgba(111,78,203,0.2)]`; shadow `shadow-card-sm`
 - **Textarea**: auto-grows up to 6 lines, `resize-none`; `Enter` sends, `Shift+Enter` newline
@@ -160,7 +173,7 @@ Placeholder text: `placeholder:text-muted-foreground/70`
 
 ### Pills (Category Filters)
 - Base: `bg-[rgba(47,45,90,1)] text-white rounded-full px-4 py-2 font-poppins`
-- Hover: darken ~10%, `shadow-sm-hover`, scale 1.03
+- Hover: darken ~10%, `shadow-sm`, scale 1.03
 - Active: `scale-[0.98]`; Focus: focus-primary ring; Motion: `transition-all duration-200 ease-out`
 
 ### Button (shadcn/ui)
@@ -183,33 +196,10 @@ Placeholder text: `placeholder:text-muted-foreground/70`
 
 ### CategoryCard
 - Base: white bg, `border border-[rgba(224,224,224,1)]`, `shadow-xs`, `rounded-2xl`
-- Hover: `shadow-sm-hover`, `-translate-y-0.5`, icon `group-hover:scale-110`
+- Hover: `shadow-sm`, `-translate-y-0.5`, icon `group-hover:scale-110`
 - Accessibility: `role="button"`, Enter/Space activation, focus-primary ring
 
 ---
-
-### TypeBadge
-- **File**: `src/components/ui/TypeBadge.tsx`
-- **Colors from**: `DOCUMENT_TYPE_COLORS` in `src/lib/colors.ts`
-- **Styling**: `rounded-full px-3 py-1 font-inter text-[11px] font-medium`
-
-| Type | Background | Text |
-|---|---|---|
-| Methodologies | `#E8F4FD` | `#1E6BB8` |
-| Policy | `#E8F5E9` | `#2E7D32` |
-| Research | `#F3E8FD` | `#6F4ECB` |
-| Projects | `#FFF3E0` | `#E65100` |
-| Co-benefits | `#FFF8E1` | `#B45309` |
-| PDD | `#E0F2F1` | `#00695C` |
-
-### DataSourcesTable
-- **File**: `src/components/data-sources/DataSourcesTable.tsx`
-- **Layout**: Title + subtitle → search bar → collapsible filter pills → results counter → table
-- **Columns**: Document (24%), Source (16%), Type (12%), Updated (10%), Description (38%)
-- **Typography**: title Poppins Semibold 20px `#1F1F1F`; subtitle Inter 15px `#5B5B7A`; headers Inter Semibold 12px `#6B7280` uppercase; cells Inter 13-14px
-- **Filter pills**: active `bg-[#403D85] text-white`; inactive `bg-[#F3F4F6] text-[#5B5B7A]`; hover `bg-[#E5E7EB]`; `px-3.5 py-1.5` Inter Medium 12px; shows count
-- **Search**: `h-11 w-full rounded-full border-[#E5E7EB]` placeholder `#99A1AF`
-- **Table container**: `rounded-xl border border-[#E5E7EB] shadow-sm`; header `bg-[#F8F9FA]`; rows alternate white/`bg-[#FAFAFA]/50`; hover `bg-[#F3E8FF]/30`; dividers `divide-y divide-[#F3F4F6]`; cell padding `py-4 px-5`
 
 ### ProjectKPIs
 - **File**: `src/components/projects/ProjectKPIs.tsx`
@@ -236,7 +226,7 @@ All messages are plain text (no bubbles), centered in a **680px** max-width cont
 | User | `font-inter font-semibold text-lg md:text-xl` |
 | Bot pending | Animated dots, `#6B7280` |
 | Bot error | `bg-red-50 border border-red-200 rounded-md`; retry `bg-red-600 hover:bg-red-700` |
-| Bot cancelled | `bg-[#F3F0FF] border border-[#DAD6FF]`; from `NOTICE_COLORS.cancelled` |
+| Bot cancelled | `bg-brand-50 border border-brand-200 text-brand-900 rounded-md` |
 | Bot success | Markdown via ChatMarkdownContent |
 
 **Retry button** (error/cancelled): Poppins font, `text-[11px] px-2.5 py-1 rounded`; disabled with spinner while retrying (`Loader2 animate-spin`)
@@ -281,21 +271,26 @@ All messages are plain text (no bubbles), centered in a **680px** max-width cont
 
 ### Pricing Components
 
-#### PricingChart
-- **File**: `src/components/pricing/PricingChart.tsx`; Recharts (`ResponsiveContainer`, `LineChart`, `Line`, `XAxis`, `YAxis`, `Tooltip`); full-width responsive
+Page shell: `src/pages/PricingPage.tsx` — hero + `PricingFactorTabs` + `PricingExplorer`. No `react-query` on this route; no chart library. Data lives in `src/data/pricingData.ts` (order, labels, `TYPE_COLORS`) and `src/data/pricingFactorContent.ts` (sourced figures, methodology statuses, SBTi timeline copy, source links).
 
-#### MethodologyExplanation
-- **File**: `src/components/pricing/MethodologyExplanation.tsx`; category-aware (Agriculture, REDD+, Renewable Energy, Household Devices); sticky positioning
+#### PricingFactorTabs
+- **File**: `src/components/pricing/PricingFactorTabs.tsx`
+- Text tabs (`role="tablist"`) with a single ink-filled active state, roving `tabIndex` + arrow keys, and horizontal scrolling on mobile.
 
-#### PricingDrivers
-- **File**: `src/components/pricing/PricingDrivers.tsx`; `grid-cols-2 md:grid-cols-4`
-- Card: `rounded-[12px] md:rounded-[16px] border border-gray-200 bg-white px-3 md:px-5 pt-3 md:pt-5 pb-4 md:pb-6 min-h-[140px] md:min-h-[200px] shadow-sm hover:shadow-md`
-- Icon container: `rounded-[10px] md:rounded-[14px] p-1.5 md:p-2 w-9 h-9 md:w-12 md:h-12`
-- Category theming from `CATEGORY_THEMES` in `colors.ts`
+#### PricingExplorer
+- **File**: `src/components/pricing/PricingExplorer.tsx`
+- Single `tabpanel` that switches the active factor with a reduced-motion-aware `AnimatePresence` transition.
 
-#### SBTImpact
-- **File**: `src/components/pricing/SBTImpact.tsx`; category-aware
-- Badge colors from `TREND_COLORS` in `colors.ts`: rising `bg-[#E3F6D6] text-[#2F4F2F]`; declining `bg-[#FDE6C9] text-[#7C2D00]`
+#### FactorComparison
+- **File**: `src/components/pricing/FactorComparison.tsx`
+- One white `DataCard` per force, using open layout gaps instead of repeated internal divider rules:
+  - **Type** — linear animated bar comparison plus a dark neutral context panel.
+  - **Integrity** — balanced landfill-gas metrics, co-benefit premium, and CCP methodology status list.
+  - **Claims** — SBTi V2.0 milestone timeline + open demand lanes without flow chips.
+  - **Compliance** — CORSIA timeline + open authorized and unauthorized buyer pools without large tinted cards.
+  - **Vintage** — linear animated bar comparison plus a dark neutral context panel.
+- Statuses render as semantic text labels rather than capsules. Large values use tabular numerals.
+- Shared primitives: `BandLabel`, `DataCard`, `SplitBand`, `BarComparison`, `StatusPill`.
 
 ---
 
@@ -384,14 +379,6 @@ All messages are plain text (no bubbles), centered in a **680px** max-width cont
 
 ### Modals & Overlays
 
-#### TermsOfServicePopup
-- **File**: `src/components/ui/TermsOfServicePopup.tsx`
-- **Features**: focus trap, Escape to close, cookie persistence 365 days, shows only on `/`
-- Overlay: `fixed inset-0 bg-black/60 backdrop-blur-md z-[100]`
-- Dialog: `bg-white rounded-[28px] max-w-[480px] border border-[#E5E7EB] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.14)]`
-- Notice cards: Research `bg-[#FFFBEB] border-[#FEF3C7]` amber; Privacy `bg-[#F5F3FF] border-[#EDE9FE]` purple (from `NOTICE_COLORS`)
-- Primary button: `bg-[#403D85] hover:bg-[#6F4ECB] text-white rounded-xl px-6 py-2.5`
-
 #### ScrollToTop
 - Fixed `bottom-6 right-6`; white circle, `shadow-scroll-btn`; brand purple `#4A2AA3` arrow; appears after 300px scroll; `aria-label` for accessibility
 
@@ -399,12 +386,12 @@ All messages are plain text (no bubbles), centered in a **680px** max-width cont
 
 ### IconWrapper
 - **File**: `src/components/icons/IconWrapper.tsx`
-- **Icons**: `src/assets/icons/` — 40 stroke-based (outline) SVGs
+- **Icons**: `src/assets/icons/` — 22 stroke-based (outline) SVGs
 - **Props**: `Icon` (required), `size` (default 24), `color`, `state ('default'|'active'|'selected')`, `title`, `aria-hidden`, `onClick`
 - **State colors** (from `ICON_STATE`): default `#6B7280`, active/selected `#6F4ECB`
 - **Accessibility**: use `title` for meaningful icons OR `aria-hidden={true}` for decorative — never both
 
-**Available icons**: alert, arrow-up, back, book, calendar, chat, check-circle, chevron-down, chevron-first, chevron-left, chevron-up, complex, cookie, cora, database, date, explore, external-link, file, globe, info, lightbulb, list, location, mail, map, plus-circle, pricing, refresh, scale, search, shield, sidebar-close, sidebar-open, tag, target, trash, tree, trending-down, users, x
+**Available icons**: arrow-up, book, calender, chat, chevron-left, cora, explore, file, globe, info, lightbulb, location, map, plus-circle, pricing, sidebar-close, target, trash, tree, trending-down, users, x
 
 ```tsx
 import { IconWrapper } from '@/components/icons/IconWrapper';
@@ -459,7 +446,7 @@ import ChatIcon from '@/assets/icons/chat.svg?react';
 - Motion: all transitions respect `@media (prefers-reduced-motion: reduce)`
 
 ### Responsive Design
-- Container centered with `2rem` padding; custom `2xl` breakpoint at `1400px`
+- Container centered with `2rem` padding; custom `2xl` breakpoint at `1400px`; ultra-wide `3xl` at `1920px`, `4xl` at `2400px` (`tailwind.config.ts` `screens`)
 - Split view right panel hidden below `lg`; mobile gets sheet-style drawer
 - Sidebar collapses to icon-only on mobile (hamburger toggle)
 
@@ -468,7 +455,7 @@ import ChatIcon from '@/assets/icons/chat.svg?react';
 - Scroll area: `paddingBottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))'`
 
 ### Content Rendering (Markdown)
-- **Links**: sanitized URLs; external open with `target="_blank" rel="noopener noreferrer"`; style `text-purple-700 underline break-words inline-flex items-center gap-1` + external-link icon
+- **Links**: sanitized URLs; external open with `target="_blank" rel="noopener noreferrer"`; style `text-brand-700 underline break-words inline-flex items-center gap-1` + lucide `ExternalLink` icon
 - **Images**: `loading="lazy" decoding="async" max-w-full h-auto max-h-80 object-contain rounded-md border border-gray-100`
 
 ---

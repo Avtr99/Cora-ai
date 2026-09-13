@@ -10,9 +10,11 @@
 // Brand tokens (mirrors DESIGN_TOKENS_REFERENCE.md)
 // ---------------------------------------------------------------------------
 export const BRAND = {
+  primary950: '#2E1065',
   primary900: '#403D85',
   primary700: '#4A2AA3',
   primary500: '#6F4ECB',
+  primary300: '#C4B5FD',
   primary200: '#E9D5FF',
   primary100: '#F3E8FF',
   primary50: '#FAF5FF',
@@ -201,62 +203,6 @@ export const SDG_COLORS: Record<number, string> = {
   17: '#19486A',
 } as const;
 
-// ---------------------------------------------------------------------------
-// Category themes (Pricing page)
-// ---------------------------------------------------------------------------
-export type CategoryThemeSet = { iconColor: string; iconBgColor: string; textColor: string };
-
-export const CATEGORY_THEMES: Record<string, CategoryThemeSet> = {
-  agriculture:       { iconColor: '#294C7B', iconBgColor: '#DBEAFE', textColor: '#294C7B' },
-  'household devices': { iconColor: '#6F4ECB', iconBgColor: '#F3E8FF', textColor: '#403D85' },
-  'renewable energy':  { iconColor: '#BF7E2B', iconBgColor: '#F9DBB6', textColor: '#A65B00' },
-  'redd+':             { iconColor: '#A13D15', iconBgColor: '#FAD1C1', textColor: '#A13D15' },
-} as const;
-
-/**
- * Returns the theme colors for a pricing category.
- * Matches against keywords (case-insensitive).
- */
-export function getCategoryTheme(category: string | undefined): CategoryThemeSet {
-  if (!category) return CATEGORY_THEMES.agriculture;
-  const lower = category.toLowerCase();
-  for (const [keyword, colors] of Object.entries(CATEGORY_THEMES)) {
-    if (lower.includes(keyword)) return colors;
-  }
-  return CATEGORY_THEMES.agriculture;
-}
-
-// ---------------------------------------------------------------------------
-// Notice/Alert card colors
-// ---------------------------------------------------------------------------
-export type NoticeColorSet = { bg: string; border: string; text: string; iconBg?: string; iconBorder?: string };
-
-export const NOTICE_COLORS = {
-  research: {
-    bg: '#FFFBEB',
-    border: '#FEF3C7',
-    text: '#92400E',
-    iconBg: '#FEF3C7',
-    iconBorder: '#FDE68A',
-  },
-  privacy: {
-    bg: '#F5F3FF',
-    border: '#EDE9FE',
-    text: '#5B21B6',
-    iconBg: '#EDE9FE',
-    iconBorder: '#DDD6FE',
-  },
-  cancelled: {
-    bg: '#F3F0FF',
-    border: '#DAD6FF',
-    text: '#2F2A72',
-  },
-  error: {
-    bg: '#FEF2F2',
-    border: '#FECACA',
-    text: '#991B1B',
-  },
-} as const;
 
 // ---------------------------------------------------------------------------
 // Choropleth density colors (shared by ProjectMap + MapLegend)
@@ -271,7 +217,7 @@ export const CHOROPLETH_COLORS: ReadonlyArray<{ min: number; color: string }> = 
 ];
 
 // ---------------------------------------------------------------------------
-// Trend colors (SBTImpact component)
+// Trend colors (FactorComparison claims demand lanes)
 // Consistent nested structure: each trend has badge and icon sub-objects
 // ---------------------------------------------------------------------------
 export type TrendBadgeColorSet = { bg: string; text: string; border?: string };
@@ -344,16 +290,6 @@ export const SEMANTIC: Record<'success' | 'error' | 'warning' | 'info', Semantic
     button: '#1D4ED8',
     buttonHover: '#1E40AF',
   },
-} as const;
-
-// ---------------------------------------------------------------------------
-// Chart / data-visualization colors
-// ---------------------------------------------------------------------------
-export const CHART = {
-  household: '#4F46E5',
-  agriculture: '#2098D8',
-  renewable: '#F59E0B',
-  redd: '#EF4444',
 } as const;
 
 // ---------------------------------------------------------------------------

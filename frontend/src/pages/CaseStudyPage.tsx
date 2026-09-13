@@ -43,7 +43,7 @@ function CaseStudyPage(): JSX.Element {
     return (
       <main className="bg-surface-page min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-semibold text-text-primary mb-2">Case study not found</h1>
+          <h1 className="text-2xl 3xl:text-3xl 4xl:text-4xl font-semibold text-text-primary mb-2 3xl:mb-3">Case study not found</h1>
           <p className="text-text-muted">The requested case study does not exist.</p>
         </div>
       </main>
@@ -57,7 +57,7 @@ function CaseStudyPage(): JSX.Element {
       {/* Main Page Heading - Visually Hidden but accessible to screen readers */}
       <h1 className="sr-only">Carbon Credit Project Case Study - {caseStudyData.title}</h1>
 
-      <div className="container mx-auto px-4 md:px-16 lg:px-24 pt-16 pb-24 md:pb-16 max-w-7xl">
+      <div className="container mx-auto px-4 md:px-12 lg:px-24 3xl:px-24 4xl:px-32 pt-16 3xl:pt-20 4xl:pt-24 pb-24 md:pb-16 3xl:pb-20 4xl:pb-24 max-w-7xl 3xl:max-w-[1600px] 4xl:max-w-[1800px]">
         {/* Case Study Header */}
         <CaseStudyHeader
           title={caseStudyData.title}
@@ -69,12 +69,12 @@ function CaseStudyPage(): JSX.Element {
         />
 
         {/* Hero Image + Strengths */}
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,600px)_1fr] gap-x-6 lg:gap-x-14 gap-y-4 mb-12 items-stretch">
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,600px)_1fr] 3xl:grid-cols-[minmax(0,760px)_1fr] 4xl:grid-cols-[minmax(0,900px)_1fr] gap-x-6 lg:gap-x-14 3xl:gap-x-16 4xl:gap-x-20 gap-y-4 3xl:gap-y-6 mb-12 3xl:mb-14 4xl:mb-16 items-stretch">
           <div className="relative rounded-2xl overflow-hidden w-full min-w-0 aspect-[16/9] md:aspect-[3/2] lg:aspect-auto lg:h-full bg-surface-subtle max-h-[62.5vw] md:max-h-[480px] lg:max-h-none">
             <img
               src={caseStudyData.mainImage}
               srcSet={caseStudyData.mainImageSrcSet}
-              sizes="(max-width: 767px) calc(100vw - 2rem), (max-width: 1023px) calc(100vw - 8rem), 600px"
+              sizes="(max-width: 767px) calc(100vw - 2rem), (max-width: 1023px) calc(100vw - 8rem), (max-width: 1919px) 600px, (max-width: 2399px) 760px, 900px"
               alt={caseStudyData.title}
               className="w-full h-full max-w-full object-cover"
               loading="eager"
@@ -82,7 +82,7 @@ function CaseStudyPage(): JSX.Element {
               ref={(el) => el?.setAttribute('fetchpriority', 'high')}
             />
           </div>
-          <div className="min-w-0 lg:max-w-[480px]">
+          <div className="min-w-0 lg:max-w-[480px] 3xl:max-w-none">
             <CaseStudyStrengths
               strengths={caseStudyData.strengths}
               sdgs={caseStudyData.sdgs}
@@ -92,7 +92,7 @@ function CaseStudyPage(): JSX.Element {
             />
           </div>
           {caseStudyData.mainImageCaption && (
-            <p className="lg:col-span-2 font-inter text-xs text-text-muted leading-normal">
+            <p className="lg:col-span-2 font-inter text-xs 3xl:text-[15px] 4xl:text-lg text-text-muted leading-normal">
               {caseStudyData.mainImageCaption}
             </p>
           )}
@@ -100,14 +100,14 @@ function CaseStudyPage(): JSX.Element {
 
         {/* Remote sensing evidence + project overview */}
         {(caseStudyData.overviewMap || (caseStudyData.beforeAfterImages && caseStudyData.beforeAfterImages.length > 0)) && (
-          <div className="mb-16">
-            <p className="text-xs uppercase text-text-muted font-inter font-semibold leading-snug mb-4">
+          <div className="mb-16 3xl:mb-20 4xl:mb-24">
+            <p className="text-xs 3xl:text-[15px] 4xl:text-lg uppercase text-text-muted font-inter font-semibold leading-snug mb-4 3xl:mb-5 4xl:mb-6">
               Satellite images
             </p>
 
             {/* Overview map + project summary */}
             {caseStudyData.overviewMap && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10 items-start mb-10">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10 3xl:gap-12 4xl:gap-14 items-start mb-10 3xl:mb-12 4xl:mb-14">
                 <div className="flex flex-col">
                   <Dialog>
                     <DialogTrigger asChild>
@@ -122,7 +122,7 @@ function CaseStudyPage(): JSX.Element {
                           loading="lazy"
                           decoding="async"
                         />
-                        <span className="absolute bottom-3 right-3 rounded-md bg-black/60 px-2.5 py-1.5 font-inter text-xs font-medium text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+                        <span className="absolute bottom-3 right-3 3xl:bottom-4 3xl:right-4 rounded-md bg-surface-overlay/60 px-2.5 3xl:px-3.5 py-1.5 3xl:py-2 font-inter text-xs 3xl:text-[13px] 4xl:text-sm font-medium text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
                           View full map
                         </span>
                       </button>
@@ -144,21 +144,21 @@ function CaseStudyPage(): JSX.Element {
                     </DialogContent>
                   </Dialog>
                   {(caseStudyData.overviewMap.caption || caseStudyData.overviewMap.attribution) && (
-                    <p className="mt-2 font-inter text-xs text-text-muted leading-normal">
+                    <p className="mt-2 3xl:mt-3 font-inter text-xs 3xl:text-[15px] 4xl:text-lg text-text-muted leading-normal">
                       {formatMapCaption(caseStudyData.overviewMap.caption, caseStudyData.overviewMap.attribution)}
                     </p>
                   )}
                 </div>
                 <div className="min-w-0">
-                  <h3 className="font-inter text-base font-semibold text-text-primary">
+                  <h3 className="font-inter text-base 3xl:text-[22px] 4xl:text-2xl font-semibold text-text-primary">
                     Project overview
                   </h3>
                   {caseStudyData.about && (
-                    <p className="mt-2 font-inter text-sm text-text-secondary leading-relaxed">
+                    <p className="mt-2 3xl:mt-3 font-inter text-sm 3xl:text-[17px] 4xl:text-[22px] text-text-secondary leading-relaxed 3xl:leading-[1.6]">
                       {caseStudyData.about}
                     </p>
                   )}
-                  <dl className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 border-t border-border-ui pt-4 font-inter text-xs">
+                  <dl className="mt-6 3xl:mt-8 grid grid-cols-1 sm:grid-cols-2 gap-x-6 3xl:gap-x-8 gap-y-3 3xl:gap-y-4 border-t border-border-ui pt-4 3xl:pt-6 font-inter text-xs 3xl:text-[15px] 4xl:text-lg">
                     <div>
                       <dt className="font-medium text-text-primary">Location</dt>
                       <dd className="mt-0.5 text-text-secondary leading-snug">{caseStudyData.location}</dd>
@@ -182,11 +182,11 @@ function CaseStudyPage(): JSX.Element {
 
             {/* Before/After village-tract sliders */}
             {caseStudyData.beforeAfterImages && caseStudyData.beforeAfterImages.length > 0 && (
-              <div className="mt-2">
-                <h3 className="font-inter text-sm font-semibold text-text-primary mb-4">
+              <div className="mt-2 3xl:mt-4">
+                <h3 className="font-inter text-sm 3xl:text-xl 4xl:text-2xl font-semibold text-text-primary mb-4 3xl:mb-5 4xl:mb-6">
                   Before & after
                 </h3>
-                <div className={`grid auto-rows-fr gap-6 ${caseStudyData.beforeAfterImages.length > 1 ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}>
+                <div className={`grid auto-rows-fr gap-6 3xl:gap-8 4xl:gap-10 ${caseStudyData.beforeAfterImages.length > 1 ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}>
                   {caseStudyData.beforeAfterImages.map((image) => (
                     <BeforeAfterSlider
                       key={`${image.before}-${image.after}`}
@@ -206,9 +206,9 @@ function CaseStudyPage(): JSX.Element {
 
         {/* Gallery Images */}
         {caseStudyData.galleryImages && caseStudyData.galleryImages.length > 0 && (
-          <div className="mb-16">
-            <p className="text-xs uppercase text-text-muted font-inter font-semibold leading-snug mb-4">Project Gallery</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="mb-16 3xl:mb-20 4xl:mb-24">
+            <p className="text-xs 3xl:text-[15px] 4xl:text-lg uppercase text-text-muted font-inter font-semibold leading-snug mb-4 3xl:mb-5 4xl:mb-6">Project Gallery</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 3xl:gap-6 4xl:gap-8">
               {caseStudyData.galleryImages.map((img, i) => (
                 <div key={i} className="relative aspect-[4/3] overflow-hidden rounded-xl bg-surface-subtle border border-border-ui shadow-sm">
                   <img
@@ -235,8 +235,8 @@ function CaseStudyPage(): JSX.Element {
         />
 
         {/* Project Benefits */}
-        <div className="mb-6 md:mb-12">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-14">
+        <div className="mb-6 md:mb-12 3xl:mb-14 4xl:mb-16">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-14 3xl:gap-16 4xl:gap-20">
             {firstTwoBenefits.map((benefit) => (
               <BenefitCard
                 key={benefit.number}
@@ -248,8 +248,8 @@ function CaseStudyPage(): JSX.Element {
           </div>
         </div>
 
-        <div className="mb-6 md:mb-12">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-14">
+        <div className="mb-6 md:mb-12 3xl:mb-14 4xl:mb-16">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-14 3xl:gap-16 4xl:gap-20">
             {lastTwoBenefits.map((benefit) => (
               <BenefitCard
                 key={benefit.number}

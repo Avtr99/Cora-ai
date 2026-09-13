@@ -22,7 +22,7 @@ export const FilterSearchInput: React.FC<FilterSearchInputProps> = ({
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       aria-label={ariaLabel}
-      className="w-full h-8 pl-8 pr-8 font-inter text-xs text-text-primary placeholder:text-text-muted
+      className="w-full h-8 3xl:h-10 4xl:h-11 pl-8 3xl:pl-10 pr-8 font-inter text-xs 3xl:text-sm 4xl:text-base text-text-primary placeholder:text-text-muted
         bg-surface-base border border-border-ui rounded-lg
         focus:outline-none focus:bg-surface-card focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
     />

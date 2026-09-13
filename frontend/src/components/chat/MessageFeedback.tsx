@@ -165,7 +165,7 @@ export const MessageFeedback: React.FC<MessageFeedbackProps> = ({
   const submitDisabled = selectedTags.size === 0 && !comment.trim();
 
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-1.5 3xl:gap-2">
       {/* Thumbs row */}
       <div className="flex items-center gap-0.5">
         {/* Thumbs Up */}
@@ -176,7 +176,7 @@ export const MessageFeedback: React.FC<MessageFeedbackProps> = ({
           aria-label="Good response"
           aria-pressed={isPositiveActive}
           title="Good response"
-          className={`flex items-center justify-center w-6 h-6 rounded transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2
+          className={`flex items-center justify-center w-6 h-6 3xl:w-7 3xl:h-7 4xl:w-8 4xl:h-8 rounded transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2
             ${isPositiveActive
               ? 'text-semantic-success-icon'
               : isSubmitted || isSubmitting
@@ -196,7 +196,7 @@ export const MessageFeedback: React.FC<MessageFeedbackProps> = ({
             className="inline-flex"
           >
             <ThumbsUp
-              className="h-3.5 w-3.5"
+              className="h-3.5 w-3.5 3xl:h-4 3xl:w-4 4xl:h-5 4xl:w-5"
               fill={isPositiveActive ? 'currentColor' : 'none'}
               strokeWidth={isPositiveActive ? 0 : 1.75}
             />
@@ -211,7 +211,7 @@ export const MessageFeedback: React.FC<MessageFeedbackProps> = ({
           aria-label="Bad response"
           aria-pressed={isNegativeSelected}
           title="Bad response"
-          className={`flex items-center justify-center w-6 h-6 rounded transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2
+          className={`flex items-center justify-center w-6 h-6 3xl:w-7 3xl:h-7 4xl:w-8 4xl:h-8 rounded transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2
             ${isNegativeSelected
               ? 'text-semantic-error-icon'
               : isSubmitted || isSubmitting
@@ -231,7 +231,7 @@ export const MessageFeedback: React.FC<MessageFeedbackProps> = ({
             className="inline-flex"
           >
             <ThumbsDown
-              className="h-3.5 w-3.5"
+              className="h-3.5 w-3.5 3xl:h-4 3xl:w-4 4xl:h-5 4xl:w-5"
               fill={isNegativeSelected ? 'currentColor' : 'none'}
               strokeWidth={isNegativeSelected ? 0 : 1.75}
             />
@@ -244,7 +244,7 @@ export const MessageFeedback: React.FC<MessageFeedbackProps> = ({
             initial={shouldReduceMotion ? { opacity: 1, x: 0 } : { opacity: 0, x: -4 }}
             animate={{ opacity: 1, x: 0 }}
             transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.2, ease: 'easeOut' }}
-            className="ml-2 font-inter text-xs text-semantic-success-icon font-medium select-none"
+            className="ml-2 3xl:ml-3 font-inter text-xs 3xl:text-sm text-semantic-success-icon font-medium select-none"
           >
             {status.text}
           </motion.span>
@@ -256,7 +256,7 @@ export const MessageFeedback: React.FC<MessageFeedbackProps> = ({
             initial={shouldReduceMotion ? { opacity: 1, x: 0 } : { opacity: 0, x: -4 }}
             animate={{ opacity: 1, x: 0 }}
             transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.2, ease: 'easeOut' }}
-            className="ml-2 font-inter text-xs text-semantic-error-text font-medium select-none"
+            className="ml-2 3xl:ml-3 font-inter text-xs 3xl:text-sm text-semantic-error-text font-medium select-none"
           >
             {status.text}
           </motion.span>
@@ -266,16 +266,16 @@ export const MessageFeedback: React.FC<MessageFeedbackProps> = ({
       {/* Slide-down negative feedback panel */}
       {isNegativePanelOpen && (
         <div
-          className="mt-0.5 rounded-xl border border-border-ui bg-surface-card p-3.5 shadow-sm"
+          className="mt-0.5 3xl:mt-1 rounded-xl border border-border-ui bg-surface-card p-3.5 3xl:p-5 4xl:p-6 shadow-sm"
           role="group"
           aria-label="Tell us what went wrong"
         >
-          <p className="font-inter text-xs font-medium text-text-secondary mb-2.5">
+          <p className="font-inter text-xs 3xl:text-sm 4xl:text-base font-medium text-text-secondary mb-2.5 3xl:mb-3.5 4xl:mb-4">
             What went wrong?
           </p>
 
           {/* Tag chips */}
-          <div className="flex flex-wrap gap-1.5 mb-3" role="group" aria-label="Feedback categories">
+          <div className="flex flex-wrap gap-1.5 3xl:gap-2 4xl:gap-2.5 mb-3 3xl:mb-4 4xl:mb-5" role="group" aria-label="Feedback categories">
             {FEEDBACK_TAGS.map((tag) => {
               const selected = selectedTags.has(tag);
               return (
@@ -284,7 +284,7 @@ export const MessageFeedback: React.FC<MessageFeedbackProps> = ({
                   type="button"
                   onClick={() => handleTagToggle(tag)}
                   aria-pressed={selected}
-                  className={`inline-flex items-center px-2.5 py-1 rounded-full font-inter text-xs font-medium border transition-all duration-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2
+                  className={`inline-flex items-center px-2.5 3xl:px-3 4xl:px-3.5 py-1 3xl:py-1.5 4xl:py-2 rounded-full font-inter text-xs 3xl:text-sm 4xl:text-base font-medium border transition-all duration-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2
                     ${selected
                       ? 'border-brand-900 bg-brand-100 text-brand-900'
                       : 'border-border-ui bg-surface-card text-text-muted hover:border-brand-200 hover:text-brand-900'
@@ -292,7 +292,7 @@ export const MessageFeedback: React.FC<MessageFeedbackProps> = ({
                 >
                   {selected && (
                     <svg
-                      className="mr-1 h-2.5 w-2.5 flex-shrink-0"
+                      className="mr-1 h-2.5 w-2.5 3xl:h-3 3xl:w-3 4xl:h-3.5 4xl:w-3.5 flex-shrink-0"
                       viewBox="0 0 10 8"
                       fill="none"
                       aria-hidden="true"
@@ -319,17 +319,17 @@ export const MessageFeedback: React.FC<MessageFeedbackProps> = ({
             onChange={(e) => setComment(e.target.value.slice(0, 500))}
             placeholder="Tell us more (optional)"
             rows={2}
-            className="w-full px-3 py-2 rounded-lg border border-border-ui font-inter text-xs text-text-primary placeholder:text-text-muted bg-surface-card outline-none resize-none leading-relaxed focus:border-brand-900 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 transition-all"
+            className="w-full px-3 3xl:px-4 py-2 3xl:py-3 rounded-lg border border-border-ui font-inter text-xs 3xl:text-sm text-text-primary placeholder:text-text-muted bg-surface-card outline-none resize-none leading-relaxed focus:border-brand-900 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 transition-all"
           />
 
           {/* Actions */}
-          <div className="flex items-center justify-end gap-2 mt-2.5">
+          <div className="flex items-center justify-end gap-2 3xl:gap-3 mt-2.5 3xl:mt-3.5 4xl:mt-4">
             <button
               type="button"
               onClick={handleCancel}
               disabled={isSubmitting}
               aria-disabled={isSubmitting}
-              className="font-inter text-xs text-text-muted hover:text-text-secondary transition-colors px-2 py-1 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:text-text-muted"
+              className="font-inter text-xs 3xl:text-sm text-text-muted hover:text-text-secondary transition-colors px-2 3xl:px-2.5 py-1 3xl:py-1.5 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:text-text-muted"
             >
               Cancel
             </button>
@@ -337,7 +337,7 @@ export const MessageFeedback: React.FC<MessageFeedbackProps> = ({
               type="button"
               onClick={handleSubmit}
               disabled={submitDisabled || isSubmitting}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-brand-900 text-white font-inter text-xs font-semibold hover:bg-brand-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
+              className="inline-flex items-center gap-1.5 3xl:gap-2 px-3.5 3xl:px-4.5 4xl:px-5 py-1.5 3xl:py-2 4xl:py-2.5 rounded-full bg-brand-900 text-white font-inter text-xs 3xl:text-sm font-semibold hover:bg-brand-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
             >
               Submit
             </button>
@@ -348,8 +348,8 @@ export const MessageFeedback: React.FC<MessageFeedbackProps> = ({
       {/* Submitting overlay-state (if panel was open) */}
       {isSubmitting && isNegativePanelOpen && (
         <div className="flex items-center gap-1.5 text-text-muted">
-          <Loader2 className="h-3 w-3 animate-spin" />
-          <span className="font-inter text-xs">Submitting…</span>
+          <Loader2 className="h-3 w-3 3xl:h-3.5 3xl:w-3.5 4xl:h-4 4xl:w-4 animate-spin" />
+          <span className="font-inter text-xs 3xl:text-sm 4xl:text-base">Submitting…</span>
         </div>
       )}
     </div>

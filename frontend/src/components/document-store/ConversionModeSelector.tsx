@@ -26,7 +26,7 @@ export const ConversionModeSelector: React.FC<ConversionModeSelectorProps> = ({
   capabilities,
 }) => {
   return (
-    <div role="radiogroup" aria-label="PDF parse mode" className="overflow-hidden rounded-lg border border-border-ui divide-y divide-border-ui bg-surface-card">
+    <div role="radiogroup" aria-label="PDF parse mode" className="overflow-hidden rounded-lg 3xl:rounded-xl border border-border-ui divide-y divide-border-ui bg-surface-card">
       {CONVERSION_OPTIONS.map((option) => {
         const modeInfo: ConversionModeInfo | undefined = capabilities?.[option.value];
         const available = modeInfo?.available ?? (option.value === 'standard');
@@ -70,12 +70,12 @@ export const ConversionModeSelector: React.FC<ConversionModeSelectorProps> = ({
         return (
           <label
             key={option.value}
-            className={`flex cursor-pointer gap-3 px-3.5 py-3 transition-colors ${
+            className={`flex cursor-pointer gap-3 3xl:gap-4 px-3.5 3xl:px-5 4xl:px-6 py-3 3xl:py-4 4xl:py-5 transition-colors first:rounded-t-lg 3xl:first:rounded-t-xl last:rounded-b-lg 3xl:last:rounded-b-xl ${
               selected
-                ? 'bg-brand-50'
+                ? 'bg-surface-subtle'
                 : available
-                  ? 'bg-surface-card hover:bg-surface-subtle/60'
-                  : 'bg-surface-subtle/30 cursor-not-allowed'
+                  ? 'bg-surface-card hover:bg-surface-base'
+                  : 'bg-surface-card cursor-not-allowed'
             }`}
           >
             <input
@@ -85,35 +85,35 @@ export const ConversionModeSelector: React.FC<ConversionModeSelectorProps> = ({
               checked={selected}
               disabled={!available}
               onChange={() => available && setConversionMode(option.value)}
-              className="mt-0.5 h-4 w-4 shrink-0 accent-brand-700 disabled:cursor-not-allowed"
+              className="mt-0.5 h-4 w-4 3xl:h-5 3xl:w-5 shrink-0 accent-focus disabled:cursor-not-allowed"
             />
             <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="flex flex-wrap items-start justify-between gap-2 3xl:gap-3">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className={`font-poppins text-sm font-semibold ${selected ? 'text-text-primary' : available ? 'text-text-primary' : 'text-text-muted'}`}>
+                  <span className={`font-inter text-body-sm 3xl:text-[15px] 4xl:text-base font-semibold ${selected ? 'text-text-primary' : available ? 'text-text-primary' : 'text-text-muted'}`}>
                     {option.label}
                   </span>
                   {isExperimental && (
-                    <span className="inline-flex items-center rounded px-1.5 py-0.5 font-inter text-2xs font-semibold uppercase tracking-wide bg-semantic-warning-bg text-semantic-warning-text border border-semantic-warning-border">
+                    <span className="inline-flex items-center rounded px-1.5 3xl:px-2 py-0.5 3xl:py-1 font-inter text-micro 3xl:text-xs font-semibold uppercase tracking-wide bg-semantic-warning-bg text-semantic-warning-text border border-semantic-warning-border">
                       Advanced
                     </span>
                   )}
                   {!available && (
-                    <span className="inline-flex items-center rounded px-1.5 py-0.5 font-inter text-2xs font-semibold uppercase tracking-wide bg-surface-card text-text-muted border border-border-ui">
+                    <span className="inline-flex items-center rounded px-1.5 3xl:px-2 py-0.5 3xl:py-1 font-inter text-micro 3xl:text-xs font-semibold uppercase tracking-wide bg-surface-card text-text-muted border border-border-ui">
                       Unavailable
                     </span>
                   )}
                 </div>
                 {badge && available && (
-                  <span className={`inline-flex shrink-0 rounded-md px-2 py-0.5 font-inter text-xs font-medium border ${selected ? 'bg-surface-card text-brand-700 border-brand-200' : 'bg-surface-subtle text-text-secondary border-border-ui'}`}>
+                  <span className={`inline-flex shrink-0 rounded-md px-2 3xl:px-3 py-0.5 3xl:py-1 font-inter text-caption 3xl:text-[13px] font-medium border ${selected ? 'bg-surface-card text-text-primary border-border-ui' : 'bg-surface-subtle text-text-secondary border-border-ui'}`}>
                     {badge}
                   </span>
                 )}
               </div>
-              <p className={`mt-1 font-inter text-xs leading-relaxed ${selected ? 'text-text-secondary' : available ? 'text-text-secondary' : 'text-text-muted'}`}>
+              <p className={`mt-1 3xl:mt-1.5 font-inter text-caption 3xl:text-[13px] 4xl:text-sm ${selected ? 'text-text-secondary' : available ? 'text-text-secondary' : 'text-text-muted'}`}>
                 {option.description}
               </p>
-              <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 font-inter text-xs">
+              <div className="mt-2.5 3xl:mt-3 flex flex-wrap items-center gap-x-3 3xl:gap-x-4 gap-y-1 font-inter text-caption 3xl:text-[13px] 4xl:text-sm">
                 <span className="text-text-muted">
                   Cost:{' '}
                   <span className={`font-semibold ${isFreeCost ? 'text-semantic-success-text' : available ? 'text-text-primary' : 'text-text-secondary'}`}>
@@ -133,13 +133,13 @@ export const ConversionModeSelector: React.FC<ConversionModeSelectorProps> = ({
                 </span>
               </div>
               {hint && (
-                <p className="mt-2 font-inter text-xs text-text-muted">
+                <p className="mt-2 3xl:mt-3 font-inter text-caption 3xl:text-[13px] 4xl:text-sm text-text-muted">
                   {hint}
                 </p>
               )}
               {rateLimitWarning && (
-                <div className="mt-2 flex items-start gap-1.5 rounded-md bg-semantic-warning-bg/50 border border-semantic-warning-border px-2 py-1.5 font-inter text-xs text-semantic-warning-text">
-                  <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5 text-semantic-warning-text" aria-hidden="true" />
+                <div className="mt-2 3xl:mt-3 flex items-start gap-1.5 3xl:gap-2 rounded-md bg-semantic-warning-bg/50 border border-semantic-warning-border px-2 3xl:px-3 py-1.5 3xl:py-2 font-inter text-caption 3xl:text-[13px] 4xl:text-sm text-semantic-warning-text">
+                  <AlertCircle className="h-3.5 w-3.5 3xl:h-4 3xl:w-4 shrink-0 mt-0.5 text-semantic-warning-text" aria-hidden="true" />
                   <span>{rateLimitWarning}</span>
                 </div>
               )}

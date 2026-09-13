@@ -46,23 +46,23 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md w-[calc(100%-2rem)] rounded-xl border-border-ui bg-surface-card p-5 shadow-modal">
+      <DialogContent className="max-w-md 3xl:max-w-lg 4xl:max-w-xl w-[calc(100%-2rem)] rounded-xl border-border-ui bg-surface-card p-5 3xl:p-6 4xl:p-7 shadow-modal">
         <DialogHeader className="space-y-2 text-left">
-          <DialogTitle className="font-poppins text-base font-medium leading-snug text-text-primary break-all">
+          <DialogTitle className="font-poppins text-base 3xl:text-lg 4xl:text-xl font-medium leading-snug 3xl:leading-7 4xl:leading-8 text-text-primary break-all">
             {title}
           </DialogTitle>
           {description && (
-            <DialogDescription className="font-inter text-sm leading-5 text-text-secondary">
+            <DialogDescription className="font-inter text-sm 3xl:text-base 4xl:text-lg leading-5 3xl:leading-6 4xl:leading-7 text-text-secondary">
               {description}
             </DialogDescription>
           )}
         </DialogHeader>
-        <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <div className="mt-4 3xl:mt-5 4xl:mt-6 flex flex-col-reverse gap-2 3xl:gap-3 sm:flex-row sm:justify-end">
           <button
             type="button"
             onClick={() => onOpenChange(false)}
             disabled={isConfirming}
-            className="inline-flex h-9 items-center justify-center rounded-lg border border-border-ui px-4 font-poppins text-sm font-semibold text-text-primary transition-colors hover:bg-surface-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:opacity-50"
+            className="inline-flex h-9 3xl:h-10 4xl:h-11 items-center justify-center rounded-lg border border-border-ui px-4 3xl:px-5 4xl:px-6 font-poppins text-sm 3xl:text-base 4xl:text-lg font-semibold text-text-primary transition-colors hover:bg-surface-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:opacity-50"
           >
             {cancelLabel}
           </button>
@@ -70,7 +70,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             type="button"
             onClick={onConfirm}
             disabled={isConfirming}
-            className={`inline-flex h-9 items-center justify-center rounded-lg px-4 font-poppins text-sm font-semibold transition-colors focus:outline-none focus-visible:ring-2 disabled:opacity-50 ${confirmClasses}`}
+            className={`inline-flex h-9 3xl:h-10 4xl:h-11 items-center justify-center rounded-lg px-4 3xl:px-5 4xl:px-6 font-poppins text-sm 3xl:text-base 4xl:text-lg font-semibold transition-colors focus:outline-none focus-visible:ring-2 disabled:opacity-50 ${confirmClasses}`}
           >
             {isConfirming ? `${confirmLabel}…` : confirmLabel}
           </button>

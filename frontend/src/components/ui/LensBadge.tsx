@@ -18,7 +18,7 @@ export const LensBadge: React.FC<LensBadgeProps> = ({ label, className }) => {
     <span
       className={cn(
         'inline-flex items-center justify-center rounded-full',
-        'px-3 py-1 font-inter text-xs font-medium whitespace-nowrap w-fit',
+        'px-3 3xl:px-3.5 4xl:px-4 py-1 3xl:py-1.5 4xl:py-2 font-inter text-xs 3xl:text-sm font-medium whitespace-nowrap w-fit',
         className
       )}
       style={{

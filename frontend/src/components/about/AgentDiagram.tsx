@@ -182,6 +182,9 @@ const NATIVE_H = 490;
 // Readable floor: never shrink below this rendered width. Narrower viewports scroll.
 const MIN_RENDER_WIDTH = 680;
 const MIN_SCALE = MIN_RENDER_WIDTH / NATIVE_W;
+// Growth cap: on 3xl/4xl viewports the diagram scales up with the page but
+// stays proportionate to the surrounding content instead of filling edge-to-edge.
+const MAX_SCALE = 1.5;
 
 export function AgentDiagram() {
   const [hoveredCardId, setHoveredCardId] = useState<string | null>(null);
@@ -196,7 +199,7 @@ export function AgentDiagram() {
     const update = () => {
       const width = el.clientWidth;
       if (width > 0) {
-        setScale(Math.min(1, Math.max(MIN_SCALE, width / NATIVE_W)));
+        setScale(Math.min(MAX_SCALE, Math.max(MIN_SCALE, width / NATIVE_W)));
       }
     };
     update();

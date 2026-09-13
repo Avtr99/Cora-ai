@@ -27,13 +27,13 @@ const HomePage: React.FC = () => {
       <ErrorBoundary
         fallback={
           <div className="min-h-screen bg-surface-base flex flex-col items-center justify-center gap-4 text-center px-6">
-            <p className="text-brand-700 font-poppins text-base">
+            <p className="text-brand-700 font-poppins text-base 3xl:text-lg 4xl:text-xl">
               Something went wrong while loading chat.
             </p>
             <button
               type="button"
               onClick={() => window.location.reload()}
-              className="px-5 py-2 rounded-lg bg-brand-700 text-white font-poppins text-sm font-semibold shadow-md transition-colors hover:bg-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-brand-500"
+              className="px-5 3xl:px-6 4xl:px-7 py-2 3xl:py-2.5 rounded-lg bg-brand-700 text-white font-poppins text-sm 3xl:text-[15px] 4xl:text-base font-semibold shadow-md transition-colors hover:bg-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-brand-500"
             >
               Reload
             </button>

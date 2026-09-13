@@ -2,7 +2,7 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import type { VCMProject } from '@/types/project';
 import { getProjectTypeColor, getStatusStyle, TEXT } from '@/lib/colors';
 import { useLongPress } from '@/hooks/useLongPress';
-import { formatCredits } from '@/lib/formatCredits';
+import { formatCredits, getRetiredPercentage } from '@/lib/formatCredits';
 
 interface ProjectListItemProps {
   project: VCMProject;
@@ -52,27 +52,10 @@ export const ProjectListItem: React.FC<ProjectListItemProps> = ({
   const typeColor = getProjectTypeColor(project.type);
   const statusStyle = getStatusStyle(project.status);
 
-  // Handle creditsIssued === 0 edge case explicitly
-  const retiredPct: number | null = (() => {
-    if (project.creditsIssued === 0) {
-      // No credits issued - can't compute meaningful percentage
-      return null;
-    }
-    const rawRetiredPct = (project.creditsRetired / project.creditsIssued) * 100;
-    if (project.creditsRetired > 0) {
-      return Math.max(1, Math.min(100, Math.round(rawRetiredPct)));
-    }
-    return 0;
-  })();
-
-  const retiredLabel = (() => {
-    if (retiredPct === null) return 'N/A';
-    if (project.creditsIssued > 0 && project.creditsRetired > 0) {
-      const rawRetiredPct = (project.creditsRetired / project.creditsIssued) * 100;
-      if (rawRetiredPct > 0 && rawRetiredPct < 0.5) return '<1%';
-    }
-    return retiredPct === null ? 'N/A' : `${retiredPct}%`;
-  })();
+  const { pct: retiredPct, label: retiredLabel } = getRetiredPercentage(
+    project.creditsIssued,
+    project.creditsRetired,
+  );
 
   // Long-press to toggle compare selection (mobile UX)
   const [longPressFlash, setLongPressFlash] = useState(false);
@@ -150,45 +133,45 @@ export const ProjectListItem: React.FC<ProjectListItemProps> = ({
       {/* Main clickable area */}
       <button
         type="button"
-        className="w-full text-left px-4 py-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500"
+        className="w-full text-left px-4 3xl:px-6 py-3 3xl:py-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500"
         onClick={() => onSelect(project)}
         aria-label={`View details for ${project.name}`}
       >
         {/* Row 1: Status badge + ID + Registry */}
         <div className="flex items-center gap-1.5 mb-1">
           <span
-            className="inline-flex items-center gap-1 px-1 py-0.5 rounded text-2xs font-semibold font-inter uppercase tracking-wide flex-shrink-0"
+            className="inline-flex items-center gap-1 px-1 py-0.5 rounded text-2xs 3xl:text-xs 4xl:text-sm font-semibold font-inter uppercase tracking-wide flex-shrink-0"
             style={{ backgroundColor: statusStyle.bg, color: statusStyle.text }}
           >
-            <span className="w-1 h-1 rounded-full" style={{ backgroundColor: statusStyle.dot }} />
+            <span className="w-1 h-1 3xl:w-1.5 3xl:h-1.5 rounded-full" style={{ backgroundColor: statusStyle.dot }} />
             {project.status.length > 12 ? project.status.slice(0, 10) + '…' : project.status}
           </span>
-          <span className="font-inter text-2xs text-text-muted font-medium truncate">{project.id}</span>
-          <span className="font-inter text-2xs text-text-muted">·</span>
-          <span className="font-inter text-2xs text-text-muted truncate">{project.registry}</span>
+          <span className="font-inter text-2xs 3xl:text-xs 4xl:text-sm text-text-muted font-medium truncate">{project.id}</span>
+          <span className="font-inter text-2xs 3xl:text-xs 4xl:text-sm text-text-muted">·</span>
+          <span className="font-inter text-2xs 3xl:text-xs 4xl:text-sm text-text-muted truncate">{project.registry}</span>
         </div>
 
         {/* Row 2: Project name */}
-        <h3 className="font-poppins font-semibold text-sm text-text-primary leading-[1.35] line-clamp-2 pr-8 mb-1.5">
+        <h3 className="font-poppins font-semibold text-sm 3xl:text-base 4xl:text-lg text-text-primary leading-[1.35] line-clamp-2 pr-8 mb-1.5">
           {project.name}
         </h3>
 
         {/* Row 3: Type badge + Country */}
         <div className="flex items-center gap-1.5 mb-2">
           <span
-            className="inline-block px-1.5 py-0.5 rounded text-2xs font-medium font-inter truncate max-w-[140px]"
+            className="inline-block px-1.5 py-0.5 rounded text-2xs 3xl:text-xs 4xl:text-sm font-medium font-inter truncate max-w-[140px]"
             style={{ backgroundColor: typeColor.bg, color: typeColor.text }}
           >
             {project.type}
           </span>
           {project.country && (
-            <span className="font-inter text-2xs text-text-muted truncate">{project.country}</span>
+            <span className="font-inter text-2xs 3xl:text-xs 4xl:text-sm text-text-muted truncate">{project.country}</span>
           )}
         </div>
 
         {/* Row 4: Credits with micro progress bar */}
         <div className="flex items-center gap-2">
-          <span className="font-poppins font-semibold text-xs text-text-primary tabular-nums flex-shrink-0">
+          <span className="font-poppins font-semibold text-xs 3xl:text-sm 4xl:text-base text-text-primary tabular-nums flex-shrink-0">
             {formatCredits(project.creditsIssued)}
           </span>
           <div className="flex-1 rounded-full bg-surface-subtle overflow-hidden" style={{ height: '4px' }}>
@@ -202,7 +185,7 @@ export const ProjectListItem: React.FC<ProjectListItemProps> = ({
               }}
             />
           </div>
-          <span className="font-inter text-xs text-text-muted flex-shrink-0 tabular-nums">
+          <span className="font-inter text-xs 3xl:text-sm 4xl:text-base text-text-muted flex-shrink-0 tabular-nums">
             {retiredLabel} retired
           </span>
         </div>

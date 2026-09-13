@@ -126,7 +126,7 @@ const CredentialsStep = ({
 
       {/* API Key */}
       {config.needsApiKey && (
-        <Field label="API Key" className="mb-5" hint={settings?.has_api_key ? "(already set — leave blank to keep existing)" : undefined}>
+        <Field label="API Key" className="mb-5 3xl:mb-6 4xl:mb-7" hint={settings?.has_api_key ? "(already set — leave blank to keep existing)" : undefined}>
           <input
             type="password"
             value={form.apiKey}
@@ -139,7 +139,7 @@ const CredentialsStep = ({
 
       {/* Base URL */}
       {config.needsBaseUrl && (
-        <Field label="Base URL" className="mb-5">
+        <Field label="Base URL" className="mb-5 3xl:mb-6 4xl:mb-7">
           <input
             type="text"
             value={form.baseUrl}
@@ -151,7 +151,7 @@ const CredentialsStep = ({
       )}
 
       {/* Model */}
-      <Field label="Model" className="mb-5">
+      <Field label="Model" className="mb-5 3xl:mb-6 4xl:mb-7">
         {form.preset === "ollama" && ollamaModels.length > 0 ? (
           <select
             value={form.modelMain}
@@ -168,7 +168,7 @@ const CredentialsStep = ({
             ))}
           </select>
         ) : form.preset === "ollama" && loadingModels ? (
-          <div className="text-sm text-text-muted font-inter">Loading available models...</div>
+          <div className="text-sm 3xl:text-base 4xl:text-lg text-text-muted font-inter">Loading available models...</div>
         ) : (
           <input
             type="text"
@@ -179,7 +179,7 @@ const CredentialsStep = ({
           />
         )}
         {form.preset === "ollama" && ollamaModels.length === 0 && !loadingModels && (
-          <p className="mt-2 text-xs text-semantic-warning-icon font-inter">
+          <p className="mt-2 3xl:mt-3 text-xs 3xl:text-sm 4xl:text-base text-semantic-warning-icon font-inter">
             No models found. Make sure Ollama is running (<code>ollama serve</code>) and you&apos;ve
             pulled a model (<code>ollama pull &lt;model-name&gt;</code>). You can also enter the
             model name manually above.
@@ -188,7 +188,7 @@ const CredentialsStep = ({
       </Field>
 
       {/* Test connection */}
-      <div className="mb-5">
+      <div className="mb-5 3xl:mb-6 4xl:mb-7">
         <TestConnection
           state={testState}
           result={testResult}
@@ -196,9 +196,9 @@ const CredentialsStep = ({
         />
       </div>
 
-      {error && <div className="mb-5"><ErrorBox message={error} /></div>}
+      {error && <div className="mb-5 3xl:mb-6 4xl:mb-7"><ErrorBox message={error} /></div>}
 
-      <p className="mb-6 text-xs text-text-muted font-inter">
+      <p className="mb-6 3xl:mb-8 4xl:mb-10 text-xs 3xl:text-sm 4xl:text-base text-text-muted font-inter">
         Note: after changing the provider, the backend needs to restart for the new client to take
         effect.
       </p>

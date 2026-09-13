@@ -86,19 +86,14 @@ export const ProviderToggle: React.FC = () => {
       <button
         onClick={() => setIsOpen(!isOpen)}
         disabled={switching}
-        className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium border transition-colors disabled:opacity-50"
-        style={{
-          borderColor: "var(--color-border-ui, #e5e7eb)",
-          background: "var(--color-surface-subtle, #f9fafb)",
-          color: "var(--color-text-secondary, #4b5563)",
-        }}
+        className="inline-flex items-center gap-1.5 3xl:gap-2 rounded-lg px-2.5 3xl:px-3 py-1 3xl:py-1.5 text-xs 3xl:text-sm font-medium border border-border-ui bg-surface-subtle text-text-secondary transition-colors disabled:opacity-50"
         aria-label={`LLM provider: ${currentLabel}. Click to switch.`}
         title="Switch LLM provider"
       >
-        <Zap className="w-3 h-3 opacity-60" />
-        <span className="max-w-[100px] truncate">{currentLabel}</span>
+        <Zap className="w-3 h-3 3xl:w-4 3xl:h-4 4xl:w-5 4xl:h-5 opacity-60" />
+        <span className="max-w-[100px] 3xl:max-w-[120px] 4xl:max-w-[140px] truncate">{currentLabel}</span>
         <ChevronDown
-          className={`w-3 h-3 opacity-50 transition-transform ${isOpen ? "rotate-180" : ""}`}
+          className={`w-3 h-3 3xl:w-4 3xl:h-4 4xl:w-5 4xl:h-5 opacity-50 transition-transform ${isOpen ? "rotate-180" : ""}`}
         />
       </button>
 
@@ -109,14 +104,10 @@ export const ProviderToggle: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             exit={shouldReduceMotion ? { opacity: 1 } : { opacity: 0, y: -4 }}
             transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.15 }}
-            className="absolute bottom-full left-0 mb-2 w-56 rounded-xl border shadow-lg overflow-hidden z-50"
-            style={{
-              borderColor: "var(--color-border-ui, #e5e7eb)",
-              background: "var(--color-surface-card, #ffffff)",
-            }}
+            className="absolute bottom-full left-0 mb-2 w-56 3xl:w-64 4xl:w-72 rounded-xl border border-border-ui bg-surface-card shadow-lg overflow-hidden z-50"
           >
-            <div className="px-3 py-2 border-b" style={{ borderColor: "var(--color-border-ui, #e5e7eb)" }}>
-              <span className="text-xs font-semibold uppercase tracking-wide opacity-50">
+            <div className="px-3 3xl:px-4 py-2 3xl:py-2.5 4xl:py-3 border-b border-border-ui">
+              <span className="text-xs 3xl:text-sm font-semibold uppercase tracking-wide opacity-50">
                 LLM Provider
               </span>
             </div>
@@ -126,27 +117,27 @@ export const ProviderToggle: React.FC = () => {
                   key={p.slug}
                   onClick={() => handleSwitch(p.slug)}
                   disabled={switching}
-                  className="w-full flex items-center justify-between px-3 py-2 text-left text-sm transition-colors hover:bg-surface-subtle disabled:opacity-50"
+                  className="w-full flex items-center justify-between px-3 3xl:px-4 py-2 3xl:py-2.5 4xl:py-3 text-left text-sm 3xl:text-base 4xl:text-lg transition-colors hover:bg-surface-subtle disabled:opacity-50"
                 >
                   <div className="flex flex-col min-w-0">
-                    <span className="font-medium truncate" style={{ color: "var(--color-text-primary, #111827)" }}>
+                    <span className="font-medium truncate text-text-primary">
                       {p.label}
                     </span>
-                    <span className="text-xs opacity-50 truncate">{p.model}</span>
+                    <span className="text-xs 3xl:text-sm 4xl:text-base opacity-50 truncate">{p.model}</span>
                   </div>
                   {p.slug === current && (
-                    <Check className="w-4 h-4 shrink-0 ml-2 text-brand-500" />
+                    <Check className="w-4 h-4 3xl:w-5 3xl:h-5 4xl:w-6 4xl:h-6 shrink-0 ml-2 3xl:ml-3 text-brand-500" />
                   )}
                 </button>
               ))}
             </div>
             {error && (
-              <div className="px-3 py-2 text-xs text-red-500 border-t" style={{ borderColor: "var(--color-border-ui, #e5e7eb)" }}>
+              <div className="px-3 3xl:px-4 py-2 3xl:py-2.5 4xl:py-3 text-xs 3xl:text-sm 4xl:text-base text-red-500 border-t border-border-ui">
                 {error}
               </div>
             )}
             {switching && (
-              <div className="px-3 py-2 text-xs opacity-50 border-t" style={{ borderColor: "var(--color-border-ui, #e5e7eb)" }}>
+              <div className="px-3 3xl:px-4 py-2 3xl:py-2.5 4xl:py-3 text-xs 3xl:text-sm 4xl:text-base opacity-50 border-t border-border-ui">
                 Switching...
               </div>
             )}

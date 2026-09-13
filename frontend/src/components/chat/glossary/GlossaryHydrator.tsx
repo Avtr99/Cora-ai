@@ -57,7 +57,7 @@ const CATEGORY_STYLES: Record<string, string> = {
   'Core Concept': 'bg-muted text-muted-foreground',
   'Project Type': 'bg-accent text-accent-foreground',
   Market:       'bg-destructive/10 text-destructive',
-  Methodology:  'bg-brand-100 text-brand-800',
+  Methodology:  'bg-brand-100 text-brand-900',
   'Credit Type': 'bg-destructive/10 text-destructive',
   Unit:         'bg-secondary text-secondary-foreground',
   Governance:   'bg-muted text-muted-foreground',
@@ -78,19 +78,19 @@ const GlossaryCardContent: React.FC<{ entry: GlossaryEntry }> = ({ entry }) => {
       {/* Category pill */}
       {entry.category && (
         <span
-          className={`inline-block mb-2 px-2 py-0.5 rounded-full text-2xs font-semibold uppercase tracking-[0.08em] font-inter ${pillStyle}`}
+          className={`inline-block mb-2 px-2 3xl:px-2.5 py-0.5 3xl:py-1 rounded-full text-2xs 3xl:text-xs font-semibold uppercase tracking-[0.08em] font-inter ${pillStyle}`}
         >
           {entry.category}
         </span>
       )}
 
       {/* Term title - show full form (first part before | if present), trimmed */}
-      <h4 className="font-poppins text-sm font-semibold tracking-tight leading-snug">
+      <h4 className="font-poppins text-sm 3xl:text-base 4xl:text-lg font-semibold tracking-tight leading-snug">
         {entry.term?.split('|')[0]?.trim() ?? entry.term}
       </h4>
 
       {/* Definition */}
-      <p className="mt-1.5 font-inter text-sm leading-[1.55] text-muted-foreground">
+      <p className="mt-1.5 3xl:mt-2 font-inter text-sm 3xl:text-base 4xl:text-lg leading-[1.55] text-muted-foreground">
         {entry.definition}
       </p>
     </>
@@ -102,7 +102,7 @@ const DesktopGlossaryTerm: React.FC<{ text: string; entry: GlossaryEntry }> = ({
   <HoverCard openDelay={200} closeDelay={100}>
     <HoverCardTrigger asChild>
       <span
-        className="cursor-help underline decoration-dotted decoration-brand-400/50 underline-offset-2 hover:bg-brand-100/60 rounded-sm px-0.5 -mx-0.5 transition-colors duration-150"
+        className="cursor-help underline decoration-dotted decoration-brand-500/50 underline-offset-2 hover:bg-brand-100/60 rounded-sm px-0.5 -mx-0.5 transition-colors duration-150"
         role="term"
         title="Hover for definition"
       >
@@ -112,7 +112,7 @@ const DesktopGlossaryTerm: React.FC<{ text: string; entry: GlossaryEntry }> = ({
     <HoverCardContent
       align="start"
       sideOffset={6}
-      className="z-50 w-[320px] max-w-[calc(100vw-2rem)] rounded-xl border bg-popover text-popover-foreground p-4 shadow-lg"
+      className="z-50 w-[320px] 3xl:w-[360px] 4xl:w-[400px] max-w-[calc(100vw-2rem)] rounded-xl border bg-popover text-popover-foreground p-4 3xl:p-5 4xl:p-6 shadow-lg"
     >
       <GlossaryCardContent entry={entry} />
     </HoverCardContent>
@@ -127,7 +127,7 @@ const MobileGlossaryTerm: React.FC<{ text: string; entry: GlossaryEntry }> = ({ 
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <span
-          className="cursor-pointer underline decoration-dotted decoration-brand-400/60 underline-offset-2 active:bg-brand-100/60 rounded-sm px-0.5 -mx-0.5"
+          className="cursor-pointer underline decoration-dotted decoration-brand-500/60 underline-offset-2 active:bg-brand-100/60 rounded-sm px-0.5 -mx-0.5"
           role="term"
           aria-expanded={open}
           title="Tap for definition"
@@ -138,7 +138,7 @@ const MobileGlossaryTerm: React.FC<{ text: string; entry: GlossaryEntry }> = ({ 
       <PopoverContent
         align="start"
         sideOffset={6}
-        className="z-50 w-[320px] max-w-[calc(100vw-2rem)] rounded-xl border bg-popover text-popover-foreground p-4 shadow-lg"
+        className="z-50 w-[320px] 3xl:w-[360px] 4xl:w-[400px] max-w-[calc(100vw-2rem)] rounded-xl border bg-popover text-popover-foreground p-4 3xl:p-5 4xl:p-6 shadow-lg"
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
         <GlossaryCardContent entry={entry} />

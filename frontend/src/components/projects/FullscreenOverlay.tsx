@@ -24,7 +24,7 @@ const DetailPanelContent: React.FC<{ activeProject: VCMProject | null; allProjec
     <ProjectDetailPanel project={activeProject} allProjects={allProjects} />
   ) : (
     <div className="w-full h-full flex items-center justify-center p-8">
-      <p className="font-inter text-sm text-text-muted">
+      <p className="font-inter text-sm 3xl:text-[15px] 4xl:text-base text-text-muted">
         Select a project to view details
       </p>
     </div>
@@ -182,7 +182,7 @@ const FullscreenOverlay: React.FC<FullscreenOverlayProps> = ({
                 value={localSearch}
                 onChange={handleSearchInput}
                 placeholder="Search projects..."
-                className="w-full h-7 pl-7 pr-7 font-inter text-[11.5px] text-text-primary placeholder:text-text-muted bg-surface-card border border-border-ui rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 transition-shadow"
+                className="w-full h-7 3xl:h-9 pl-7 3xl:pl-9 pr-7 font-inter text-[11.5px] 3xl:text-[13px] 4xl:text-sm text-text-primary placeholder:text-text-muted bg-surface-card border border-border-ui rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 transition-shadow"
                 aria-label="Search projects"
               />
               {localSearch && (
@@ -203,7 +203,7 @@ const FullscreenOverlay: React.FC<FullscreenOverlayProps> = ({
               <button
                 type="button"
                 onClick={() => onSetFilter('country', null)}
-                className="hidden sm:inline-flex items-center gap-1.5 h-6 px-2 rounded-full bg-surface-card border border-border-ui text-text-primary font-inter text-[10.5px] font-medium hover:bg-surface-subtle transition-colors"
+                className="hidden sm:inline-flex items-center gap-1.5 h-6 3xl:h-7 px-2 3xl:px-3 rounded-full bg-surface-card border border-border-ui text-text-primary font-inter text-[10.5px] 3xl:text-xs 4xl:text-[13px] font-medium hover:bg-surface-subtle transition-colors"
                 aria-label={`Clear ${filters.country} filter`}
               >
                 <span className="w-1 h-1 rounded-full bg-text-muted" />
@@ -211,7 +211,7 @@ const FullscreenOverlay: React.FC<FullscreenOverlayProps> = ({
                 <IconWrapper Icon={XIcon} size={9} color={TEXT.muted} aria-hidden={true} />
               </button>
             )}
-            <span className="font-inter text-[10.5px] md:text-[11.5px] text-text-muted tabular-nums">
+            <span className="font-inter text-[10.5px] md:text-[11.5px] 3xl:text-[13px] 4xl:text-sm text-text-muted tabular-nums">
               {filteredCount.toLocaleString()} projects
             </span>
 
@@ -220,7 +220,7 @@ const FullscreenOverlay: React.FC<FullscreenOverlayProps> = ({
               type="button"
               ref={fullscreenExitBtnRef}
               onClick={onExitFullscreen}
-              className="inline-flex items-center gap-1.5 h-8 px-2.5 md:px-3 rounded-full border border-border-ui bg-surface-card text-text-secondary font-inter text-[11.5px] md:text-xs font-medium hover:border-brand-500 hover:text-brand-700 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 flex-shrink-0"
+              className="inline-flex items-center gap-1.5 h-8 3xl:h-10 px-2.5 md:px-3 3xl:px-4 rounded-full border border-border-ui bg-surface-card text-text-secondary font-inter text-[11.5px] md:text-xs 3xl:text-[13px] 4xl:text-sm font-medium hover:border-brand-500 hover:text-brand-700 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 flex-shrink-0"
               aria-label="Exit fullscreen explorer"
             >
               <Minimize2 className="w-3.5 h-3.5" aria-hidden="true" />
@@ -237,7 +237,7 @@ const FullscreenOverlay: React.FC<FullscreenOverlayProps> = ({
             id="fs-panel-list"
             ref={fullscreenListRef}
             onScroll={onFullscreenListScroll}
-            className="hidden md:flex md:w-[280px] lg:w-[340px] md:flex-shrink-0 w-full flex-col overflow-y-auto divide-y divide-surface-subtle md:border-r border-border-ui"
+            className="hidden md:flex md:w-[280px] lg:w-[340px] 3xl:w-[420px] 4xl:w-[480px] md:flex-shrink-0 w-full flex-col overflow-y-auto divide-y divide-surface-subtle md:border-r border-border-ui"
             role="list"
             aria-label="Project list"
           >
@@ -258,7 +258,7 @@ const FullscreenOverlay: React.FC<FullscreenOverlayProps> = ({
             ))}
             {hasMore && (
               <div className="px-4 py-3 text-center">
-                <span className="font-inter text-xs text-text-muted">
+                <span className="font-inter text-xs 3xl:text-[13px] 4xl:text-sm text-text-muted">
                   Scroll for more…
                 </span>
               </div>
@@ -279,7 +279,7 @@ const FullscreenOverlay: React.FC<FullscreenOverlayProps> = ({
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.2 }}
-                  className="hidden lg:flex w-[360px] xl:w-[420px] flex-shrink-0 border-r border-border-ui bg-surface-card overflow-hidden z-10 flex-col"
+                  className="hidden lg:flex w-[360px] xl:w-[420px] 3xl:w-[480px] 4xl:w-[560px] flex-shrink-0 border-r border-border-ui bg-surface-card overflow-hidden z-10 flex-col"
                 >
                   <DetailPanelContent activeProject={activeProject} allProjects={allProjects} />
                 </motion.div>

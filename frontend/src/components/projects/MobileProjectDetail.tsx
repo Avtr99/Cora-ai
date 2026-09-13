@@ -134,7 +134,7 @@ export const MobileProjectDetail: React.FC<MobileProjectDetailProps> = ({
 
   return (
     <div
-      className="lg:hidden fixed inset-0 z-50 bg-black/40"
+      className="lg:hidden fixed inset-0 z-50 bg-surface-overlay/40"
       onClick={handleOverlayClick}
     >
       <div

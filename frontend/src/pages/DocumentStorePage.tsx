@@ -279,94 +279,94 @@ const DocumentStorePage: React.FC = () => {
 
   return (
     <main className="min-h-screen bg-surface-page">
-      <div className="container mx-auto px-4 md:px-12 lg:px-24 pt-16 pb-8 max-w-7xl">
-        <nav aria-label="Back navigation" className="mb-4 md:mb-6">
+      <div className="container mx-auto px-4 md:px-12 lg:px-24 3xl:px-24 4xl:px-32 pt-16 3xl:pt-20 4xl:pt-24 pb-8 3xl:pb-12 4xl:pb-16 max-w-7xl 3xl:max-w-[1600px] 4xl:max-w-[1800px]">
+        <nav aria-label="Back navigation" className="mb-4 md:mb-6 3xl:mb-8 4xl:mb-10">
           <Link
             to="/"
-            className="inline-flex items-center gap-2 text-brand-700 transition-colors duration-200 hover:text-brand-hover font-poppins text-sm md:text-base font-semibold"
+            className="inline-flex items-center gap-2 3xl:gap-2.5 text-brand-700 transition-colors duration-200 hover:text-brand-hover font-poppins text-sm md:text-base 3xl:text-lg 4xl:text-xl font-semibold"
           >
-            <IconWrapper Icon={ChevronLeftIcon} size={16} color="currentColor" aria-hidden={true} className="md:!w-4.5 md:!h-4.5" />
+            <IconWrapper Icon={ChevronLeftIcon} size={16} color="currentColor" aria-hidden={true} className="md:!w-4.5 md:!h-4.5 3xl:!w-5 3xl:!h-5 4xl:!w-6 4xl:!h-6" />
             <span>Document store</span>
           </Link>
         </nav>
 
         {configQuery.isError && (
-          <div className="mb-5 flex items-center gap-3.5 rounded-xl border border-border-ui bg-surface-card px-4 py-3.5 shadow-xs">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-semantic-error-bg text-semantic-error-icon">
-              <AlertTriangle className="h-4.5 w-4.5" aria-hidden="true" />
+          <div className="mb-5 3xl:mb-8 flex items-center gap-3.5 3xl:gap-5 rounded-xl 3xl:rounded-2xl border border-border-ui bg-surface-card px-4 3xl:px-6 4xl:px-8 py-3.5 3xl:py-5 shadow-xs">
+            <span className="flex h-9 w-9 3xl:h-12 3xl:w-12 4xl:h-14 4xl:w-14 shrink-0 items-center justify-center rounded-full bg-semantic-error-bg text-semantic-error-icon">
+              <AlertTriangle className="h-4.5 w-4.5 3xl:h-6 3xl:w-6" aria-hidden="true" />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="font-poppins text-[13.5px] font-semibold text-text-primary">Backend unavailable</p>
-              <p className="mt-0.5 font-inter text-[12.5px] leading-relaxed text-text-secondary">
+              <p className="font-inter text-heading-3 3xl:text-lg 4xl:text-xl font-semibold text-text-primary">Backend unavailable</p>
+              <p className="mt-0.5 font-inter text-caption 3xl:text-sm 4xl:text-base text-text-secondary">
                 {configQuery.error instanceof Error ? configQuery.error.message : 'The backend isn\u2019t running. Start it with `python -m src.api.main` from the repo root, then retry.'}
               </p>
             </div>
             <button
               type="button"
               onClick={() => configQuery.refetch()}
-              className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-border-ui bg-surface-card px-3 font-inter text-xs font-semibold text-text-primary transition-colors hover:bg-surface-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:opacity-50"
+              className="inline-flex h-8 3xl:h-10 4xl:h-12 shrink-0 items-center gap-1.5 3xl:gap-2 rounded-lg 3xl:rounded-xl border border-border-ui bg-surface-card px-3 3xl:px-4 font-inter text-ui 3xl:text-sm 4xl:text-base font-semibold text-text-primary transition-colors hover:bg-surface-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:opacity-50"
               disabled={configQuery.isFetching}
             >
-              <RefreshCw className={`h-3.5 w-3.5 ${configQuery.isFetching ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`h-3.5 w-3.5 3xl:h-4 3xl:w-4 4xl:h-5 4xl:w-5 ${configQuery.isFetching ? 'animate-spin' : ''}`} />
               {configQuery.isFetching ? 'Retrying' : 'Retry'}
             </button>
           </div>
         )}
 
         {!configQuery.isError && configQuery.isSuccess && !backendReady && (
-          <div className="mb-5 flex items-center gap-3.5 rounded-xl border border-border-ui bg-surface-card px-4 py-3.5 shadow-xs">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-semantic-warning-bg text-semantic-warning-icon">
-              <AlertCircle className="h-4.5 w-4.5" aria-hidden="true" />
+          <div className="mb-5 3xl:mb-8 flex items-center gap-3.5 3xl:gap-5 rounded-xl 3xl:rounded-2xl border border-border-ui bg-surface-card px-4 3xl:px-6 4xl:px-8 py-3.5 3xl:py-5 shadow-xs">
+            <span className="flex h-9 w-9 3xl:h-12 3xl:w-12 4xl:h-14 4xl:w-14 shrink-0 items-center justify-center rounded-full bg-semantic-warning-bg text-semantic-warning-icon">
+              <AlertCircle className="h-4.5 w-4.5 3xl:h-6 3xl:w-6" aria-hidden="true" />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="font-poppins text-[13.5px] font-semibold text-text-primary">Finish setting up Cora</p>
-              <p className="mt-0.5 font-inter text-[12.5px] leading-relaxed text-text-secondary">
+              <p className="font-inter text-heading-3 3xl:text-lg 4xl:text-xl font-semibold text-text-primary">Finish setting up Cora</p>
+              <p className="mt-0.5 font-inter text-caption 3xl:text-sm 4xl:text-base text-text-secondary">
                 Cora is running but not fully configured. Complete setup in Settings to add documents and unlock all PDF parse modes.
               </p>
             </div>
             <Link
               to="/settings"
-              className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-border-ui bg-surface-card px-3 font-inter text-xs font-semibold text-text-primary transition-colors hover:bg-surface-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
+              className="inline-flex h-8 3xl:h-10 4xl:h-12 shrink-0 items-center gap-1.5 3xl:gap-2 rounded-lg 3xl:rounded-xl border border-border-ui bg-surface-card px-3 3xl:px-4 font-inter text-ui 3xl:text-sm 4xl:text-base font-semibold text-text-primary transition-colors hover:bg-surface-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
             >
-              <SettingsIcon className="h-3.5 w-3.5" />
+              <SettingsIcon className="h-3.5 w-3.5 3xl:h-4 3xl:w-4 4xl:h-5 4xl:w-5" />
               Open Settings
             </Link>
           </div>
         )}
 
-        <div className="grid gap-5 lg:grid-cols-[1fr_360px] items-start">
+        <div className="grid gap-5 3xl:gap-8 4xl:gap-10 lg:grid-cols-[1fr_360px] 3xl:grid-cols-[1fr_440px] 4xl:grid-cols-[1fr_520px] items-start">
           {/* Knowledge base */}
-          <section className="bg-surface-card rounded-xl border border-border-ui shadow-xs overflow-hidden">
-            <div className="px-5 py-4 border-b border-border-ui">
-              <div className="flex items-center justify-between gap-3">
+          <section className="bg-surface-card rounded-xl 3xl:rounded-2xl border border-border-ui shadow-xs overflow-hidden">
+            <div className="px-5 3xl:px-8 4xl:px-10 py-4 3xl:py-6 4xl:py-8 border-b border-border-ui">
+              <div className="flex items-center justify-between gap-3 3xl:gap-4">
                 <div>
-                  <h2 className="font-poppins text-xl font-semibold text-text-primary">Knowledge base</h2>
-                  <p className="font-inter text-xs text-text-muted mt-0.5">
+                  <h2 className="font-poppins text-heading-2 3xl:text-xl 4xl:text-2xl font-semibold text-text-primary">Knowledge base</h2>
+                  <p className="font-inter text-caption 3xl:text-sm 4xl:text-base text-text-muted mt-0.5 3xl:mt-1">
                     {debouncedSearch || statusFilter || typeFilter
                       ? `Showing ${filteredDocuments.length} of ${documents.length} document${documents.length === 1 ? '' : 's'}`
                       : `${documents.length} document${documents.length === 1 ? '' : 's'}`}
                   </p>
                 </div>
                 {documents.length > 0 && (
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 3xl:gap-3">
                     <button
                       type="button"
                       onClick={handleReindexAll}
                       disabled={anyBusy}
-                      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border-ui px-3 font-inter text-xs font-semibold text-text-primary hover:bg-surface-subtle disabled:opacity-50"
+                      className="inline-flex h-8 3xl:h-10 4xl:h-12 items-center gap-1.5 3xl:gap-2 rounded-lg 3xl:rounded-xl border border-border-ui px-3 3xl:px-4 4xl:px-5 font-inter text-ui 3xl:text-sm 4xl:text-base font-semibold text-text-primary hover:bg-surface-subtle disabled:opacity-50"
                       title="Re-chunk and re-embed all documents from their converted text"
                     >
-                      <RefreshCw className={`h-3.5 w-3.5 ${reindexAllMutation.isPending ? 'animate-spin' : ''}`} />
+                      <RefreshCw className={`h-3.5 w-3.5 3xl:h-4 3xl:w-4 4xl:h-5 4xl:w-5 ${reindexAllMutation.isPending ? 'animate-spin' : ''}`} />
                       Reindex all
                     </button>
                     <button
                       type="button"
                       onClick={handleClearAll}
                       disabled={anyBusy}
-                      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-semantic-error-border px-3 font-inter text-xs font-semibold text-semantic-error-text hover:bg-semantic-error-bg disabled:opacity-50"
+                      className="inline-flex h-8 3xl:h-10 4xl:h-12 items-center gap-1.5 3xl:gap-2 rounded-lg 3xl:rounded-xl border border-semantic-error-border px-3 3xl:px-4 4xl:px-5 font-inter text-ui 3xl:text-sm 4xl:text-base font-semibold text-semantic-error-text hover:bg-semantic-error-bg disabled:opacity-50"
                       title="Delete all documents and remove them from the knowledge base"
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <Trash2 className="h-3.5 w-3.5 3xl:h-4 3xl:w-4 4xl:h-5 4xl:w-5" />
                       Clear all
                     </button>
                   </div>
@@ -386,12 +386,12 @@ const DocumentStorePage: React.FC = () => {
             </div>
 
             {reindexAllProgress && (
-              <div className="flex items-center gap-3 px-5 py-2.5 border-b border-border-ui bg-brand-50/50">
-                <RefreshCw className="h-3.5 w-3.5 animate-spin text-brand-500 shrink-0" />
-                <span className="font-inter text-xs text-text-secondary">
+              <div className="flex items-center gap-3 3xl:gap-4 px-5 3xl:px-8 4xl:px-10 py-2.5 3xl:py-4 border-b border-border-ui bg-brand-50/50">
+                <RefreshCw className="h-3.5 w-3.5 3xl:h-5 3xl:w-5 4xl:h-6 4xl:w-6 animate-spin text-brand-500 shrink-0" />
+                <span className="font-inter text-caption 3xl:text-sm 4xl:text-base text-text-secondary">
                   Reindexing: {reindexAllProgress.completed} of {reindexAllProgress.total} complete
                 </span>
-                <div className="flex-1 h-1.5 rounded-full bg-surface-subtle overflow-hidden max-w-[200px]">
+                <div className="flex-1 h-1.5 3xl:h-2 4xl:h-2.5 rounded-full bg-surface-subtle overflow-hidden max-w-[200px] 3xl:max-w-[280px] 4xl:max-w-[320px]">
                   <div
                     className="h-full rounded-full bg-brand-500 transition-all duration-300"
                     style={{ width: `${reindexAllProgress.total ? (reindexAllProgress.completed / reindexAllProgress.total) * 100 : 0}%` }}
@@ -402,7 +402,7 @@ const DocumentStorePage: React.FC = () => {
 
             <div role="list">
               {documents.length > 0 && !documentsQuery.isLoading && (
-                <div className="hidden sm:grid grid-cols-[1fr_100px_90px_64px] gap-3 px-4 py-2 border-b border-border-ui bg-surface-base font-inter text-xs font-semibold text-text-muted uppercase tracking-wider">
+                <div className="hidden sm:grid grid-cols-[1fr_100px_90px_64px] 3xl:grid-cols-[1fr_140px_130px_96px] 4xl:grid-cols-[1fr_160px_150px_112px] gap-3 3xl:gap-4 px-4 3xl:px-6 4xl:px-8 py-2 3xl:py-3 border-b border-border-ui bg-surface-base font-inter text-overline 3xl:text-xs 4xl:text-sm uppercase tracking-wider font-semibold text-text-muted">
                   <span>Name</span>
                   <span className="text-right">Date</span>
                   <span className="text-right">Status</span>
@@ -411,21 +411,21 @@ const DocumentStorePage: React.FC = () => {
               )}
 
               {documentsQuery.isLoading && (
-                <div className="px-5 py-10 text-center">
-                  <div className="mx-auto h-6 w-6 animate-spin rounded-full border-2 border-brand-200 border-t-brand-500" />
-                  <p className="mt-3 font-inter text-sm text-text-muted">Loading documents...</p>
+                <div className="px-5 3xl:px-8 py-10 3xl:py-14 4xl:py-16 text-center">
+                  <div className="mx-auto h-6 w-6 3xl:h-8 3xl:w-8 4xl:h-10 4xl:w-10 animate-spin rounded-full border-2 border-brand-200 border-t-brand-500" />
+                  <p className="mt-3 3xl:mt-4 font-inter text-body-sm 3xl:text-base 4xl:text-lg text-text-muted">Loading documents...</p>
                 </div>
               )}
 
               {!documentsQuery.isLoading && filteredDocuments.length === 0 && (
-                <div className="px-5 py-14 text-center">
-                  <div className="mx-auto h-12 w-12 flex items-center justify-center rounded-xl bg-surface-subtle text-text-muted">
-                    <FileText className="h-6 w-6" />
+                <div className="px-5 3xl:px-8 py-14 3xl:py-20 4xl:py-24 text-center">
+                  <div className="mx-auto h-12 w-12 3xl:h-16 3xl:w-16 4xl:h-20 4xl:w-20 flex items-center justify-center rounded-xl 3xl:rounded-2xl bg-surface-subtle text-text-muted">
+                    <FileText className="h-6 w-6 3xl:h-8 3xl:w-8 4xl:h-10 4xl:w-10" />
                   </div>
-                  <p className="mt-4 font-poppins text-base font-semibold text-text-primary">
+                  <p className="mt-3 3xl:mt-4 font-inter text-heading-3 3xl:text-lg 4xl:text-xl font-semibold text-text-primary">
                     {documents.length === 0 ? 'No documents yet' : 'No matches'}
                   </p>
-                  <p className="mt-1 font-inter text-sm text-text-muted">
+                  <p className="mt-0.5 3xl:mt-1 font-inter text-body-sm 3xl:text-base 4xl:text-lg text-text-muted">
                     {documents.length === 0 ? 'Add documents to start building your knowledge base.' : 'Try a different search or filter.'}
                   </p>
                 </div>
@@ -447,16 +447,16 @@ const DocumentStorePage: React.FC = () => {
           </section>
 
           {/* Right column: Add docs */}
-          <div className="space-y-5 lg:sticky lg:top-6">
+          <div className="space-y-5 3xl:space-y-8 4xl:space-y-10 lg:sticky lg:top-6 3xl:top-8 4xl:top-10">
             <UploadPanel
               backendReady={backendReady}
               onUploadComplete={handleUploadComplete}
             />
 
             {actionError && (
-              <div className="flex items-start gap-2.5 rounded-xl border border-semantic-error-border bg-semantic-error-bg px-4 py-3.5">
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-semantic-error-icon" aria-hidden="true" />
-                <span className="flex-1 font-inter text-[12.5px] leading-relaxed text-semantic-error-text">{actionError}</span>
+              <div className="flex items-start gap-2.5 3xl:gap-3 rounded-xl 3xl:rounded-2xl border border-semantic-error-border bg-semantic-error-bg px-4 3xl:px-5 py-3.5 3xl:py-4 4xl:py-5">
+                <AlertTriangle className="mt-0.5 h-4 w-4 3xl:h-5 3xl:w-5 shrink-0 text-semantic-error-icon" aria-hidden="true" />
+                <span className="flex-1 font-inter text-caption 3xl:text-[13px] 4xl:text-sm text-semantic-error-text">{actionError}</span>
                 <button
                   type="button"
                   onClick={() => {
@@ -489,19 +489,19 @@ const DocumentStorePage: React.FC = () => {
 
           {/* Document preview modal */}
           <Dialog open={previewOpen} onOpenChange={(open) => { if (!open) setPreviewDocument(null); }}>
-            <DialogContent className="max-w-5xl w-[calc(100%-2rem)] rounded-xl p-0 flex flex-col max-h-[90vh] overflow-hidden">
-              <DialogHeader className="px-5 py-4 border-b border-border-ui">
-                <DialogTitle className="font-poppins text-base font-semibold text-text-primary">Document preview</DialogTitle>
+            <DialogContent className="max-w-5xl 3xl:max-w-6xl 4xl:max-w-7xl w-[calc(100%-2rem)] rounded-xl 3xl:rounded-2xl p-0 flex flex-col max-h-[90vh] overflow-hidden">
+              <DialogHeader className="px-5 3xl:px-8 4xl:px-10 py-4 3xl:py-6 border-b border-border-ui">
+                <DialogTitle className="font-poppins text-heading-3 3xl:text-lg 4xl:text-xl font-semibold text-text-primary">Document preview</DialogTitle>
                 <DialogDescription className="sr-only">Preview the selected document content and status.</DialogDescription>
               </DialogHeader>
-              <div className="flex-1 overflow-auto p-5">
+              <div className="flex-1 overflow-auto p-5 3xl:p-8 4xl:p-10">
                 {previewDocument ? (
                   <DocumentPreview
                     document={previewDocument}
                     isBusy={anyBusy}
                   />
                 ) : (
-                  <p className="text-center font-inter text-sm text-text-muted">Select a document to preview.</p>
+                  <p className="text-center font-inter text-body-sm text-text-muted">Select a document to preview.</p>
                 )}
               </div>
             </DialogContent>
@@ -530,15 +530,15 @@ export default function DocumentStorePageWrapper(): JSX.Element {
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-semantic-error-bg text-semantic-error-icon">
               <AlertCircle className="h-6 w-6" aria-hidden="true" />
             </div>
-            <h1 className="mt-5 font-poppins text-lg font-semibold text-text-primary">
+            <h1 className="mt-5 font-poppins text-heading-1 font-semibold text-text-primary">
               Document store unavailable
             </h1>
-            <p className="mt-1.5 font-inter text-sm leading-relaxed text-text-secondary">
+            <p className="mt-1.5 font-inter text-body-sm leading-relaxed text-text-secondary">
               Something went wrong while loading this page.
             </p>
             {error && (
               <div className="mt-4 rounded-lg border border-semantic-error-border bg-semantic-error-bg p-3 text-left">
-                <p className="font-inter text-xs leading-relaxed text-semantic-error-text break-words">
+                <p className="font-inter text-caption text-semantic-error-text break-words">
                   {error.message}
                 </p>
               </div>
@@ -546,7 +546,7 @@ export default function DocumentStorePageWrapper(): JSX.Element {
             <button
               type="button"
               onClick={() => window.location.reload()}
-              className="mt-6 inline-flex h-9 items-center gap-2 rounded-lg bg-brand-700 px-5 font-inter text-sm font-semibold text-white transition-colors hover:bg-brand-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-2"
+              className="mt-6 inline-flex h-9 items-center gap-2 rounded-lg bg-brand-700 px-5 font-inter text-body-sm font-semibold text-white transition-colors hover:bg-brand-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-2"
             >
               <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
               Reload

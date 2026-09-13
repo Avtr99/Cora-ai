@@ -50,17 +50,17 @@ export const RecommendationCard: React.FC<RecommendationCardProps> = ({ recommen
 
   return (
     <Link to={recommendation.ctaLink} className="block group">
-      <div className="flex flex-col items-start gap-4 p-4 bg-surface-card border border-border-ui rounded-xl hover:shadow-sm hover:border-border-ui transition-all duration-200 cursor-pointer">
+      <div className="flex flex-col items-start gap-4 3xl:gap-5 p-4 3xl:p-5 4xl:p-6 bg-surface-card border border-border-ui rounded-xl hover:shadow-sm hover:border-border-ui transition-all duration-200 cursor-pointer">
         {/* Text content */}
         <div className="flex flex-col items-start w-full">
           {/* Project title - with ellipsis for overflow */}
-          <h4 className="w-full font-inter font-semibold text-xs leading-4 text-text-primary mb-1 line-clamp-2">
+          <h4 className="w-full font-inter font-semibold text-xs 3xl:text-sm 4xl:text-base leading-4 3xl:leading-5 4xl:leading-6 text-text-primary mb-1 line-clamp-2">
             {recommendation.title}
           </h4>
           
           {/* Project metadata - only show if metadata exists */}
           {recommendation.metadata && (recommendation.metadata.type || recommendation.metadata.code) && (
-            <div className="flex flex-row items-baseline gap-1 font-inter font-normal text-xs leading-4 text-text-muted">
+            <div className="flex flex-row items-baseline gap-1 3xl:gap-1.5 font-inter font-normal text-xs 3xl:text-sm leading-4 text-text-muted">
               {recommendation.metadata.type && <span>{recommendation.metadata.type}</span>}
               {recommendation.metadata.type && recommendation.metadata.code && <span>•</span>}
               {recommendation.metadata.code && <span>{recommendation.metadata.code}</span>}
@@ -72,7 +72,7 @@ export const RecommendationCard: React.FC<RecommendationCardProps> = ({ recommen
         {recommendation.type === 'project' ? (
           <LensBadge label={label} />
         ) : (
-          <span className="inline-flex items-center justify-center px-3 py-1 bg-semantic-warning-iconBg rounded-full font-inter text-xs font-medium whitespace-nowrap w-fit text-semantic-warning-text">
+          <span className="inline-flex items-center justify-center px-3 3xl:px-3.5 4xl:px-4 py-1 3xl:py-1.5 4xl:py-2 bg-semantic-warning-iconBg rounded-full font-inter text-xs 3xl:text-sm font-medium whitespace-nowrap w-fit text-semantic-warning-text">
             {label}
           </span>
         )}

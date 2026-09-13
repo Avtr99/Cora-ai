@@ -75,7 +75,6 @@
     --shadow-bottom-bar: 0 -4px 16px rgba(0, 0, 0, 0.08);
     --shadow-modal:      0 32px 64px -12px rgba(0, 0, 0, 0.14);
     --shadow-scroll-btn: 0 2px 8px rgba(0, 0, 0, 0.08);
-    --shadow-tooltip:    0 4px 16px rgba(0, 0, 0, 0.08);
 
     /* Glow / gradient tokens (single-use decorative surfaces) */
     --glow-searchbar: linear-gradient(135deg, rgba(147, 51, 234, 0.15) 0%, rgba(236, 72, 153, 0.15) 100%);
@@ -99,10 +98,6 @@
     --tw-exit-rotate:       0deg;
     --tw-exit-translate-x:  0px;
     --tw-exit-translate-y:  0px;
-
-    /* Brand purple: used for key actions and accents */
-    --brand: 262 83% 56%;
-    --brand-foreground: 0 0% 100%;   /* intentionally white — foreground on brand surfaces */
 
     /* Brand palette tokens — consumed by brand.* Tailwind utilities */
     --brand-primary:   243 37% 38%;
@@ -165,9 +160,6 @@
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
-    /* Global brand token (matches sidebar-primary for consistency) */
-    --brand: 262 83% 60%;
-    --brand-foreground: 0 0% 100%;
   }
 }
 
@@ -177,6 +169,6 @@
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
   }
 }

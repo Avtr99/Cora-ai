@@ -47,11 +47,11 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
   return (
     <span
       title={STATUS_TOOLTIPS[status] ?? status}
-      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 border text-xs font-medium font-inter ${STATUS_STYLES[status]}`}
+      className={`inline-flex items-center gap-1 3xl:gap-1.5 rounded-full px-2 3xl:px-3 4xl:px-3.5 py-0.5 3xl:py-1 border text-caption 3xl:text-[13px] 4xl:text-sm font-medium font-inter ${STATUS_STYLES[status]}`}
     >
-      {status === 'indexed' && <CheckCircle2 className="h-3 w-3" />}
-      {status === 'failed' && <AlertTriangle className="h-3 w-3" />}
-      {processing && <Loader2 className="h-3 w-3 animate-spin" />}
+      {status === 'indexed' && <CheckCircle2 className="h-3 w-3 3xl:h-3.5 3xl:w-3.5 4xl:h-4 4xl:w-4" />}
+      {status === 'failed' && <AlertTriangle className="h-3 w-3 3xl:h-3.5 3xl:w-3.5 4xl:h-4 4xl:w-4" />}
+      {processing && <Loader2 className="h-3 w-3 3xl:h-3.5 3xl:w-3.5 4xl:h-4 4xl:w-4 animate-spin" />}
       {STATUS_LABELS[status] ?? status}
     </span>
   );

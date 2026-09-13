@@ -56,13 +56,13 @@ export const ChatListSection: React.FC<ChatListSectionProps> = ({
 
   return (
     <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-      <p className="text-xs font-semibold text-text-muted uppercase tracking-wider px-5 pt-2 pb-0.5 flex-shrink-0">
+      <p className="text-overline 3xl:text-sm 4xl:text-lg font-semibold text-text-muted uppercase tracking-wider px-5 3xl:px-6 pt-2 3xl:pt-3 pb-0.5 flex-shrink-0">
         History
       </p>
       <ScrollArea.Root className="flex-1 min-h-0 overflow-hidden">
         <ScrollArea.Viewport
           ref={chatListRef as React.Ref<HTMLDivElement>}
-          className="h-full w-full px-3 pb-2"
+          className="h-full w-full px-3 3xl:px-4 4xl:px-5 pb-2"
           role="listbox"
           aria-label="Chat history"
           onWheel={(e) => {
@@ -99,7 +99,7 @@ export const ChatListSection: React.FC<ChatListSectionProps> = ({
                   }}
                 >
                   <div
-                    className={`group relative transition-all duration-200 w-full overflow-hidden px-2.5 h-full mx-0.5 rounded-md flex items-center gap-2 ${activeChat?.id === chat.id
+                    className={`group relative transition-all duration-200 w-full overflow-hidden px-2.5 3xl:px-3.5 4xl:pl-4 4xl:pr-2.5 h-full mx-0.5 rounded-md 3xl:rounded-lg flex items-center gap-2 3xl:gap-2.5 4xl:gap-3 ${activeChat?.id === chat.id
                       ? 'bg-surface-subtle/80 text-text-primary shadow-sm'
                       : 'text-text-muted hover:bg-surface-subtle'
                       }`}
@@ -129,7 +129,7 @@ export const ChatListSection: React.FC<ChatListSectionProps> = ({
                         const current = rowRefs.current.get(chat.id) || { title: null, delete: null };
                         rowRefs.current.set(chat.id, { ...current, title: el });
                       }}
-                      className={`truncate flex-grow overflow-hidden whitespace-nowrap text-ellipsis font-inter text-xs leading-snug text-left cursor-pointer transition-colors ${activeChat?.id === chat.id ? 'font-medium' : 'font-normal hover:text-text-secondary'
+                      className={`truncate flex-grow overflow-hidden whitespace-nowrap text-ellipsis font-inter text-caption 3xl:text-sm 4xl:text-[19px] text-left cursor-pointer transition-colors ${activeChat?.id === chat.id ? 'font-medium' : 'font-normal hover:text-text-secondary'
                         }`}
                       onClick={() => {
                         setActiveChat(chat.id);
@@ -147,7 +147,7 @@ export const ChatListSection: React.FC<ChatListSectionProps> = ({
                         const current = rowRefs.current.get(chat.id) || { title: null, delete: null };
                         rowRefs.current.set(chat.id, { ...current, delete: el });
                       }}
-                      className="opacity-0 group-hover:opacity-100 hover:text-semantic-error-icon transition-opacity duration-200 p-1 -mr-1 focus:outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 flex-shrink-0"
+                      className="opacity-0 group-hover:opacity-100 hover:text-semantic-error-icon transition-opacity duration-200 p-1 3xl:p-1.5 4xl:p-2 -mr-1 3xl:-mr-1.5 4xl:-mr-2 focus:outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 flex-shrink-0"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleDeleteChat(e, chat.id);
@@ -156,7 +156,7 @@ export const ChatListSection: React.FC<ChatListSectionProps> = ({
                       data-action="delete-chat"
                       tabIndex={-1}
                     >
-                      <IconWrapper Icon={TrashIcon} size={14} aria-hidden={true} />
+                      <IconWrapper Icon={TrashIcon} size={14} className="3xl:scale-125 4xl:scale-150" aria-hidden={true} />
                     </button>
                   </div>
                 </div>
@@ -166,7 +166,7 @@ export const ChatListSection: React.FC<ChatListSectionProps> = ({
         </ScrollArea.Viewport>
         <ScrollArea.Scrollbar
           orientation="vertical"
-          className="flex select-none touch-none p-0.5 w-1.5 transition-opacity duration-200 opacity-0 hover:opacity-100 data-[state=visible]:opacity-100"
+          className="flex select-none touch-none p-0.5 w-1.5 3xl:w-2 transition-opacity duration-200 opacity-0 hover:opacity-100 data-[state=visible]:opacity-100"
         >
           <ScrollArea.Thumb className="flex-1 bg-border-ui rounded-full relative" />
         </ScrollArea.Scrollbar>

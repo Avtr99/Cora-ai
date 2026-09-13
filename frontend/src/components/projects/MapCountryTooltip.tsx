@@ -49,21 +49,21 @@ export const MapCountryTooltip: React.FC<MapCountryTooltipProps> = ({
         {/* Country + totals */}
         <div className="px-3 pt-2.5 pb-2 border-b border-surface-subtle">
           <div className="flex items-baseline justify-between">
-            <h4 className="font-poppins font-semibold text-sm text-text-primary leading-tight truncate">
+            <h4 className="font-poppins font-semibold text-sm 3xl:text-base 4xl:text-lg text-text-primary leading-tight truncate">
               {agg.country}
             </h4>
-            <span className="font-poppins font-semibold text-sm text-text-primary tabular-nums">
+            <span className="font-poppins font-semibold text-sm 3xl:text-base 4xl:text-lg text-text-primary tabular-nums">
               {agg.projectCount}
             </span>
           </div>
           <div className="flex items-center gap-2 mt-1">
-            <span className="font-inter text-2xs text-text-muted">
+            <span className="font-inter text-2xs 3xl:text-xs 4xl:text-sm text-text-muted">
               {formatCredits(agg.creditsIssued)} credits
             </span>
             {agg.creditsIssued > 0 && (
               <>
                 <span className="w-px h-2 bg-border-ui" />
-                <span className="font-inter text-2xs text-text-muted">
+                <span className="font-inter text-2xs 3xl:text-xs 4xl:text-sm text-text-muted">
                   {pctRetired}% retired
                 </span>
               </>
@@ -93,10 +93,10 @@ export const MapCountryTooltip: React.FC<MapCountryTooltipProps> = ({
                     className="w-1.5 h-1.5 rounded-full flex-shrink-0"
                     style={{ backgroundColor: s.color }}
                   />
-                  <span className="font-inter text-[10.5px] text-text-secondary flex-1 truncate">
+                  <span className="font-inter text-[10.5px] 3xl:text-xs text-text-secondary flex-1 truncate">
                     {s.scope}
                   </span>
-                  <span className="font-inter text-2xs text-text-muted tabular-nums">
+                  <span className="font-inter text-2xs 3xl:text-xs 4xl:text-sm text-text-muted tabular-nums">
                     {s.count}
                   </span>
                 </div>
@@ -107,7 +107,7 @@ export const MapCountryTooltip: React.FC<MapCountryTooltipProps> = ({
 
         {/* Top projects */}
         <div className="px-2.5 py-1.5">
-          <div className="font-poppins text-xs font-semibold text-text-muted uppercase tracking-widest px-1 pt-1 pb-1">
+          <div className="font-poppins text-xs 3xl:text-sm 4xl:text-base font-semibold text-text-muted uppercase tracking-widest px-1 pt-1 pb-1">
             Top projects
           </div>
           <ul className="flex flex-col">
@@ -119,15 +119,15 @@ export const MapCountryTooltip: React.FC<MapCountryTooltipProps> = ({
                   aria-label={`Open project ${p.name} — ${formatCredits(p.creditsIssued)}, ${p.type}`}
                   className="w-full text-left px-2 py-1.5 rounded-md hover:bg-surface-base transition-colors focus:outline-none focus-visible:bg-brand-100"
                 >
-                  <div className="font-inter text-xs text-text-primary font-medium leading-tight line-clamp-1">
+                  <div className="font-inter text-xs 3xl:text-sm 4xl:text-base text-text-primary font-medium leading-tight line-clamp-1">
                     {p.name}
                   </div>
                   <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className="font-inter text-[9.5px] text-text-muted tabular-nums">
+                    <span className="font-inter text-[9.5px] 3xl:text-xs text-text-muted tabular-nums">
                       {formatCredits(p.creditsIssued)}
                     </span>
                     <span className="w-0.5 h-0.5 rounded-full bg-border-ui" />
-                    <span className="font-inter text-[9.5px] text-text-muted truncate">
+                    <span className="font-inter text-[9.5px] 3xl:text-xs text-text-muted truncate">
                       {p.type}
                     </span>
                   </div>
@@ -135,7 +135,7 @@ export const MapCountryTooltip: React.FC<MapCountryTooltipProps> = ({
               </li>
             ))}
           </ul>
-          <div className="px-2 pt-1 pb-1.5 font-inter text-2xs text-brand-700">
+          <div className="px-2 pt-1 pb-1.5 font-inter text-2xs 3xl:text-xs 4xl:text-sm text-brand-700">
             Click a project to view details →
           </div>
         </div>

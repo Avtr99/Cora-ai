@@ -64,7 +64,7 @@ const SearchStep = ({ onBack, onContinue }: SearchStepProps): JSX.Element => {
 
   if (loading) {
     return (
-      <div className="py-8 text-center text-text-muted font-inter text-sm animate-pulse">
+      <div className="py-8 3xl:py-10 4xl:py-12 text-center text-text-muted font-inter text-sm 3xl:text-base 4xl:text-lg animate-pulse">
         Loading search settings...
       </div>
     );
@@ -78,40 +78,40 @@ const SearchStep = ({ onBack, onContinue }: SearchStepProps): JSX.Element => {
       />
 
       {/* Provider selection */}
-      <div className="grid grid-cols-2 gap-3 mb-4">
+      <div className="grid grid-cols-2 gap-3 3xl:gap-4 4xl:gap-5 mb-4 3xl:mb-5 4xl:mb-6">
         <button
           type="button"
           onClick={() => setProvider("tavily")}
-          className={`px-4 py-3 rounded-lg border-2 text-sm font-poppins font-medium transition-all text-left ${
+          className={`px-4 3xl:px-5 py-3 3xl:py-4 4xl:py-5 rounded-lg border-2 text-sm 3xl:text-base 4xl:text-lg font-poppins font-medium transition-all text-left ${
             provider === "tavily"
               ? "border-brand-700 bg-brand-100 text-brand-700"
               : "border-border-ui bg-surface-card text-text-secondary hover:border-brand-200"
           }`}
         >
           <div className="font-semibold">Tavily</div>
-          <div className="text-xs font-normal mt-0.5 opacity-80">AI-optimized web search</div>
+          <div className="text-xs 3xl:text-sm 4xl:text-base font-normal mt-0.5 3xl:mt-1 opacity-80">AI-optimized web search</div>
         </button>
         <button
           type="button"
           onClick={() => setProvider("none")}
-          className={`px-4 py-3 rounded-lg border-2 text-sm font-poppins font-medium transition-all text-left ${
+          className={`px-4 3xl:px-5 py-3 3xl:py-4 4xl:py-5 rounded-lg border-2 text-sm 3xl:text-base 4xl:text-lg font-poppins font-medium transition-all text-left ${
             provider === "none"
               ? "border-brand-700 bg-brand-100 text-brand-700"
               : "border-border-ui bg-surface-card text-text-secondary hover:border-brand-200"
           }`}
         >
           <div className="font-semibold">Disabled</div>
-          <div className="text-xs font-normal mt-0.5 opacity-80">KB-only mode</div>
+          <div className="text-xs 3xl:text-sm 4xl:text-base font-normal mt-0.5 3xl:mt-1 opacity-80">KB-only mode</div>
         </button>
       </div>
 
       {/* Tavily API key */}
       {provider === "tavily" && (
-        <div className="mb-5">
-          <label className="block text-sm font-poppins font-medium text-text-primary mb-2">
+        <div className="mb-5 3xl:mb-6 4xl:mb-7">
+          <label className="block text-sm 3xl:text-base 4xl:text-lg font-poppins font-medium text-text-primary mb-2 3xl:mb-3 4xl:mb-4">
             Tavily API Key
             {existing?.has_api_key && (
-              <span className="ml-2 text-xs text-semantic-success-icon font-normal">
+              <span className="ml-2 text-xs 3xl:text-sm 4xl:text-base text-semantic-success-icon font-normal">
                 (already set — leave blank to keep)
               </span>
             )}
@@ -127,11 +127,11 @@ const SearchStep = ({ onBack, onContinue }: SearchStepProps): JSX.Element => {
             href="https://app.tavily.com/"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-block mt-1.5 text-xs text-brand-700 hover:text-brand-hover font-inter"
+            className="inline-block mt-1.5 3xl:mt-2 text-xs 3xl:text-sm 4xl:text-base text-brand-700 hover:text-brand-hover font-inter"
           >
             Get a free Tavily key &rarr;
           </a>
-          <p className="mt-1.5 text-xs text-text-muted font-inter">
+          <p className="mt-1.5 3xl:mt-2 text-xs 3xl:text-sm 4xl:text-base text-text-muted font-inter">
             Free tier: 1,000 searches/month. No credit card required.
           </p>
         </div>
@@ -139,15 +139,15 @@ const SearchStep = ({ onBack, onContinue }: SearchStepProps): JSX.Element => {
 
       {/* Disabled info */}
       {provider === "none" && (
-        <div className="mb-5 p-3 rounded-lg bg-surface-subtle border border-border-ui">
-          <p className="text-xs text-text-muted font-inter">
+        <div className="mb-5 3xl:mb-6 4xl:mb-7 p-3 3xl:p-4 4xl:p-5 rounded-lg bg-surface-subtle border border-border-ui">
+          <p className="text-xs 3xl:text-sm 4xl:text-base text-text-muted font-inter">
             Cora will only answer from the local knowledge base. Questions outside the KB will
             return "Information not found." You can enable web search later in Settings.
           </p>
         </div>
       )}
 
-      {error && <div className="mb-5"><ErrorBox message={error} /></div>}
+      {error && <div className="mb-5 3xl:mb-6 4xl:mb-7"><ErrorBox message={error} /></div>}
 
       <StepActions
         onBack={onBack}

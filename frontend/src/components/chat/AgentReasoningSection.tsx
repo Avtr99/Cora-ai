@@ -18,14 +18,14 @@ const friendlyMessage = (m: string) => m.trim();
 
 const renderStepIcon = (name?: string) => {
   const n = (name || '').toLowerCase();
-  if (n.includes('intent') || n.includes('query')) return <MessageSquare className="h-3.5 w-3.5 text-brand-500" />;
-  if (n.includes('clarify') || n.includes('rewrit')) return <Pencil className="h-3.5 w-3.5 text-brand-500" />;
-  if (n.includes('route')) return <Route className="h-3.5 w-3.5 text-brand-500" />;
-  if (n.includes('retriev') || n.includes('search')) return <Search className="h-3.5 w-3.5 text-brand-500" />;
-  if (n.includes('summarize') || n.includes('findings')) return <FileText className="h-3.5 w-3.5 text-brand-500" />;
-  if (n.includes('validat') || n.includes('quality') || n.includes('check')) return <CheckCircle className="h-3.5 w-3.5 text-brand-500" />;
-  if (n.includes('answer') || n.includes('generat') || n.includes('draft')) return <Pencil className="h-3.5 w-3.5 text-brand-500" />;
-  return <FileText className="h-3.5 w-3.5 text-brand-500" />;
+  if (n.includes('intent') || n.includes('query')) return <MessageSquare className="h-3.5 w-3.5 3xl:h-4 3xl:w-4 4xl:h-5 4xl:w-5 text-brand-500" />;
+  if (n.includes('clarify') || n.includes('rewrit')) return <Pencil className="h-3.5 w-3.5 3xl:h-4 3xl:w-4 4xl:h-5 4xl:w-5 text-brand-500" />;
+  if (n.includes('route')) return <Route className="h-3.5 w-3.5 3xl:h-4 3xl:w-4 4xl:h-5 4xl:w-5 text-brand-500" />;
+  if (n.includes('retriev') || n.includes('search')) return <Search className="h-3.5 w-3.5 3xl:h-4 3xl:w-4 4xl:h-5 4xl:w-5 text-brand-500" />;
+  if (n.includes('summarize') || n.includes('findings')) return <FileText className="h-3.5 w-3.5 3xl:h-4 3xl:w-4 4xl:h-5 4xl:w-5 text-brand-500" />;
+  if (n.includes('validat') || n.includes('quality') || n.includes('check')) return <CheckCircle className="h-3.5 w-3.5 3xl:h-4 3xl:w-4 4xl:h-5 4xl:w-5 text-brand-500" />;
+  if (n.includes('answer') || n.includes('generat') || n.includes('draft')) return <Pencil className="h-3.5 w-3.5 3xl:h-4 3xl:w-4 4xl:h-5 4xl:w-5 text-brand-500" />;
+  return <FileText className="h-3.5 w-3.5 3xl:h-4 3xl:w-4 4xl:h-5 4xl:w-5 text-brand-500" />;
 };
 
 interface AgentReasoningSectionProps {
@@ -44,8 +44,8 @@ export const AgentReasoningSection: React.FC<AgentReasoningSectionProps> = ({ st
   if (visibleSteps.length === 0) return null;
 
   return (
-    <details className="-mt-1 mb-3 text-xs cursor-pointer group">
-      <summary className="font-inter font-normal text-xs leading-[1.4] text-text-secondary outline-none flex items-center gap-1.5 hover:text-brand-500 transition-colors list-none select-none">
+    <details className="-mt-1 mb-3 3xl:mb-4 text-xs 3xl:text-sm 4xl:text-base cursor-pointer group">
+      <summary className="font-inter font-normal text-xs 3xl:text-sm 4xl:text-base leading-[1.4] text-text-secondary outline-none flex items-center gap-1.5 3xl:gap-2 hover:text-brand-500 transition-colors list-none select-none">
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" className="flex-shrink-0">
           <path d="M6.5 2L3 6.5L6.5 6.5L6.5 10L10 5.5L6.5 5.5L6.5 2Z" fill={BRAND.primary500} stroke={BRAND.primary500} strokeWidth="0.5" />
         </svg>
@@ -54,7 +54,7 @@ export const AgentReasoningSection: React.FC<AgentReasoningSectionProps> = ({ st
           <path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </summary>
-      <div className="mt-2.5 space-y-1.5 reasoning-content">
+      <div className="mt-2.5 3xl:mt-3.5 space-y-1.5 3xl:space-y-2 4xl:space-y-2.5 reasoning-content">
         {visibleSteps.map((step, idx) => {
           const msgs = normalizeStepMessages(step.messages);
           const primaryMsg = msgs[0] || '';
@@ -63,28 +63,28 @@ export const AgentReasoningSection: React.FC<AgentReasoningSectionProps> = ({ st
           const isRetrievalStep = stepName.includes('retriev') || stepName.includes('search') || stepName.includes('kb');
 
           return (
-            <div key={idx} className="rounded-md border border-border-ui bg-surface-card p-2.5">
-              <div className="flex items-center gap-1.5 mb-1.5">
-                <span className="flex items-center justify-center w-5 h-5 rounded bg-brand-100">
+            <div key={idx} className="rounded-md border border-border-ui bg-surface-card p-2.5 3xl:p-3 4xl:p-3.5">
+              <div className="flex items-center gap-1.5 3xl:gap-2 mb-1.5 3xl:mb-2">
+                <span className="flex items-center justify-center w-5 h-5 3xl:w-6 3xl:h-6 4xl:w-7 4xl:h-7 rounded bg-brand-100">
                   {renderStepIcon(step.agentName)}
                 </span>
-                <span className="font-poppins font-medium text-xs text-text-primary">
+                <span className="font-poppins font-medium text-xs 3xl:text-sm text-text-primary">
                   {friendlyLabel(step.agentName)}
                 </span>
               </div>
               {primaryMsg && (
-                <p className="font-inter font-normal text-sm leading-[1.45] text-text-secondary mb-1">
+                <p className="font-inter font-normal text-sm 3xl:text-base 4xl:text-lg leading-[1.45] text-text-secondary mb-1 3xl:mb-1.5">
                   {friendlyMessage(primaryMsg)}
                 </p>
               )}
               {detailMsgs.length > 0 && (
                 <div className="pl-1">
                   {isRetrievalStep ? (
-                    <ul className="space-y-1">
+                    <ul className="space-y-1 3xl:space-y-1.5 4xl:space-y-2">
                       {detailMsgs.map((msg: string, i: number) => (
                         <li key={i} className="flex items-start gap-2">
-                          <span className="w-1 h-1 rounded-full bg-brand-500 mt-1.5 flex-shrink-0"></span>
-                          <span className="font-inter font-normal text-xs leading-[1.45] text-text-secondary">
+                          <span className="w-1 h-1 3xl:w-1.5 3xl:h-1.5 rounded-full bg-brand-500 mt-1.5 3xl:mt-2 flex-shrink-0"></span>
+                          <span className="font-inter font-normal text-xs 3xl:text-sm leading-[1.45] text-text-secondary">
                             {friendlyMessage(msg)}
                           </span>
                         </li>
@@ -93,7 +93,7 @@ export const AgentReasoningSection: React.FC<AgentReasoningSectionProps> = ({ st
                   ) : (
                     <div className="space-y-0.5">
                       {detailMsgs.map((msg: string, i: number) => (
-                        <p key={i} className="font-inter font-normal text-xs leading-[1.45] text-text-secondary">
+                        <p key={i} className="font-inter font-normal text-xs 3xl:text-sm leading-[1.45] text-text-secondary">
                           {friendlyMessage(msg)}
                         </p>
                       ))}

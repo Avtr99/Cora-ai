@@ -179,8 +179,8 @@ export const FilterDropdown: React.FC<FilterDropdownProps> = ({
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={open ? `${listId}-list` : undefined}
-        className={`inline-flex items-center justify-between w-full h-8 px-3 rounded-lg font-inter text-xs font-medium transition-all
-          border focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2
+        className={`inline-flex items-center justify-between w-full h-8 3xl:h-10 4xl:h-11 px-3 3xl:px-4 rounded-lg 3xl:rounded-xl font-inter text-xs 3xl:text-[13px] 4xl:text-sm font-medium transition-all
+          border focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2
           ${value
             ? 'bg-brand-900 text-white border-brand-900'
             : 'bg-surface-card text-text-secondary border-border-ui hover:border-border-ui'
@@ -193,7 +193,7 @@ export const FilterDropdown: React.FC<FilterDropdownProps> = ({
       {open && menuPos && (
         <>
           <div
-            className="fixed inset-0 z-30 sm:bg-transparent bg-black/20"
+            className="fixed inset-0 z-30 sm:bg-transparent bg-surface-overlay/20"
             onClick={() => setOpen(false)}
             aria-hidden="true"
           />
@@ -209,7 +209,7 @@ export const FilterDropdown: React.FC<FilterDropdownProps> = ({
             {/* Mobile header — makes the bottom sheet look like a modal,
                 mirroring the Filters popup for UX consistency. */}
             <div className="sm:hidden flex items-center justify-between border-b border-surface-subtle px-4 py-3">
-              <span className="font-poppins text-sm font-semibold text-text-primary">
+              <span className="font-poppins text-sm 3xl:text-base 4xl:text-lg font-semibold text-text-primary">
                 {label}
               </span>
               <button
@@ -231,7 +231,7 @@ export const FilterDropdown: React.FC<FilterDropdownProps> = ({
                   aria-selected={false}
                   onClick={() => { onChange(null); setOpen(false); }}
                   onMouseEnter={() => setFocusedIndex(0)}
-                  className={`w-full text-left px-4 sm:px-3 py-3 sm:py-2 font-inter text-sm sm:text-xs transition-colors
+                  className={`w-full text-left px-4 sm:px-3 py-3 sm:py-2 font-inter text-sm sm:text-xs 3xl:text-sm 4xl:text-[15px] transition-colors
                     ${focusedIndex === 0 ? 'bg-surface-subtle' : 'hover:bg-surface-base'}
                     text-text-muted hover:text-text-primary
                   `}
@@ -240,7 +240,7 @@ export const FilterDropdown: React.FC<FilterDropdownProps> = ({
                 </button>
               )}
               {options.length === 0 ? (
-                <div className="px-4 sm:px-3 py-3 sm:py-2 font-inter text-sm sm:text-xs text-text-muted italic">
+                <div className="px-4 sm:px-3 py-3 sm:py-2 font-inter text-sm sm:text-xs 3xl:text-sm 4xl:text-[15px] text-text-muted italic">
                   No options available
                 </div>
               ) : (
@@ -255,7 +255,7 @@ export const FilterDropdown: React.FC<FilterDropdownProps> = ({
                       aria-selected={value === opt.value}
                       onClick={() => { onChange(opt.value); setOpen(false); }}
                       onMouseEnter={() => setFocusedIndex(optionIndex)}
-                      className={`w-full text-left px-4 sm:px-3 py-3 sm:py-2 font-inter text-sm sm:text-xs transition-colors flex items-center justify-between gap-3
+                      className={`w-full text-left px-4 sm:px-3 py-3 sm:py-2 font-inter text-sm sm:text-xs 3xl:text-sm 4xl:text-[15px] transition-colors flex items-center justify-between gap-3
                       ${value === opt.value
                         ? 'bg-surface-subtle text-text-primary font-medium'
                         : focusedIndex === optionIndex
@@ -265,7 +265,7 @@ export const FilterDropdown: React.FC<FilterDropdownProps> = ({
                     >
                       <span className="break-words max-w-[260px] overflow-hidden">{opt.label}</span>
                       {opt.count !== undefined && (
-                        <span className="text-text-muted text-xs sm:text-2xs flex-shrink-0">{opt.count.toLocaleString()}</span>
+                        <span className="text-text-muted text-xs sm:text-2xs 3xl:text-xs 4xl:text-[13px] flex-shrink-0">{opt.count.toLocaleString()}</span>
                       )}
                     </button>
                   );

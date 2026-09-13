@@ -193,15 +193,15 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({ backendReady, onUpload
   const nonPdfCount = stagedFiles.length - pdfCount;
 
   return (
-    <section className="bg-surface-card rounded-xl border border-border-ui shadow-xs overflow-hidden">
-      <div className="px-5 py-4 border-b border-border-ui">
-        <h2 className="font-poppins text-xl font-semibold text-text-primary">Add documents</h2>
-        <p className="font-inter text-xs text-text-muted mt-0.5">
+    <section className="bg-surface-card rounded-xl 3xl:rounded-2xl border border-border-ui shadow-xs overflow-hidden">
+      <div className="px-5 3xl:px-8 4xl:px-10 py-4 3xl:py-6 4xl:py-8 border-b border-border-ui">
+        <h2 className="font-poppins text-heading-2 3xl:text-xl 4xl:text-2xl font-semibold text-text-primary">Add documents</h2>
+        <p className="font-inter text-caption 3xl:text-sm 4xl:text-base text-text-muted mt-0.5 3xl:mt-1">
           Stage files, then build your knowledge base in one go.
         </p>
       </div>
 
-      <div className="p-5">
+      <div className="p-5 3xl:p-7 4xl:p-8">
         <FileDropzone
           backendReady={backendReady}
           allowedExtensions={allowedExtensions}
@@ -210,41 +210,41 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({ backendReady, onUpload
         />
 
         {workerDown && (
-          <div className="mt-3 flex items-start gap-2 rounded-lg bg-semantic-warning-bg/50 border border-semantic-warning-border p-2.5 text-semantic-warning-text text-xs font-inter">
-            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" aria-hidden="true" />
+          <div className="mt-3 3xl:mt-4 flex items-start gap-2 3xl:gap-2.5 rounded-lg 3xl:rounded-xl bg-semantic-warning-bg/50 border border-semantic-warning-border p-2.5 3xl:p-3.5 text-semantic-warning-text text-caption 3xl:text-[13px] 4xl:text-sm font-inter">
+            <AlertCircle className="h-4 w-4 3xl:h-5 3xl:w-5 shrink-0 mt-0.5" aria-hidden="true" />
             <span className="flex-1">
               The background PDF parser is not running, so uploaded files won&apos;t be
-              added to the knowledge base until it starts. Start it from your terminal: <code className="font-mono text-2xs">docker compose up -d ingest-worker</code>
+              added to the knowledge base until it starts. Start it from your terminal: <code className="font-mono text-micro">docker compose up -d ingest-worker</code>
             </span>
           </div>
         )}
 
         {uploadSuccess && (
-          <div className="mt-3 flex items-start gap-2 rounded-lg bg-semantic-success-bg p-2.5 text-semantic-success-text text-xs font-inter">
-            <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5" />
+          <div className="mt-3 3xl:mt-4 flex items-start gap-2 3xl:gap-2.5 rounded-lg 3xl:rounded-xl bg-semantic-success-bg p-2.5 3xl:p-3.5 text-semantic-success-text text-caption 3xl:text-[13px] 4xl:text-sm font-inter">
+            <CheckCircle2 className="h-4 w-4 3xl:h-5 3xl:w-5 shrink-0 mt-0.5" />
             <span className="flex-1">{uploadSuccess}</span>
             <button type="button" onClick={() => setUploadSuccess(null)} className="shrink-0" aria-label="Dismiss success message">
-              <X className="h-4 w-4" />
+              <X className="h-4 w-4 3xl:h-5 3xl:w-5" />
             </button>
           </div>
         )}
 
         {workerWarning && (
-          <div className="mt-3 flex items-start gap-2 rounded-lg bg-semantic-warning-bg/50 border border-semantic-warning-border p-2.5 text-semantic-warning-text text-xs font-inter">
-            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" aria-hidden="true" />
+          <div className="mt-3 3xl:mt-4 flex items-start gap-2 3xl:gap-2.5 rounded-lg 3xl:rounded-xl bg-semantic-warning-bg/50 border border-semantic-warning-border p-2.5 3xl:p-3.5 text-semantic-warning-text text-caption 3xl:text-[13px] 4xl:text-sm font-inter">
+            <AlertCircle className="h-4 w-4 3xl:h-5 3xl:w-5 shrink-0 mt-0.5" aria-hidden="true" />
             <span className="flex-1">{workerWarning}</span>
             <button type="button" onClick={() => setWorkerWarning(null)} className="shrink-0" aria-label="Dismiss warning message">
-              <X className="h-4 w-4" />
+              <X className="h-4 w-4 3xl:h-5 3xl:w-5" />
             </button>
           </div>
         )}
 
         {displayError && (
-          <div className="mt-3 flex items-start gap-2 rounded-lg bg-semantic-error-bg p-2.5 text-semantic-error-text text-xs font-inter">
-            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+          <div className="mt-3 3xl:mt-4 flex items-start gap-2 3xl:gap-2.5 rounded-lg 3xl:rounded-xl bg-semantic-error-bg p-2.5 3xl:p-3.5 text-semantic-error-text text-caption 3xl:text-[13px] 4xl:text-sm font-inter">
+            <AlertCircle className="h-4 w-4 3xl:h-5 3xl:w-5 shrink-0 mt-0.5" />
             <span className="flex-1">{displayError}</span>
             <button type="button" onClick={clearErrors} className="shrink-0" aria-label="Dismiss error message">
-              <X className="h-4 w-4" />
+              <X className="h-4 w-4 3xl:h-5 3xl:w-5" />
             </button>
           </div>
         )}
@@ -256,7 +256,7 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({ backendReady, onUpload
           onClear={handleClear}
         />
 
-        <div className="mt-4">
+        <div className="mt-4 3xl:mt-6 4xl:mt-8">
           {/* ponytail: the parse-mode selector is a PDF-only concept. Every other
               accepted format has exactly one correct handling determined by its
               structure (MD passes through, TXT wraps, CSV/JSON/JSONL flatten).
@@ -264,8 +264,8 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({ backendReady, onUpload
               what will happen per file type. */}
           {stagedFiles.length === 0 ? (
             <>
-              <p className="font-poppins text-sm font-medium text-text-primary mb-2">PDF parse mode</p>
-              <p className="font-inter text-xs text-text-secondary mb-3">
+              <p className="font-inter text-heading-3 3xl:text-lg 4xl:text-xl font-medium text-text-primary mb-2 3xl:mb-3">PDF parse mode</p>
+              <p className="font-inter text-caption 3xl:text-[13px] 4xl:text-sm text-text-secondary mb-3 3xl:mb-4">
                 Only PDFs need a parse mode. Text, Markdown, and structured files (CSV, JSON) are handled automatically.
               </p>
               <ConversionModeSelector
@@ -275,18 +275,18 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({ backendReady, onUpload
               />
             </>
           ) : pdfCount === 0 ? (
-            <div className="rounded-lg border border-border-ui bg-surface-subtle/40 p-3">
-              <p className="font-poppins text-sm font-medium text-text-primary mb-1">No parsing needed</p>
-              <p className="font-inter text-xs text-text-secondary">
+            <div className="rounded-lg 3xl:rounded-xl border border-border-ui bg-surface-subtle/40 p-3 3xl:p-5 4xl:p-6">
+              <p className="font-inter text-heading-3 3xl:text-lg 4xl:text-xl font-medium text-text-primary mb-1 3xl:mb-2">No parsing needed</p>
+              <p className="font-inter text-caption 3xl:text-[13px] 4xl:text-sm text-text-secondary">
                 These files are already structured or text-based, so they&apos;ll be added directly without AI parsing.
               </p>
               <FileTypeSummary files={stagedFiles} />
             </div>
           ) : (
             <>
-              <p className="font-poppins text-sm font-medium text-text-primary mb-2">PDF parse mode</p>
+              <p className="font-inter text-heading-3 3xl:text-lg 4xl:text-xl font-medium text-text-primary mb-2 3xl:mb-3">PDF parse mode</p>
               {nonPdfCount > 0 && (
-                <p className="font-inter text-xs text-text-secondary mb-3">
+                <p className="font-inter text-caption 3xl:text-[13px] 4xl:text-sm text-text-secondary mb-3 3xl:mb-4">
                   Applies to {pdfCount} PDF{pdfCount === 1 ? '' : 's'}. {nonPdfCount} other {nonPdfCount === 1 ? 'file' : 'files'} will be added directly.
                 </p>
               )}
@@ -305,9 +305,9 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({ backendReady, onUpload
         <button
           type="button"
           onClick={() => setShowTags((v) => !v)}
-          className="mt-3 flex items-center gap-1.5 font-inter text-xs text-text-muted hover:text-text-primary"
+          className="mt-3 3xl:mt-4 flex items-center gap-1.5 3xl:gap-2 font-inter text-caption 3xl:text-[13px] 4xl:text-sm text-text-muted hover:text-text-primary"
         >
-          <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showTags ? 'rotate-180' : ''}`} />
+          <ChevronDown className={`h-3.5 w-3.5 3xl:h-4 3xl:w-4 transition-transform ${showTags ? 'rotate-180' : ''}`} />
           Optional tags
         </button>
         {showTags && (
@@ -315,17 +315,17 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({ backendReady, onUpload
             value={tags}
             onChange={(e) => setTags(e.target.value)}
             placeholder="e.g. legal, methodology"
-            className="mt-2 h-9 w-full rounded-lg border border-border-ui bg-surface-card px-3 font-inter text-sm text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
+            className="mt-2 3xl:mt-3 h-9 3xl:h-11 4xl:h-12 w-full rounded-lg 3xl:rounded-xl border border-border-ui bg-surface-card px-3 3xl:px-4 font-inter text-body-sm 3xl:text-[15px] 4xl:text-base text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
           />
         )}
 
         {isUploading && (
-          <div className="mt-4">
-            <div className="flex items-center justify-between text-xs font-inter mb-1.5">
+          <div className="mt-4 3xl:mt-6">
+            <div className="flex items-center justify-between text-caption 3xl:text-[13px] 4xl:text-sm font-inter mb-1.5 3xl:mb-2">
               <span className="text-text-secondary">Building knowledge base</span>
               <span className="text-text-primary font-medium">{Math.round((uploadProgress.done / uploadProgress.total) * 100)}%</span>
             </div>
-            <div className="h-2 w-full rounded-full bg-surface-subtle overflow-hidden">
+            <div className="h-2 3xl:h-2.5 4xl:h-3 w-full rounded-full bg-surface-subtle overflow-hidden">
               <div
                 className="h-full rounded-full bg-brand-500 transition-all duration-300"
                 style={{ width: `${uploadProgress.total ? (uploadProgress.done / uploadProgress.total) * 100 : 0}%` }}
@@ -338,7 +338,7 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({ backendReady, onUpload
           type="button"
           disabled={uploadDisabled}
           onClick={handleIngest}
-          className="mt-4 w-full h-10 rounded-lg bg-brand-700 px-4 font-poppins text-sm font-semibold text-white transition-colors hover:bg-brand-hover disabled:opacity-50 disabled:cursor-not-allowed"
+          className="mt-4 3xl:mt-6 w-full h-10 3xl:h-12 4xl:h-14 rounded-lg 3xl:rounded-xl bg-brand-700 px-4 3xl:px-6 font-inter text-body-sm 3xl:text-[15px] 4xl:text-base font-semibold text-white transition-colors hover:bg-brand-hover disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {buttonLabel}
         </button>

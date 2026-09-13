@@ -69,7 +69,7 @@ const EmbeddingsStep = ({ onBack, onContinue }: EmbeddingsStepProps): JSX.Elemen
 
   if (loading) {
     return (
-      <div className="py-8 text-center text-text-muted font-inter text-sm animate-pulse">
+      <div className="py-8 3xl:py-10 4xl:py-12 text-center text-text-muted font-inter text-sm 3xl:text-base 4xl:text-lg animate-pulse">
         Loading embedding settings...
       </div>
     );
@@ -83,7 +83,7 @@ const EmbeddingsStep = ({ onBack, onContinue }: EmbeddingsStepProps): JSX.Elemen
       />
 
       {/* Provider selection */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 3xl:gap-3 4xl:gap-4 mb-4 3xl:mb-5 4xl:mb-6">
         {(Object.keys(EMBEDDING_PRESETS) as EmbeddingProvider[]).map((key) => {
           const isActive = provider === key;
           return (
@@ -91,7 +91,7 @@ const EmbeddingsStep = ({ onBack, onContinue }: EmbeddingsStepProps): JSX.Elemen
               key={key}
               type="button"
               onClick={() => setProvider(key)}
-              className={`px-3 py-2.5 rounded-lg border-2 text-xs font-poppins font-medium transition-all ${
+              className={`px-3 3xl:px-4 py-2.5 3xl:py-3 4xl:py-4 rounded-lg border-2 text-xs 3xl:text-sm 4xl:text-base font-poppins font-medium transition-all ${
                 isActive
                   ? "border-brand-700 bg-brand-100 text-brand-700"
                   : "border-border-ui bg-surface-card text-text-secondary hover:border-brand-200"
@@ -103,11 +103,11 @@ const EmbeddingsStep = ({ onBack, onContinue }: EmbeddingsStepProps): JSX.Elemen
         })}
       </div>
 
-      <p className="text-xs text-text-muted font-inter mb-5">{config.description}</p>
+      <p className="text-xs 3xl:text-sm 4xl:text-base text-text-muted font-inter mb-5 3xl:mb-6 4xl:mb-7">{config.description}</p>
 
       {/* API key (if needed) */}
       {config.needsApiKey && (
-        <div className="mb-5">
+        <div className="mb-5 3xl:mb-6 4xl:mb-7">
           <Field
             label={config.keyLabel}
             hint={existing?.has_api_key ? "(already set — leave blank to keep)" : undefined}
@@ -123,7 +123,7 @@ const EmbeddingsStep = ({ onBack, onContinue }: EmbeddingsStepProps): JSX.Elemen
               href={config.signupUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-block mt-1.5 text-xs text-brand-700 hover:text-brand-hover font-inter"
+              className="inline-block mt-1.5 3xl:mt-2 text-xs 3xl:text-sm 4xl:text-base text-brand-700 hover:text-brand-hover font-inter"
             >
               Get a key &rarr;
             </a>
@@ -133,7 +133,7 @@ const EmbeddingsStep = ({ onBack, onContinue }: EmbeddingsStepProps): JSX.Elemen
 
       {/* Ollama base URL */}
       {provider === "ollama" && (
-        <div className="mb-5">
+        <div className="mb-5 3xl:mb-6 4xl:mb-7">
           <Field label="Ollama Base URL">
             <input
               type="text"
@@ -142,7 +142,7 @@ const EmbeddingsStep = ({ onBack, onContinue }: EmbeddingsStepProps): JSX.Elemen
               placeholder="http://localhost:11434"
               className={inputClass}
             />
-            <p className="mt-1.5 text-xs text-text-muted font-inter">
+            <p className="mt-1.5 3xl:mt-2 text-xs 3xl:text-sm 4xl:text-base text-text-muted font-inter">
               Pull the model first: <code>ollama pull bge-large-en-v1.5</code>
             </p>
           </Field>
@@ -150,8 +150,8 @@ const EmbeddingsStep = ({ onBack, onContinue }: EmbeddingsStepProps): JSX.Elemen
       )}
 
       {/* Dimension note */}
-      <div className="mb-5 p-3 rounded-lg bg-surface-subtle border border-border-ui">
-        <p className="text-xs text-text-muted font-inter">
+      <div className="mb-5 3xl:mb-6 4xl:mb-7 p-3 3xl:p-4 4xl:p-5 rounded-lg bg-surface-subtle border border-border-ui">
+        <p className="text-xs 3xl:text-sm 4xl:text-base text-text-muted font-inter">
           <strong className="text-text-primary">Dimension:</strong> {config.defaultDim}d
           {existing && existing.dim !== config.defaultDim && (
             <span className="ml-1 text-semantic-warning-icon">
@@ -163,7 +163,7 @@ const EmbeddingsStep = ({ onBack, onContinue }: EmbeddingsStepProps): JSX.Elemen
         </p>
       </div>
 
-      {error && <div className="mb-5"><ErrorBox message={error} /></div>}
+      {error && <div className="mb-5 3xl:mb-6 4xl:mb-7"><ErrorBox message={error} /></div>}
 
       <StepActions
         onBack={onBack}

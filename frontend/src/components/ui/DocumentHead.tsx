@@ -52,7 +52,7 @@ const pageMetaMap: Record<string, PageMeta> = {
   '/pricing': {
     title: 'Carbon Credit Pricing | Cora',
     description:
-      'Explore historical and current carbon credit pricing data across project types including REDD+, Renewable Energy, Agriculture, and Household Devices.',
+      'Understand how the voluntary carbon market prices project types - price drivers, CCP label status, and demand outlook for REDD+, Renewable Energy, Agriculture, and Household Devices.',
     keywords:
       'carbon credit pricing, carbon market prices, VCM pricing, REDD+ prices, renewable energy credits, carbon offset costs',
     ogType: 'website',
@@ -60,7 +60,8 @@ const pageMetaMap: Record<string, PageMeta> = {
       '@context': 'https://schema.org',
       '@type': 'WebPage',
       name: 'Carbon Credit Pricing',
-      description: 'Explore historical and current carbon credit pricing data across project types.',
+      description:
+        'How the voluntary carbon market prices project types - drivers, integrity labels, and demand outlook.',
     },
   },
   '/case-studies': {

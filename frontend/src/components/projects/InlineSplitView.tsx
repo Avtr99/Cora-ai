@@ -69,14 +69,13 @@ const InlineSplitView: React.FC<InlineSplitViewProps> = ({
 
   return (
   <div
-    className="flex border border-border-ui rounded-2xl overflow-hidden bg-surface-card shadow-card-sm"
-    style={{ height: 'calc(100vh - 180px)', minHeight: '560px' }}
+    className="flex border border-border-ui rounded-2xl 3xl:rounded-3xl overflow-hidden bg-surface-card shadow-card-sm 3xl:shadow-card-md h-[calc(100vh-180px)] 3xl:h-[calc(100vh-200px)] 4xl:h-[calc(100vh-220px)] min-h-[560px] 3xl:min-h-[640px] 4xl:min-h-[720px]"
   >
     {/* Left: Scrollable project list */}
     <div
       ref={listRef}
       onScroll={onListScroll}
-      className="w-full lg:w-[380px] lg:flex-shrink-0 border-r border-border-ui overflow-y-auto divide-y divide-surface-subtle"
+      className="w-full lg:w-[380px] 3xl:w-[440px] 4xl:w-[500px] lg:flex-shrink-0 border-r border-border-ui overflow-y-auto divide-y divide-surface-subtle"
       data-project-list
       role="list"
       aria-label="Project list"
@@ -98,7 +97,7 @@ const InlineSplitView: React.FC<InlineSplitViewProps> = ({
 
       {hasMore && (
         <div className="px-4 py-3 text-center">
-          <span className="font-inter text-xs text-text-muted">
+          <span className="font-inter text-xs 3xl:text-[13px] 4xl:text-sm text-text-muted">
             Scroll for more...
           </span>
         </div>
@@ -108,7 +107,7 @@ const InlineSplitView: React.FC<InlineSplitViewProps> = ({
     {/* Right: Map ↔ Detail tabbed panel */}
     <div className="hidden lg:flex flex-1 min-w-0 flex-col bg-surface-card">
       {/* Tab header */}
-      <div className="flex items-center justify-between px-4 h-11 border-b border-border-ui bg-surface-base flex-shrink-0">
+      <div className="flex items-center justify-between px-4 3xl:px-6 h-11 3xl:h-12 4xl:h-14 border-b border-border-ui bg-surface-base flex-shrink-0">
         <div
           className="inline-flex items-center bg-surface-card border border-border-ui rounded-full p-0.5"
           role="tablist"
@@ -138,14 +137,14 @@ const InlineSplitView: React.FC<InlineSplitViewProps> = ({
             <button
               type="button"
               onClick={() => onSetFilter('country', null)}
-              className="inline-flex items-center gap-1.5 h-6 px-2 rounded-full bg-surface-card border border-border-ui text-text-primary font-inter text-[10.5px] font-medium hover:bg-surface-subtle transition-colors"
+              className="inline-flex items-center gap-1.5 h-6 3xl:h-7 4xl:h-8 px-2 3xl:px-3 4xl:px-4 rounded-full bg-surface-card border border-border-ui text-text-primary font-inter text-[10.5px] 3xl:text-xs 4xl:text-sm font-medium hover:bg-surface-subtle transition-colors"
             >
               <span className="w-1 h-1 rounded-full bg-text-muted" />
               {filters.country}
-              <IconWrapper Icon={XIcon} size={9} color={TEXT.muted} aria-hidden={true} />
+              <IconWrapper Icon={XIcon} size={9} color={TEXT.muted} aria-hidden={true} className="3xl:!w-3 3xl:!h-3 4xl:!w-3.5 4xl:!h-3.5" />
             </button>
           )}
-          <span className="font-inter text-[10.5px] text-text-muted tabular-nums">
+          <span className="font-inter text-[10.5px] 3xl:text-xs 4xl:text-sm text-text-muted tabular-nums">
             {filteredCount.toLocaleString()} projects
           </span>
           {rightPanel === 'map' && (
@@ -153,7 +152,7 @@ const InlineSplitView: React.FC<InlineSplitViewProps> = ({
               type="button"
               ref={expandTriggerRef}
               onClick={() => onSetMapFullscreen(true)}
-              className="inline-flex items-center gap-1.5 h-6 px-2 rounded-full border border-border-ui bg-surface-card text-text-secondary font-inter text-[10.5px] font-medium hover:border-brand-500 hover:text-brand-700 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
+              className="inline-flex items-center gap-1.5 h-6 3xl:h-7 4xl:h-8 px-2 3xl:px-3 4xl:px-4 rounded-full border border-border-ui bg-surface-card text-text-secondary font-inter text-[10.5px] 3xl:text-xs 4xl:text-sm font-medium hover:border-brand-500 hover:text-brand-700 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
               aria-label="Expand map to fullscreen"
             >
               <Maximize2 className="w-3 h-3" aria-hidden="true" />
@@ -205,7 +204,7 @@ const InlineSplitView: React.FC<InlineSplitViewProps> = ({
             <ProjectDetailPanel project={activeProject} allProjects={allProjects} />
           ) : (
             <div className="w-full h-full flex items-center justify-center p-8">
-              <p className="font-inter text-sm text-text-muted">
+              <p className="font-inter text-sm 3xl:text-[15px] 4xl:text-base text-text-muted">
                 Select a project to view details
               </p>
             </div>
