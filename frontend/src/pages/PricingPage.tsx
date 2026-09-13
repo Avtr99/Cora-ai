@@ -1,72 +1,89 @@
-import React, { useState, lazy, Suspense } from "react";
-import { Link } from "react-router-dom";
-import PricingDrivers from "../components/pricing/PricingDrivers";
-import MethodologyExplanation from "../components/pricing/MethodologyExplanation";
-import SBTImpact from "../components/pricing/SBTImpact";
-import { ScrollToTop } from "../components/ui/ScrollToTop";
-import { IconWrapper } from "@/components/icons/IconWrapper";
-import ChevronLeftIcon from "@/assets/icons/chevron-left.svg?react";
+import React, { useEffect } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { motion, useReducedMotion } from 'framer-motion';
+import { ScrollToTop } from '../components/ui/ScrollToTop';
+import { IconWrapper } from '@/components/icons/IconWrapper';
+import ChevronLeftIcon from '@/assets/icons/chevron-left.svg?react';
+import PricingFactorTabs from '@/components/pricing/PricingFactorTabs';
+import PricingExplorer from '@/components/pricing/PricingExplorer';
+import { FORCE_ORDER, type ForceId } from '@/data/pricingData';
+import { FORCE_HEADLINE_STAT } from '@/data/pricingFactorContent';
 
-// Lazy-load the chart component since Recharts is very large (1.2MB)
-const PricingChart = lazy(() => import("../components/pricing/PricingChart"));
-
-// Loading skeleton for the chart
-const ChartSkeleton = () => (
-  <div className="bg-surface-card rounded-2xl p-6 h-[400px] animate-pulse">
-    <div className="h-6 bg-surface-subtle rounded w-1/3 mb-4"></div>
-    <div className="h-8 bg-surface-subtle rounded w-1/4 mb-6"></div>
-    <div className="h-[280px] bg-surface-subtle rounded"></div>
-  </div>
-);
+const parseFactorParam = (value: string | null): ForceId =>
+  FORCE_ORDER.includes(value as ForceId) ? (value as ForceId) : 'type';
 
 const PricingPage: React.FC = () => {
-  const [selectedCategory, setSelectedCategory] = useState<string>("Agriculture");
-  const pageData = {
-    title: "Carbon Credit Pricing Analysis",
-    context: "Voluntary Carbon Market"
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeForce = parseFactorParam(searchParams.get('factor'));
+  const setActiveForce = (force: ForceId) => setSearchParams({ factor: force });
+  const reduceMotion = useReducedMotion();
+
+  // An invalid ?factor= falls back to 'type' - rewrite it so the URL always
+  // names the tab that is actually shown (copy/share stays truthful).
+  useEffect(() => {
+    const raw = searchParams.get('factor');
+    if (raw !== null && raw !== activeForce) {
+      setSearchParams({ factor: activeForce }, { replace: true });
+    }
+  }, [searchParams, activeForce, setSearchParams]);
+  const heroStat = FORCE_HEADLINE_STAT[activeForce];
+
+  const selectRelatedForce = (force: ForceId) => {
+    setActiveForce(force);
+    document.getElementById(`pricing-tab-${force}`)?.focus();
   };
-  
+
   return (
-    <main className="bg-surface-page min-h-screen relative">
-      {/* Main Page Heading - Visually Hidden but accessible to screen readers */}
-      <h1 className="sr-only">{`${pageData.title} - ${pageData.context}`}</h1>
-      
-      <div className="container mx-auto px-4 md:px-12 lg:px-24 pt-16 pb-8 max-w-7xl">
-        <nav aria-label="Back navigation" className="mb-4 md:mb-8">
+    <main className="relative min-h-screen bg-surface-card font-inter text-text-primary">
+      <div className="container mx-auto px-4 md:px-12 lg:px-24 3xl:px-24 4xl:px-32 pt-16 3xl:pt-20 4xl:pt-24 pb-24 md:pb-16 3xl:pb-20 4xl:pb-24 max-w-7xl 3xl:max-w-[1600px] 4xl:max-w-[1800px]">
+        {/* Breadcrumb */}
+        <nav aria-label="Breadcrumb" className="mb-8 md:mb-12 3xl:mb-10 4xl:mb-12">
           <Link
             to="/"
-            className="inline-flex items-center gap-2 text-brand-700 transition-colors duration-200 hover:text-brand-hover font-poppins text-sm md:text-base font-semibold"
+            className="inline-flex min-h-touch items-center gap-2 3xl:gap-2.5 rounded-lg font-poppins text-sm md:text-base 3xl:text-lg 4xl:text-xl font-semibold text-brand-700 transition-colors duration-200 hover:text-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-4"
           >
-            <IconWrapper Icon={ChevronLeftIcon} size={16} color="currentColor" aria-hidden={true} className="md:!w-4.5 md:!h-4.5" />
-            <span>Understanding pricing</span>
+            <IconWrapper Icon={ChevronLeftIcon} size={16} color="currentColor" aria-hidden={true} className="md:!w-4.5 md:!h-4.5 3xl:!w-5 3xl:!h-5 4xl:!w-6 4xl:!h-6" />
+            <span>Pricing &amp; valuation</span>
           </Link>
         </nav>
 
-        {/* First section - Chart and Methodology side by side */}
-        <div className="mb-6 md:mb-12 flex flex-col lg:flex-row gap-4 lg:gap-6 items-stretch">
-          <div className="w-full lg:w-[65%] min-w-0">
-            <Suspense fallback={<ChartSkeleton />}>
-              <PricingChart
-                selectedCategory={selectedCategory}
-                onCategoryChange={setSelectedCategory}
-              />
-            </Suspense>
+        {/* Hero */}
+        <header className="mb-10 grid items-end gap-8 md:mb-12 lg:grid-cols-[minmax(0,1fr)_auto]">
+          <div className="max-w-3xl">
+            <h1 className="text-balance font-poppins text-xl font-semibold text-text-primary md:text-display 3xl:text-4xl">
+              How carbon credit prices are set
+            </h1>
+            <p className="mt-3 max-w-[65ch] text-pretty font-inter text-body-sm md:text-body 3xl:text-lg 4xl:text-xl text-text-secondary">
+              Prices in the VCM vary from a few dollars to well over a hundred. A few
+              factors explain much of that spread; project size, geography, buyer type,
+              and delivery terms also move prices. Prices shown are 2024 transaction
+              averages.
+            </p>
           </div>
+          <dl className="shrink-0 lg:pb-1 lg:text-right" data-testid="pricing-hero-stat">
+            <motion.div
+              key={activeForce}
+              initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+            >
+              <dd
+                className="font-inter font-semibold leading-none tracking-tight text-text-primary tabular-nums text-xl sm:text-2xl 3xl:text-3xl 4xl:text-3xl"
+              >
+                {heroStat.value}
+              </dd>
+              <dt className="mt-1 max-w-[26ch] font-inter text-body-sm 3xl:text-base 4xl:text-lg text-text-secondary lg:ml-auto lg:mt-2">{heroStat.caption}</dt>
+            </motion.div>
+          </dl>
+        </header>
 
-          <div className="w-full lg:w-[35%] min-w-0">
-            <MethodologyExplanation category={selectedCategory} />
-          </div>
+        {/* Factor selector */}
+        <div className="mb-10 md:mb-12 3xl:mb-14 4xl:mb-16">
+          <PricingFactorTabs activeForce={activeForce} onChange={setActiveForce} />
         </div>
 
-        {/* Second section - Pricing Drivers */}
-        <div className="mb-6 md:mb-12">
-          <PricingDrivers category={selectedCategory} />
-        </div>
-
-        {/* Third section - SBT Impact */}
-        <div>
-          <SBTImpact category={selectedCategory} />
-        </div>
+        {/* Factor-specific comparison */}
+        <PricingExplorer activeForce={activeForce} onForceChange={selectRelatedForce} />
       </div>
       <ScrollToTop />
     </main>
