@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+# [1.4.0](https://github.com/Avtr99/Cora-ai/compare/v1.3.0...v1.4.0) (2026-09-13)
+
+
+### Bug Fixes
+
+* **deps:** bump js-yaml override to ^4.3.2 to fix high-severity advisory ([690c519](https://github.com/Avtr99/Cora-ai/commit/690c5199267ee6e18521224638927ccc3f5fc79e)), closes [hi#severity](https://github.com/hi/issues/severity) [hi#severity](https://github.com/hi/issues/severity)
+* **deps:** bump vitest to ^4.1.11, add prop-types for react-simple-maps ([bcb3296](https://github.com/Avtr99/Cora-ai/commit/bcb3296981d54e70ef88a941f368b0cdb22dbe7d))
+* **deps:** regenerate lockfile with npm 12 to fix CI npm ci sync issue ([5026ca0](https://github.com/Avtr99/Cora-ai/commit/5026ca06be298c1e91fc8b74e24eb67c7c28c518))
+
+
+### Features
+
+* **agents:** wire structured queries into routing and answer generation ([5e236b9](https://github.com/Avtr99/Cora-ai/commit/5e236b93d3c0d58b52e9b14c7eeb5d7698ccd9e4))
+* **document-store:** indexer improvements and split test suite ([0fd6490](https://github.com/Avtr99/Cora-ai/commit/0fd649024bfa30c5d9b7613a5a796072658ed15b))
+* **frontend:** design system token expansion and ultra-wide responsive support ([4618ae3](https://github.com/Avtr99/Cora-ai/commit/4618ae3a2efd96e9ddc4e2b5a3646f9c88471f36)), closes [#4B5563](https://github.com/Avtr99/Cora-ai/issues/4B5563)
+* **pricing:** replace chart-based page with factor comparison explorer ([45be4ff](https://github.com/Avtr99/Cora-ai/commit/45be4ffa096ba934d67535295118de4bb2a26f46))
+* **retrieval:** add structured query detection and context extraction ([bfdd334](https://github.com/Avtr99/Cora-ai/commit/bfdd33456e4604d3d244bfb4ee8f9181b08071b1))
+
 # [1.2.0](https://github.com/Avtr99/Cora-ai/compare/v1.1.2...v1.2.0) (2026-08-02)
 
 
