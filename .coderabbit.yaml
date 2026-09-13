@@ -1,0 +1,17 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+reviews:
+  path_filters:
+    - "!tests/**"
+    - "!**/test_*.py"
+    - "!**/conftest.py"
+    - "!**/*.test.*"
+    - "!**/*.spec.*"
+    - "!**/__tests__/**"
+    - "!**/package-lock.json"
+    - "!**/yarn.lock"
+    - "!**/pnpm-lock.yaml"
+    - "!docs/**"
+    - "!**/*.md"
+    - "!**/*.mdx"
+    - "!**/*.rst"
+    - "!**/*.txt"
