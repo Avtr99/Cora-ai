@@ -30,11 +30,15 @@ class ConversionResult:
         page_count: Optional[int] = None,
         warnings: Optional[list[str]] = None,
         metadata: Optional[dict[str, Any]] = None,
+        row_records: Optional[list[dict[str, Any]]] = None,
+        rows_truncated: bool = False,
     ) -> None:
         self.markdown = markdown
         self.page_count = page_count
         self.warnings = warnings or []
         self.metadata = metadata or {}
+        self.row_records = row_records
+        self.rows_truncated = rows_truncated
 
 
 def _ensure_title(
@@ -137,47 +141,78 @@ def _convert_structured_text_file(path: Path, extension: str, display_name: str)
     return _convert_json(path, display_name)
 
 
+# Hard cap on CSV rows converted to markdown / row_records. Rows beyond this
+# are dropped; the truncation flag is persisted in the row sidecar so the
+# structured retrieval path reports counts as lower bounds instead of totals.
+_CSV_MAX_ROWS = 50_000
+
+
 def _convert_csv(path: Path, display_name: str) -> ConversionResult:
     try:
         import pandas as pd
     except ImportError as exc:
         raise ImportError("CSV support requires pandas") from exc
 
-    df = pd.read_csv(path, nrows=50000)
+    # dtype=str keeps every cell as text: identifiers with leading zeros
+    # (project/serial IDs) survive, and pandas never coerces values to
+    # floats/ints that str() would mangle. Missing values stay NaN and are
+    # normalized to "" by fillna below.
+    df = pd.read_csv(path, nrows=_CSV_MAX_ROWS, dtype=str)
     if df.empty:
         return ConversionResult(f"# {path.name}\n\nThis CSV file is empty.")
+    truncated = len(df) >= _CSV_MAX_ROWS
     lines = [f"# {display_name}", "", f"Rows included: {len(df)}", "", "## Columns", ""]
     lines.extend(f"- {column}" for column in df.columns)
     lines.extend(["", "## Records", ""])
+    row_records: list[dict[str, Any]] = []
     for idx, row in df.fillna("").iterrows():
-        parts = [f"{column}: {str(value).strip()}" for column, value in row.items() if str(value).strip()]
+        row_record = {str(column): str(value).strip() for column, value in row.items()}
+        parts = [f"{column}: {value}" for column, value in row_record.items() if value]
         if parts:
             lines.append(f"### Row {idx + 1}")
             lines.append("; ".join(parts))
             lines.append("")
+            row_records.append(row_record)
     warnings = []
-    if len(df) >= 50000:
+    if truncated:
         warnings.append("Only the first 50,000 rows were converted. Split very large files for best results.")
-    return ConversionResult("\n".join(lines), warnings=warnings)
+    return ConversionResult(
+        "\n".join(lines), warnings=warnings, row_records=row_records,
+        rows_truncated=truncated,
+    )
 
 
 def _convert_json(path: Path, display_name: str) -> ConversionResult:
     data = json.loads(_read_text(path))
-    return ConversionResult(f"# {display_name}\n\n```json\n{json.dumps(data, indent=2, ensure_ascii=False)}\n```")
+    row_records = [
+        item for item in data
+        if isinstance(item, dict) and any(
+            value is not None and str(value).strip() for value in item.values()
+        )
+    ] if isinstance(data, list) else []
+    return ConversionResult(
+        f"# {display_name}\n\n```json\n{json.dumps(data, indent=2, ensure_ascii=False)}\n```",
+        row_records=row_records,
+    )
 
 
 def _convert_jsonl(path: Path, display_name: str) -> ConversionResult:
     lines = [f"# {display_name}", "", "## Records", ""]
+    row_records: list[dict[str, Any]] = []
     for idx, raw_line in enumerate(_read_text(path).splitlines(), start=1):
         if not raw_line.strip():
             continue
         data = json.loads(raw_line)
+        if isinstance(data, dict) and any(
+            value is not None and str(value).strip() for value in data.values()
+        ):
+            row_records.append(data)
         lines.append(f"### Record {idx}")
         lines.append("```json")
         lines.append(json.dumps(data, indent=2, ensure_ascii=False))
         lines.append("```")
         lines.append("")
-    return ConversionResult("\n".join(lines))
+    return ConversionResult("\n".join(lines), row_records=row_records)
 
 
 # Emitted by docling-core's Markdown serializer for detected formula regions

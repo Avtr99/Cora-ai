@@ -42,6 +42,7 @@ from .storage import (
     try_acquire_document_lock,
     update_document,
     update_job,
+    write_row_data_file,
 )
 # Imported as a module so handlers can mutate the process-level warmed flag via
 # attribute access (``docling_warmup._docling_models_warmed = True``). A bare
@@ -201,6 +202,8 @@ async def _process_document_job_inner(document_id: str, job_id: str) -> None:
 
         start = time.perf_counter()
         write_converted_markdown(record, result)
+        if result.row_records:
+            write_row_data_file(record, result.row_records, truncated=result.rows_truncated)
         _log_ingestion_stage("job", "markdown_writing", document_id, job_id, time.perf_counter() - start)
 
         # Persist the VCM metadata extracted during conversion so the indexer
