@@ -85,7 +85,7 @@ describe('Pricing page', () => {
   });
 
   it('preserves the reported prices and proportional bar lengths', () => {
-    const chart = container.querySelector('[role="img"]')!;
+    const chart = container.querySelector('[role="group"][aria-label*="average transaction prices"]')!;
     expect(chart.textContent).toContain('$4.05');
     expect(chart.textContent).toContain('$19.50');
     expect(chart.textContent).toContain('$160+');
