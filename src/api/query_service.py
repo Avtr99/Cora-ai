@@ -3,7 +3,7 @@
 import asyncio
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
 from fastapi import HTTPException, Request
 from loguru import logger
@@ -11,7 +11,7 @@ from loguru import logger
 from ..config import get_settings
 from ..db.revisions import get_revisions
 from ..query_processing.filter_extractor import extract_filters
-from ..utils.security import sign_history, verify_history_signature
+from ..utils.security import sign_history
 from ..agents.reasoning_formatter import create_timeout_response
 from .lifespan import (
     get_citation_manager,
@@ -20,7 +20,11 @@ from .lifespan import (
     get_retriever,
 )
 from .middleware import ThreatLevel, get_input_sanitizer, get_output_sanitizer
-from .query_history import format_history_string, sanitize_history_messages
+from .query_history import (
+    format_history_string,
+    resolve_trusted_history,
+    sanitize_history_messages,
+)
 from .query_models import Message, Query, Response
 from .query_sanitization import (
     log_blocked_threat,
@@ -91,68 +95,15 @@ async def process_query_core(
     timeout_ms = max(float(getattr(settings, "RAG_TIMEOUT_MS", 0) or 0), 0.0)
     timeout_seconds = timeout_ms / 1000.0
     
-    if not signing_secret:
-        # Fail open with warning for internal deployments (no auth)
-        logger.warning("History signing secret not configured. History integrity checks skipped.")
-        history_verified = True  # Trust history since we can't verify
-    else:
-        history_verified = False
-
     original_history_present = bool(query.history)
-    trusted_history: Optional[List[Message]] = query.history
-
-    if trusted_history and query.conversation_id:
-        if signing_secret and query.history_signature:
-            # Verify the signed 10-message window, not the entire client payload.
-            # This lets clients forward a larger fallback history while still
-            # matching the HMAC computed over the last 10 turns.
-            history_list = [
-                {"role": m.role, "content": m.content}
-                for m in trusted_history[-HISTORY_CONTEXT_MAX_MESSAGES:]
-            ]
-            if verify_history_signature(
-                history_list,
-                query.conversation_id,
-                query.history_signature,
-                signing_secret,
-                scope_key=history_scope_key or "",
-            ):
-                history_verified = True
-                logger.debug(f"History signature verified for conversation {query.conversation_id}")
-            else:
-                logger.warning(
-                    f"History signature verification FAILED for conversation {query.conversation_id}. "
-                    "Discarding untrusted history for safety."
-                )
-                trusted_history = None
-                history_verified = False
-        elif not signing_secret:
-            # Secret missing, already logged warning above, trust history
-            pass
-        elif not history_scope_key:
-            # Secret exists but no signature provided (anonymous request)
-            # In strict mode we might discard, but here we allow it with warning if enabled
-            # For now, consistent with previous logic: warn and discard if signature expected but missing
-            if query.history_signature is None:
-                # It's an unsigned request but we have a secret. 
-                # If this is the first message, history might be empty/short.
-                # If history is present without signature, discard it.
-                logger.warning(
-                    "History provided for anonymous request without signature. "
-                    "Discarding untrusted history."
-                )
-                history_verified = False
-                trusted_history = None
-    elif trusted_history and not query.conversation_id:
-        # History present but no conversation_id to verify against - discard for safety
-        logger.warning(
-            "History provided without conversation_id. "
-            "Discarding unassociated history for safety."
-        )
-        history_verified = False
-        trusted_history = None
-
-    history_window = trusted_history[-HISTORY_CONTEXT_MAX_MESSAGES:] if trusted_history else None
+    history_window, history_verified = resolve_trusted_history(
+        query.history,
+        conversation_id=query.conversation_id,
+        history_signature=query.history_signature,
+        signing_secret=signing_secret,
+        scope_key=history_scope_key or "",
+        max_messages=HISTORY_CONTEXT_MAX_MESSAGES,
+    )
 
     # Sanitize history once for both pipelines
     cleaned_history = sanitize_history_messages(history_window)

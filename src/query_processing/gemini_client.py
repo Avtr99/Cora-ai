@@ -16,8 +16,9 @@ from loguru import logger
 
 from ..config import get_settings
 from ..api.middleware.circuit_breaker import gemini_circuit
+from .fallback_answers import GENERATION_FAILED_ANSWER
 from .prompts import (
-    VCM_SYSTEM_INSTRUCTION,
+    get_system_instruction,
     _today_utc,
 )
 from .base_rag_client import BaseRAGClient
@@ -371,7 +372,7 @@ class GeminiClient(BaseRAGClient):
         """
         # Include system instruction in prompt (stateless approach)
         # Substitute {current_date} placeholder for temporal awareness
-        formatted_instruction = VCM_SYSTEM_INSTRUCTION.replace("{current_date}", _today_utc())
+        formatted_instruction = get_system_instruction().replace("{current_date}", _today_utc())
         full_prompt = f"{formatted_instruction}\n\n{prompt}"
         
         response = await gemini_circuit.call(
@@ -441,7 +442,7 @@ class GeminiClient(BaseRAGClient):
         Handles SDK cases where ``response.text`` raises when no direct text is
         available by falling back to candidate content parts.
         """
-        fallback_text = "I could not generate an answer based on the retrieved documents."
+        fallback_text = GENERATION_FAILED_ANSWER
 
         try:
             text = getattr(response, "text", None)

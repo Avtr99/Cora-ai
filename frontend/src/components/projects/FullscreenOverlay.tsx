@@ -220,7 +220,7 @@ const FullscreenOverlay: React.FC<FullscreenOverlayProps> = ({
               type="button"
               ref={fullscreenExitBtnRef}
               onClick={onExitFullscreen}
-              className="inline-flex items-center gap-1.5 h-8 3xl:h-10 px-2.5 md:px-3 3xl:px-4 rounded-full border border-border-ui bg-surface-card text-text-secondary font-inter text-[11.5px] md:text-xs 3xl:text-[13px] 4xl:text-sm font-medium hover:border-brand-500 hover:text-brand-700 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 flex-shrink-0"
+              className="inline-flex items-center gap-1.5 h-8 3xl:h-10 px-2.5 md:px-3 3xl:px-4 rounded-full border border-border-ui bg-surface-card text-text-secondary font-inter text-[11.5px] md:text-xs 3xl:text-[13px] 4xl:text-sm font-medium hover:border-brand-500 hover:text-brand-700 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 flex-shrink-0"
               aria-label="Exit fullscreen explorer"
             >
               <Minimize2 className="w-3.5 h-3.5" aria-hidden="true" />

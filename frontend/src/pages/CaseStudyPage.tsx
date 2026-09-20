@@ -113,7 +113,7 @@ function CaseStudyPage(): JSX.Element {
                     <DialogTrigger asChild>
                       <button
                         type="button"
-                        className="group relative flex w-full aspect-[4/3] cursor-pointer items-center justify-center overflow-hidden rounded-xl bg-surface-subtle border border-border-ui shadow-sm text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        className="group relative flex w-full aspect-[4/3] cursor-pointer items-center justify-center overflow-hidden rounded-xl bg-surface-subtle border border-border-ui shadow-sm text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2"
                       >
                         <img
                           src={caseStudyData.overviewMap.image}

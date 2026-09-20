@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any
 from urllib.parse import unquote, urlparse
 
 from .config import (
@@ -54,6 +55,21 @@ def clean_source_name(name: str) -> str:
 
     parts = cleaned.split()
     return " ".join(_smart_title_case(parts))
+
+
+def get_source_name(metadata: dict[str, Any] | None) -> str:
+    """Return the best available human-readable source name from metadata.
+
+    Title-first so indexed documents display their document title rather than
+    the raw filename. Works for both new and existing indexed chunks.
+    """
+    if not isinstance(metadata, dict):
+        return ""
+    for key in ("title", "file_name", "original_filename", "parent_doc", "source"):
+        value = metadata.get(key)
+        if value:
+            return str(value)
+    return ""
 
 
 def normalized_source_key(name: str) -> str:

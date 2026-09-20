@@ -67,7 +67,7 @@ export const CompareBar: React.FC<CompareBarProps> = ({
             onClick={onCompare}
             disabled={!canCompare}
             className={`inline-flex items-center gap-1.5 px-4 3xl:px-5 py-2 3xl:py-2.5 rounded-full font-inter text-sm 3xl:text-[15px] font-medium transition-all
-              focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2
+              focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2
               ${canCompare
                 ? 'bg-brand-900 text-white hover:bg-brand-500 shadow-sm'
                 : 'bg-surface-subtle text-text-disabled cursor-not-allowed'

@@ -50,7 +50,7 @@ const ZoomBtn: React.FC<{ onClick: () => void; label: string; children: React.Re
     type="button"
     onClick={onClick}
     aria-label={label}
-    className="w-8 h-8 flex items-center justify-center text-text-secondary hover:bg-brand-100/60 hover:text-brand-700 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500"
+    className="w-8 h-8 flex items-center justify-center text-text-secondary hover:bg-surface-subtle hover:text-text-primary transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
   >
     {children}
   </button>

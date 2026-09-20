@@ -5,14 +5,17 @@ Phase 2: Source Name Cleaning
 
 import pytest
 from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock
 
 from src.agents.route_processors import RouteProcessor
+from src.agents.web_search import WebSearchAgent
 from src.citations.citation_manager import (
     CitationManager,
     Citation,
     _ALL_KB_EXTENSIONS,
 )
 from src.citations.config import _EXTENSION_STRIP_RE
+from src.query_processing.fallback_answers import NO_ANSWER_FOUND
 
 
 class TestSourceTypeClassification:
@@ -1099,6 +1102,43 @@ class _DummyWebSearch:
         return dict(self._hybrid_result)
 
 
+class TestWebSearchGroundingContract:
+    @pytest.mark.asyncio
+    async def test_search_does_not_generate_without_web_sources(self):
+        llm = MagicMock()
+        llm.generate_text = AsyncMock(return_value="Ungrounded model knowledge")
+        provider = MagicMock()
+        provider.search = AsyncMock(return_value=[])
+        agent = WebSearchAgent(llm, search_provider=provider)
+
+        result = await agent.search("current market status")
+
+        assert result["answer"] == NO_ANSWER_FOUND
+        assert result["sources"] == []
+        assert result["grounded"] is False
+        llm.generate_text.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_hybrid_search_does_not_generate_without_web_sources(self):
+        llm = MagicMock()
+        llm.generate_text = AsyncMock(return_value="KB-only synthesis")
+        provider = MagicMock()
+        provider.search = AsyncMock(return_value=[])
+        agent = WebSearchAgent(llm, search_provider=provider)
+
+        result = await agent.search_with_kb_context(
+            "current market status",
+            kb_context="KB context",
+            kb_sources=["KB Document"],
+        )
+
+        assert result["answer"] == ""
+        assert result["web_sources"] == []
+        assert result["grounded"] is False
+        assert result["hybrid"] is False
+        llm.generate_text.assert_not_awaited()
+
+
 def _build_route_processor_config(**overrides):
     base = {
         "retrieval_threshold": 0.3,
@@ -1144,6 +1184,7 @@ class TestRouteProcessorCitationRegressions:
             ],
             "timed_out": False,
             "budget_exceeded": False,
+            "grounded": True,
         }
 
         processor = RouteProcessor(
@@ -1233,6 +1274,31 @@ class TestRouteProcessorCitationRegressions:
         assert result["sources"] == []
 
     @pytest.mark.asyncio
+    async def test_process_web_route_preserves_error_source_for_ungrounded_answer(self):
+        processor = RouteProcessor(
+            retriever=_DummyRetriever({"documents": [], "metadatas": [], "distances": []}),
+            answer_generator=_DummyAnswerGenerator({"answer": "", "sources": []}),
+            web_search=_DummyWebSearch(
+                search_result={
+                    "answer": NO_ANSWER_FOUND,
+                    "sources": [],
+                    "grounded": False,
+                }
+            ),
+            citation_manager=CitationManager(min_relevance_score=0.0),
+            config=_build_route_processor_config(enable_web_search=True),
+        )
+
+        result = await processor.process_web_route(
+            query="current market status",
+            original_query="current market status",
+            steps=[],
+        )
+
+        assert result["citations"] == []
+        assert result["sources"] == ["error_fallback"]
+
+    @pytest.mark.asyncio
     async def test_process_hybrid_route_aligns_sources_with_filtered_citations(self):
         vector_results = {
             "documents": ["carbon credit verification methodology integrity"],
@@ -1250,6 +1316,7 @@ class TestRouteProcessorCitationRegressions:
             ],
             "timed_out": False,
             "budget_exceeded": False,
+            "grounded": True,
         }
         hybrid_synthesis_result = {
             "answer": "The carbon credit verification methodology supports integrity.",
@@ -1258,8 +1325,25 @@ class TestRouteProcessorCitationRegressions:
                     "title": "data/431_v1.2_methodology.pdf",
                     "url": "https://example.com/docs/methodology.pdf",
                     "snippet": "carbon credit verification methodology",
+                },
+                {
+                    "title": "External Article",
+                    "url": "https://example.com/article",
+                    "snippet": "news snippet",
+                },
+            ],
+            # Contract of WebSearchAgent.search_with_kb_context: hybrid answers
+            # cite [Web, cite: N] against web_sources, not the first-pass
+            # search() results — the handler extracts web citations from here.
+            "web_sources": [
+                {
+                    "title": "External Article",
+                    "url": "https://example.com/article",
+                    "snippet": "news snippet",
                 }
             ],
+            "grounded": True,
+            "hybrid": True,
         }
 
         processor = RouteProcessor(
@@ -1288,6 +1372,82 @@ class TestRouteProcessorCitationRegressions:
         # sources are inherently answer-referenced), so both appear in sources.
         assert "Methodology" in result["sources"]
         assert "External Article" in result["sources"]
+
+    @pytest.mark.asyncio
+    async def test_hybrid_route_rejects_web_answer_without_sources(self):
+        processor = RouteProcessor(
+            retriever=_DummyRetriever({"documents": [], "metadatas": [], "distances": []}),
+            answer_generator=_DummyAnswerGenerator({"answer": "", "sources": []}),
+            web_search=_DummyWebSearch(
+                search_result={
+                    "answer": "Ungrounded model knowledge",
+                    "sources": [],
+                    "grounded": False,
+                }
+            ),
+            citation_manager=CitationManager(min_relevance_score=0.0),
+            config=_build_route_processor_config(
+                enable_web_search=True,
+                parallel_retrieval=True,
+            ),
+        )
+
+        result = await processor.process_hybrid_route(
+            query="current market status",
+            original_query="current market status",
+            metadata_filters=None,
+            steps=[],
+        )
+
+        assert result["answer"] == NO_ANSWER_FOUND
+        assert result["sources"] == []
+        assert result["citations"] == []
+
+    @pytest.mark.asyncio
+    async def test_hybrid_synthesis_error_uses_grounded_first_pass_web_answer(self):
+        web_search_result = {
+            "answer": "Grounded web answer.",
+            "sources": [
+                {
+                    "title": "External Article",
+                    "url": "https://example.com/article",
+                    "snippet": "Grounded web evidence.",
+                }
+            ],
+            "grounded": True,
+        }
+        hybrid_result = {
+            "answer": "Raw KB fallback text",
+            "sources": [{"title": "KB Document"}],
+            "web_sources": [],
+            "grounded": False,
+            "error": "provider unavailable",
+        }
+        processor = RouteProcessor(
+            retriever=_DummyRetriever({
+                "documents": ["KB context"],
+                "metadatas": [{"title": "KB Document"}],
+                "distances": [0.1],
+            }),
+            answer_generator=_DummyAnswerGenerator({"answer": "", "sources": []}),
+            web_search=_DummyWebSearch(web_search_result, hybrid_result),
+            citation_manager=CitationManager(min_relevance_score=0.0),
+            config=_build_route_processor_config(
+                enable_web_search=True,
+                parallel_retrieval=True,
+            ),
+        )
+
+        result = await processor.process_hybrid_route(
+            query="current market status",
+            original_query="current market status",
+            metadata_filters=None,
+            steps=[],
+        )
+
+        assert result["answer"] == "Grounded web answer."
+        assert result["sources"] == ["External Article"]
+        assert all(c.source_type == "web" for c in result["citations"])
 
 
 class TestCitationScoreNormalization:

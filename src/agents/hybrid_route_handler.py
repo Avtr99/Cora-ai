@@ -16,6 +16,7 @@ from .protocols import (
     RelevanceCheckerProtocol,
     RetrieverProtocol,
     WebSearchProtocol,
+    web_result_is_usable,
 )
 from .reasoning_formatter import AgentStep
 from .route_processor_utils import (
@@ -30,6 +31,12 @@ from .route_processor_utils import (
     remaining_budget_ms,
     source_name_from_metadata,
 )
+from ..query_processing.fallback_answers import (
+    NO_ANSWER_FOUND,
+    UNVERIFIED_ANSWER,
+    is_non_answer,
+)
+
 if TYPE_CHECKING:
     from ..citations import CitationManager
 
@@ -148,8 +155,11 @@ class HybridRouteHandler:
         kb_sources = self._extract_sources(vector_results)
         
         gen_start = time.time()
-        
-        if kb_context and web_results.get("answer") and not web_results.get("timed_out"):
+        web_answer = web_results.get("answer", "")
+        # The provider sets grounded only when the answer has web evidence.
+        web_answer_usable = web_result_is_usable(web_results)
+
+        if kb_context and web_answer_usable:
             # Combine KB context with web results
             remaining_budget = remaining_budget_ms(timeout_budget_ms, step_start)
             hybrid_web_timeout_ms = derive_web_timeout_ms(remaining_budget)
@@ -159,8 +169,24 @@ class HybridRouteHandler:
                 kb_sources=kb_sources,
                 timeout_ms=hybrid_web_timeout_ms,
             )
-            if result.get("sources"):
-                result["sources"] = normalize_sources(result["sources"])
+            hybrid_succeeded = bool(result.get("hybrid")) and web_result_is_usable(result)
+            if hybrid_succeeded:
+                result["hybrid"] = True
+                if result.get("sources"):
+                    result["sources"] = normalize_sources(result["sources"])
+            else:
+                # Synthesis produced nothing usable — fall back to the web-only
+                # answer rather than shipping an empty/non-answer as "hybrid".
+                result = {
+                    "answer": web_answer,
+                    "sources": [(s.get("title") or s.get("url") or "web") for s in web_results.get("sources", [])],
+                    "web_sources": web_results.get("sources", []),
+                    "hybrid": False,
+                    "timed_out": result.get("timed_out", False),
+                    "quiz": web_results.get("quiz"),
+                    "suggested_prompts": web_results.get("suggested_prompts"),
+                    "truncated": web_results.get("truncated", False),
+                }
         elif kb_context:
             # KB only
             result = await self.answer_generator.search_and_process(
@@ -168,9 +194,12 @@ class HybridRouteHandler:
             )
         else:
             # Web only
+            web_sources = web_results.get("sources", []) if web_answer_usable else []
             result = {
-                "answer": web_results.get("answer", "No answer available."),
-                "sources": [(s.get("title") or s.get("url") or "web") for s in web_results.get("sources", [])],
+                "answer": web_answer if web_answer_usable else NO_ANSWER_FOUND,
+                "sources": [(s.get("title") or s.get("url") or "web") for s in web_sources],
+                "web_sources": web_sources,
+                "hybrid": False,
                 "quiz": web_results.get("quiz"),
                 "suggested_prompts": web_results.get("suggested_prompts"),
                 "truncated": web_results.get("truncated", False),
@@ -200,15 +229,16 @@ class HybridRouteHandler:
                 source_chunks=extract_source_chunks(vector_results),
             )
             if is_irrelevant:
-                web_usable = bool(web_results.get("answer")) and not web_results.get("timed_out")
-                if web_usable:
+                if web_answer_usable:
                     logger.info("Hybrid answer off-topic, using web-only fallback")
                     result = {
-                        "answer": web_results.get("answer", "No answer available."),
+                        "answer": web_answer,
                         "sources": [
                             (s.get("title") or s.get("url") or "web")
                             for s in web_results.get("sources", [])
                         ],
+                        "web_sources": web_results.get("sources", []),
+                        "hybrid": False,
                         "quiz": web_results.get("quiz"),
                         "suggested_prompts": web_results.get("suggested_prompts"),
                         "truncated": web_results.get("truncated", False),
@@ -220,12 +250,7 @@ class HybridRouteHandler:
                         web_results.get("timed_out"),
                     )
                     result = {
-                        "answer": (
-                            "I could not find a verified answer to your question. "
-                            "The knowledge base did not contain directly relevant "
-                            "information and web verification was unavailable. "
-                            "Please try rephrasing your question."
-                        ),
+                        "answer": UNVERIFIED_ANSWER,
                         "sources": [],
                         "coverage_score": 0.0,
                     }
@@ -236,7 +261,7 @@ class HybridRouteHandler:
                     details={
                         "reason": (
                             "Hybrid answer off-topic, used web-only fallback"
-                            if web_usable
+                            if web_answer_usable
                             else "Hybrid answer off-topic, web unavailable — returned unverified-state response"
                         ),
                     },
@@ -247,29 +272,53 @@ class HybridRouteHandler:
             vector_results,
             max_citations=5
         )
+        # For hybrid answers, extract web citations from the synthesis call's own
+        # web_sources — [Web, cite: N] markers index into that list, not the
+        # first-pass web_results.
+        citation_web_results = (
+            {"sources": result.get("web_sources", [])}
+            if result.get("hybrid")
+            else web_results
+        )
         web_citations = self.citation_manager.extract_citations_from_web_results(
-            web_results,
+            citation_web_results,
             max_citations=3
         )
-        merged_citations = self.citation_manager.merge_citations(
-            kb_citations,
-            web_citations,
-            max_total=5
-        )
+        is_hybrid = bool(result.get("hybrid"))
+        is_web_only = not is_hybrid and bool(result.get("web_sources"))
+        is_no_answer = is_non_answer(result.get("answer", ""))
+        if is_hybrid:
+            merged_citations = self.citation_manager.merge_citations(
+                kb_citations,
+                web_citations,
+                max_total=5
+            )
+        elif is_web_only:
+            merged_citations = web_citations
+        elif is_no_answer:
+            merged_citations = []
+        else:
+            merged_citations = kb_citations
         # Defer filtering, suppression, and renumbering to the
         # finalize_citations_callback (RouteProcessor._finalize_citations),
         # which handles source-type alignment and marker renumbering in one
         # pass.  Setting citations to the merged set gives the callback the
         # full original list so renumber mapping is correct.
         result["citations"] = merged_citations
-        
+
         # Use coverage_score from result if available, otherwise compute from merged citations
         coverage_score = result.get("coverage_score")
         if coverage_score is None:
             # Compute based on citation coverage using canonical helper
             total_citations = len(merged_citations)
-            kb_citation_count = len(kb_citations)
-            web_citation_count = len(web_citations)
+            if is_hybrid:
+                kb_citation_count, web_citation_count = len(kb_citations), len(web_citations)
+            elif is_web_only:
+                kb_citation_count, web_citation_count = 0, len(web_citations)
+            elif is_no_answer:
+                kb_citation_count = web_citation_count = 0
+            else:
+                kb_citation_count, web_citation_count = len(kb_citations), 0
             coverage_score = compute_merged_coverage_score(
                 total_citations, kb_citation_count, web_citation_count
             )

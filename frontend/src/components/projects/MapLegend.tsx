@@ -63,7 +63,7 @@ export const MapLegend: React.FC<MapLegendProps> = ({ aggregates, totalProjects:
           onClick={() => setOpen((o) => !o)}
           aria-expanded={open}
           aria-controls="map-legend-body"
-          className="flex items-center gap-2 h-7 pl-2 pr-2.5 rounded-full bg-surface-card/90 backdrop-blur-sm border border-border-ui shadow-xs hover:shadow-card-sm transition-shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
+          className="flex items-center gap-2 h-7 pl-2 pr-2.5 rounded-full bg-surface-card/90 backdrop-blur-sm border border-border-ui shadow-xs hover:shadow-card-sm transition-shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2"
         >
           <span
             className="w-1.5 h-1.5 rounded-full bg-brand-500"

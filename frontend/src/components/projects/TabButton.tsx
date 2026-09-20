@@ -49,7 +49,7 @@ const TabButton: React.FC<TabButtonProps> = ({
     tabIndex={active ? 0 : -1}
     disabled={disabled}
     onClick={onClick}
-    className={`relative inline-flex items-center gap-1.5 h-7 3xl:h-8 4xl:h-9 px-3 3xl:px-4 rounded-full font-inter text-xs 3xl:text-[13px] 4xl:text-[15px] font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2
+    className={`relative inline-flex items-center gap-1.5 h-7 3xl:h-8 4xl:h-9 px-3 3xl:px-4 rounded-full font-inter text-xs 3xl:text-[13px] 4xl:text-[15px] font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2
       ${disabled ? 'text-border-ui cursor-not-allowed' : active ? 'text-white' : 'text-text-secondary hover:text-text-primary'} ${className}`}
   >
     {active && !disabled && (

@@ -77,7 +77,7 @@ ALLOWED_ORIGINS = [origin.strip() for origin in cors_origins_str.split(",") if o
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=[
         "Authorization",
@@ -90,7 +90,8 @@ app.add_middleware(
 )
 
 # Add security middleware (security headers + optional API key auth)
-protected_paths = ["/v1", "/api"] if settings.ENABLE_API_KEY_PROTECTION else None
+API_KEY_PROTECTED_PATHS = ["/v1", "/api", "/query"]
+protected_paths = API_KEY_PROTECTED_PATHS if settings.ENABLE_API_KEY_PROTECTION else None
 app.add_middleware(
     SecurityMiddleware,
     protected_paths=protected_paths,

@@ -176,7 +176,7 @@ export const MessageFeedback: React.FC<MessageFeedbackProps> = ({
           aria-label="Good response"
           aria-pressed={isPositiveActive}
           title="Good response"
-          className={`flex items-center justify-center w-6 h-6 3xl:w-7 3xl:h-7 4xl:w-8 4xl:h-8 rounded transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2
+          className={`flex items-center justify-center w-6 h-6 3xl:w-7 3xl:h-7 4xl:w-8 4xl:h-8 rounded transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2
             ${isPositiveActive
               ? 'text-semantic-success-icon'
               : isSubmitted || isSubmitting
@@ -211,7 +211,7 @@ export const MessageFeedback: React.FC<MessageFeedbackProps> = ({
           aria-label="Bad response"
           aria-pressed={isNegativeSelected}
           title="Bad response"
-          className={`flex items-center justify-center w-6 h-6 3xl:w-7 3xl:h-7 4xl:w-8 4xl:h-8 rounded transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2
+          className={`flex items-center justify-center w-6 h-6 3xl:w-7 3xl:h-7 4xl:w-8 4xl:h-8 rounded transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2
             ${isNegativeSelected
               ? 'text-semantic-error-icon'
               : isSubmitted || isSubmitting
@@ -284,7 +284,7 @@ export const MessageFeedback: React.FC<MessageFeedbackProps> = ({
                   type="button"
                   onClick={() => handleTagToggle(tag)}
                   aria-pressed={selected}
-                  className={`inline-flex items-center px-2.5 3xl:px-3 4xl:px-3.5 py-1 3xl:py-1.5 4xl:py-2 rounded-full font-inter text-xs 3xl:text-sm 4xl:text-base font-medium border transition-all duration-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2
+                  className={`inline-flex items-center px-2.5 3xl:px-3 4xl:px-3.5 py-1 3xl:py-1.5 4xl:py-2 rounded-full font-inter text-xs 3xl:text-sm 4xl:text-base font-medium border transition-all duration-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2
                     ${selected
                       ? 'border-brand-900 bg-brand-100 text-brand-900'
                       : 'border-border-ui bg-surface-card text-text-muted hover:border-brand-200 hover:text-brand-900'
@@ -319,7 +319,7 @@ export const MessageFeedback: React.FC<MessageFeedbackProps> = ({
             onChange={(e) => setComment(e.target.value.slice(0, 500))}
             placeholder="Tell us more (optional)"
             rows={2}
-            className="w-full px-3 3xl:px-4 py-2 3xl:py-3 rounded-lg border border-border-ui font-inter text-xs 3xl:text-sm text-text-primary placeholder:text-text-muted bg-surface-card outline-none resize-none leading-relaxed focus:border-brand-900 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 transition-all"
+            className="w-full px-3 3xl:px-4 py-2 3xl:py-3 rounded-lg border border-border-ui font-inter text-xs 3xl:text-sm text-text-primary placeholder:text-text-muted bg-surface-card outline-none resize-none leading-relaxed focus:border-brand-900 focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 transition-all"
           />
 
           {/* Actions */}
@@ -329,7 +329,7 @@ export const MessageFeedback: React.FC<MessageFeedbackProps> = ({
               onClick={handleCancel}
               disabled={isSubmitting}
               aria-disabled={isSubmitting}
-              className="font-inter text-xs 3xl:text-sm text-text-muted hover:text-text-secondary transition-colors px-2 3xl:px-2.5 py-1 3xl:py-1.5 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:text-text-muted"
+              className="font-inter text-xs 3xl:text-sm text-text-muted hover:text-text-secondary transition-colors px-2 3xl:px-2.5 py-1 3xl:py-1.5 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:text-text-muted"
             >
               Cancel
             </button>
@@ -337,7 +337,7 @@ export const MessageFeedback: React.FC<MessageFeedbackProps> = ({
               type="button"
               onClick={handleSubmit}
               disabled={submitDisabled || isSubmitting}
-              className="inline-flex items-center gap-1.5 3xl:gap-2 px-3.5 3xl:px-4.5 4xl:px-5 py-1.5 3xl:py-2 4xl:py-2.5 rounded-full bg-brand-900 text-white font-inter text-xs 3xl:text-sm font-semibold hover:bg-brand-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
+              className="inline-flex items-center gap-1.5 3xl:gap-2 px-3.5 3xl:px-4.5 4xl:px-5 py-1.5 3xl:py-2 4xl:py-2.5 rounded-full bg-brand-900 text-white font-inter text-xs 3xl:text-sm font-semibold hover:bg-brand-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2"
             >
               Submit
             </button>

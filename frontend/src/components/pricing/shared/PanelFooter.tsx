@@ -13,7 +13,7 @@ const RelatedFactor: React.FC<{
       <button
         type="button"
         onClick={() => onSelect(related.id)}
-        className="font-semibold text-brand-700 underline decoration-brand-200 underline-offset-2 transition-colors hover:text-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
+        className="font-semibold text-brand-700 underline decoration-brand-200 underline-offset-2 transition-colors hover:text-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2"
       >
         {related.label}
       </button>
@@ -31,7 +31,7 @@ const SourceLinks: React.FC<{ sources: PricingSource[] }> = ({ sources }) => (
           href={source.href}
           target="_blank"
           rel="noreferrer"
-          className="underline decoration-border-ui underline-offset-2 transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
+          className="underline decoration-border-ui underline-offset-2 transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2"
         >
           {source.label}
         </a>

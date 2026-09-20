@@ -152,7 +152,7 @@ const InlineSplitView: React.FC<InlineSplitViewProps> = ({
               type="button"
               ref={expandTriggerRef}
               onClick={() => onSetMapFullscreen(true)}
-              className="inline-flex items-center gap-1.5 h-6 3xl:h-7 4xl:h-8 px-2 3xl:px-3 4xl:px-4 rounded-full border border-border-ui bg-surface-card text-text-secondary font-inter text-[10.5px] 3xl:text-xs 4xl:text-sm font-medium hover:border-brand-500 hover:text-brand-700 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
+              className="inline-flex items-center gap-1.5 h-6 3xl:h-7 4xl:h-8 px-2 3xl:px-3 4xl:px-4 rounded-full border border-border-ui bg-surface-card text-text-secondary font-inter text-[10.5px] 3xl:text-xs 4xl:text-sm font-medium hover:border-brand-500 hover:text-brand-700 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2"
               aria-label="Expand map to fullscreen"
             >
               <Maximize2 className="w-3 h-3" aria-hidden="true" />

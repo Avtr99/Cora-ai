@@ -106,6 +106,10 @@ class Settings(BaseSettings):
     CUSTOM_REGISTRY_PATTERNS: Optional[str] = None
     # Replaces the default VCM expertise list so the LLM answers without VCM bias.
     COLLECTION_SYSTEM_INSTRUCTION: Optional[str] = None
+    # Human-readable name for a custom collection, shown to users in scope-limit
+    # replies ("I can only help with questions about {name}."). Optional — a
+    # generic guard is used when unset.
+    COLLECTION_NAME: Optional[str] = None
     # Temporal cutoff for market/pricing data. None means "current year - 1".
     KB_MARKET_DATA_CUTOFF_YEAR: Optional[int] = None
     # Per-collection JSON overrides for relevance thresholds (see config_store.get_collection_threshold).
@@ -168,7 +172,7 @@ class Settings(BaseSettings):
 
     # --- JWT auth ---
     JWT_SECRET_KEY: Optional[str] = None  # Required for auth, validated on use
-    JWT_ALGORITHM: str = "HS256"
+    JWT_ALGORITHM: Literal["HS256"] = "HS256"
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
 
     # --- Logging ---

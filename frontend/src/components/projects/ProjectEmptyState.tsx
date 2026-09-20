@@ -3,7 +3,7 @@ import { SearchX, WifiOff, RefreshCw } from 'lucide-react';
 
 /** Shared button styles for clear filters and retry buttons */
 const BUTTON_CLASSES =
-  "inline-flex items-center gap-2 px-5 3xl:px-6 py-2.5 3xl:py-3 rounded-full bg-brand-900 text-white font-inter text-sm 3xl:text-base 4xl:text-lg font-medium hover:bg-brand-500 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2";
+  "inline-flex items-center gap-2 px-5 3xl:px-6 py-2.5 3xl:py-3 rounded-full bg-brand-900 text-white font-inter text-sm 3xl:text-base 4xl:text-lg font-medium hover:bg-brand-500 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2";
 
 interface NoResultsProps {
   onClearFilters: () => void;

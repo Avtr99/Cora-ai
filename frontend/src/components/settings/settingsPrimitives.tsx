@@ -12,7 +12,7 @@ export type TestState = "idle" | "testing" | "success" | "failed";
 
 /** Shared input class string — matches the design system. */
 export const inputClass =
-  "w-full px-4 3xl:px-5 py-2.5 3xl:py-3 4xl:py-4 rounded-lg border border-border-ui bg-surface-card text-text-primary font-inter text-sm 3xl:text-base 4xl:text-lg focus:border-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-200";
+  "w-full px-4 3xl:px-5 py-2.5 3xl:py-3 4xl:py-4 rounded-lg border border-border-ui bg-surface-card text-text-primary font-inter text-sm 3xl:text-base 4xl:text-lg focus:border-brand-700 focus:outline-none focus:ring-2 focus:ring-focus";
 
 /** Labeled form field with optional hint badge and wrapper className. */
 export function Field({

@@ -334,7 +334,8 @@ This is called in three places:
 
 Citation source names (what the frontend renders as the source label) are
 resolved from chunk metadata using a shared fallback chain across all
-consumers: `title → file_name → original_filename → parent_doc → source`.
+consumers: `title → file_name → original_filename → parent_doc → source`,
+centralized in `get_source_name()` in `src/citations/source_name.py`.
 This ensures the document's extracted title (e.g. "ACM0003: A/R Large-scale
 Consolidated Methodology v02.0") is preferred over the raw filename (e.g.
 "AR-ACM0003_ver02.0.pdf"). The chain is applied in:
@@ -350,6 +351,43 @@ name: strips path prefixes and file extensions, title-cases, preserves known
 acronyms (VCS, IPCC, NDC, etc.), and keeps domain slashes like "A/R"
 (Afforestation/Reforestation) intact rather than treating them as path
 separators.
+
+### Grounded web-result contract
+
+`WebSearchResult` in `src/agents/protocols.py` requires every web-search result
+to state whether it is grounded in returned web sources. `web_result_is_usable`
+is the shared acceptance check for web-only, hybrid, and KB-supplement paths.
+Timeouts, provider errors, non-answer fallbacks, and responses without web
+evidence are not usable and cannot replace a grounded KB answer. Web search
+does not call the LLM when the provider returns no sources.
+
+### Trusted history boundary
+
+`resolve_trusted_history()` in `src/api/query_history.py` is the single
+verification path for client-supplied chat history, shared by the sync
+(`query_service.py`) and streaming (`streaming_service.py`) pipelines. History
+is accepted only when an HMAC signature over the last 10 messages verifies
+against `SECRET_KEY` and the conversation_id — otherwise it is discarded
+(fail-closed). Verified windows are further restricted to `user`/`assistant`
+roles so injected `system` messages can never reach the prompt. The signed
+window is what the server signs and returns, so clients may forward a larger
+local history while only the tail is trusted.
+
+### Request/security boundaries
+
+- `SecurityMiddleware` protects `/v1`, `/api`, and `/query` prefixes when
+  `ENABLE_API_KEY_PROTECTION` is on (`API_KEY_PROTECTED_PATHS` in `main.py`).
+- CORS runs with `allow_credentials=False` — the SPA uses header auth only.
+- `LoggingMiddleware` validates client-supplied `X-Request-ID` against
+  `[A-Za-z0-9-]{1,64}` and replaces invalid values.
+- `JWT_ALGORITHM` is pinned to `Literal["HS256"]` at the type level.
+- `InputSanitizer.sanitize()` no longer HTML-escapes query text — escaping is
+  an output concern (React escapes rendered content); escaping input corrupted
+  legitimate queries containing quotes or `&`.
+- `OutputSanitizer` redacts only env-var-shaped secrets (`$FOO_BAR`, `${FOO}`),
+  not currency/ticker strings like `$USD` or `$AAPL`.
+- `COLLECTION_NAME` (optional) gives custom-collection deployments a
+  human-readable scope name for the assistant's refusal message.
 
 ## Case Study Satellite Images Layout
 

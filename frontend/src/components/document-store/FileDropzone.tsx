@@ -52,10 +52,10 @@ export const FileDropzone: React.FC<FileDropzoneProps> = ({
       role="button"
       tabIndex={backendReady ? 0 : -1}
       aria-label={`Drop files or click to choose documents. Maximum ${maxMbLabel} per file.`}
-      className={`rounded-xl 3xl:rounded-2xl border border-dashed p-6 3xl:p-8 4xl:p-10 text-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 ${
+      className={`rounded-xl 3xl:rounded-2xl border border-dashed p-6 3xl:p-8 4xl:p-10 text-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 ${
         !backendReady ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
       } ${
-        dragging ? 'border-brand-500 bg-brand-50' : 'border-border-ui bg-surface-subtle/40 hover:bg-brand-50/30'
+        dragging ? 'border-brand-500 bg-brand-50' : 'border-border-ui bg-surface-subtle/40 hover:bg-surface-subtle'
       }`}
       onClick={handleClick}
       onKeyDown={handleKeyDown}

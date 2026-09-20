@@ -39,7 +39,7 @@ export const MobileSidebarControls: React.FC<MobileSidebarControlsProps> = ({
           aria-label="Open sidebar"
           aria-expanded={false}
           aria-controls="mobile-sidebar"
-          className="fixed top-3 left-3 z-40 w-9 h-9 rounded-lg flex items-center justify-center bg-surface-card/90 backdrop-blur-sm border border-border-ui/60 shadow-sm hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 active:scale-[0.97]"
+          className="fixed top-3 left-3 z-40 w-9 h-9 rounded-lg flex items-center justify-center bg-surface-card/90 backdrop-blur-sm border border-border-ui/60 shadow-sm hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 active:scale-[0.97]"
           onClick={() => setMobileOpen(true)}
           title="Open menu"
           initial={false}

@@ -143,7 +143,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onTypingStateChange, varia
     const sizeClasses = largeVariant 
       ? (isMobile ? "w-11 h-11" : "w-11 h-11 md:w-12 md:h-12 3xl:w-16 3xl:h-16 4xl:w-20 4xl:h-20")
       : (isMobile ? "w-11 h-11" : "w-11 h-11 3xl:w-14 3xl:h-14 4xl:w-16 4xl:h-16");
-    const focusClasses = "focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-card";
+    const focusClasses = "focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-card";
 
     // Stop state (Active typing)
     if (typingState) {

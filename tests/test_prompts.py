@@ -2,6 +2,17 @@
 Unit tests for prompt validation and sanitization functions.
 """
 import pytest
+
+from src.query_processing.fallback_answers import (
+    GENERATION_FAILED_ANSWER,
+    NO_ANSWER_FOUND,
+    UNVERIFIED_ANSWER,
+    WEB_RETRIEVAL_FAILED_ANSWER,
+    WEB_TIMEOUT_ANSWER,
+    WEB_UNAVAILABLE_ANSWER,
+    is_cacheable_answer,
+    is_non_answer,
+)
 from src.query_processing.prompts import (
     _detect_injection,
     _sanitize_input,
@@ -304,6 +315,23 @@ class TestConstants:
         """Test that MAX_CONTEXT_LENGTH is positive."""
         assert MAX_CONTEXT_LENGTH > 0
         assert MAX_CONTEXT_LENGTH >= 10_000  # Should be at least 10k for quality
+
+
+class TestFallbackAnswers:
+    @pytest.mark.parametrize(
+        "answer",
+        [
+            NO_ANSWER_FOUND,
+            GENERATION_FAILED_ANSWER,
+            UNVERIFIED_ANSWER,
+            WEB_TIMEOUT_ANSWER,
+            WEB_UNAVAILABLE_ANSWER,
+            WEB_RETRIEVAL_FAILED_ANSWER,
+        ],
+    )
+    def test_canonical_fallbacks_are_non_answers_and_not_cacheable(self, answer):
+        assert is_non_answer(answer)
+        assert not is_cacheable_answer(answer)
 
 
 class TestTemporalAwareness:

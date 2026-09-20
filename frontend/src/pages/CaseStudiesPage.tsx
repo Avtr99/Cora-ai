@@ -118,7 +118,7 @@ const CaseStudyCard: React.FC<CaseStudyCardProps> = ({
             </div>
             <Link
               to={`/case-study/${id}`}
-              className="flex md:inline-flex items-center justify-center md:justify-start gap-2 3xl:gap-3 w-full md:w-auto min-h-11 md:min-h-0 px-4 py-3 md:px-0 md:py-0 rounded-lg md:rounded-none border border-border-ui md:border-0 bg-surface-subtle md:bg-transparent text-brand-700 font-poppins text-sm 3xl:text-[17px] 4xl:text-xl font-semibold hover:bg-surface-base md:hover:bg-transparent hover:text-brand-hover transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
+              className="flex md:inline-flex items-center justify-center md:justify-start gap-2 3xl:gap-3 w-full md:w-auto min-h-11 md:min-h-0 px-4 py-3 md:px-0 md:py-0 rounded-lg md:rounded-none border border-border-ui md:border-0 bg-surface-subtle md:bg-transparent text-brand-700 font-poppins text-sm 3xl:text-[17px] 4xl:text-xl font-semibold hover:bg-surface-base md:hover:bg-transparent hover:text-brand-hover transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2"
             >
               Read case study
               <span aria-hidden="true" className="text-base 3xl:text-[17px] 4xl:text-xl">→</span>

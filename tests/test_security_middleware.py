@@ -2,6 +2,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from src.api.middleware.logging_middleware import LoggingMiddleware
 from src.api.middleware.security import SecurityMiddleware, generate_api_key
 from src.config import get_settings
 
@@ -22,6 +23,18 @@ def minimal_app() -> FastAPI:
     @app.get("/v1/private")
     def private():
         return {"message": "private"}
+
+    @app.post("/query")
+    def root_query():
+        return {"message": "root query"}
+
+    @app.post("/v1/query")
+    def versioned_query():
+        return {"message": "versioned query"}
+
+    @app.post("/api/cora-query")
+    def spa_query():
+        return {"message": "SPA query"}
 
     return app
 
@@ -64,6 +77,18 @@ class TestAPIKeyProtection:
         client = TestClient(app)
 
         response = client.get("/v1/private")
+        assert response.status_code == 401
+        assert response.json()["error"] == "unauthorized"
+
+    @pytest.mark.parametrize("path", ["/query", "/v1/query", "/api/cora-query"])
+    def test_all_query_prefixes_require_api_key(self, minimal_app: FastAPI, path: str):
+        minimal_app.add_middleware(
+            SecurityMiddleware,
+            protected_paths=["/v1", "/api", "/query"],
+        )
+
+        response = TestClient(minimal_app).post(path)
+
         assert response.status_code == 401
         assert response.json()["error"] == "unauthorized"
 
@@ -134,6 +159,30 @@ class TestAPIKeyProtection:
 
         response = client.get("/public")
         assert response.status_code == 200
+
+
+class TestRequestIDValidation:
+    def test_valid_client_request_id_is_preserved(self, minimal_app: FastAPI):
+        minimal_app.add_middleware(LoggingMiddleware)
+        response = TestClient(minimal_app).get(
+            "/public", headers={"X-Request-ID": "client-request-123"}
+        )
+
+        assert response.headers["X-Request-ID"] == "client-request-123"
+
+    @pytest.mark.parametrize("request_id", ["invalid request", "invalid!request", "x" * 65])
+    def test_invalid_client_request_id_is_replaced(
+        self, minimal_app: FastAPI, request_id: str
+    ):
+        minimal_app.add_middleware(LoggingMiddleware)
+        response = TestClient(minimal_app).get(
+            "/public", headers={"X-Request-ID": request_id}
+        )
+
+        generated = response.headers["X-Request-ID"]
+        assert generated != request_id
+        assert len(generated) == 8
+        assert generated.replace("-", "").isalnum()
 
 
 class TestGenerateAPIKey:

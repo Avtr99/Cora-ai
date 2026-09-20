@@ -45,7 +45,7 @@ export const AgentReasoningSection: React.FC<AgentReasoningSectionProps> = ({ st
 
   return (
     <details className="-mt-1 mb-3 3xl:mb-4 text-xs 3xl:text-sm 4xl:text-base cursor-pointer group">
-      <summary className="font-inter font-normal text-xs 3xl:text-sm 4xl:text-base leading-[1.4] text-text-secondary outline-none flex items-center gap-1.5 3xl:gap-2 hover:text-brand-500 transition-colors list-none select-none">
+      <summary className="font-inter font-normal text-xs 3xl:text-sm 4xl:text-base leading-[1.4] text-text-secondary outline-none flex items-center gap-1.5 3xl:gap-2 hover:text-brand-500 transition-colors list-none select-none rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2">
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" className="flex-shrink-0">
           <path d="M6.5 2L3 6.5L6.5 6.5L6.5 10L10 5.5L6.5 5.5L6.5 2Z" fill={BRAND.primary500} stroke={BRAND.primary500} strokeWidth="0.5" />
         </svg>

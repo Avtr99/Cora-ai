@@ -31,7 +31,7 @@ export const FilterPillList: React.FC<FilterPillListProps> = ({
             onClick={() => onToggle(opt.value, isSelected)}
             aria-pressed={isSelected}
             className={`px-2.5 py-1 rounded-md font-inter text-xs font-medium transition-colors
-              focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2
+              focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2
               ${isSelected
                 ? 'bg-brand-900 text-white'
                 : 'bg-surface-subtle text-text-secondary hover:bg-border-ui'

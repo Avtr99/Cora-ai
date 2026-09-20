@@ -130,6 +130,33 @@ class TestAllowedDocumentDirsResolved:
 # Field validators
 # ---------------------------------------------------------------------------
 
+class TestReloadSettings:
+    def test_can_refresh_startup_overlay_without_bumping_version(self, monkeypatch):
+        from unittest.mock import Mock
+
+        from src import config_store
+        from src.db import revisions
+
+        settings = Settings()
+        apply_overlay = Mock()
+        bump_version = Mock()
+        monkeypatch.setattr(config_store, "_settings_instance", settings)
+        monkeypatch.setattr(config_store, "_apply_db_overlay", apply_overlay)
+        monkeypatch.setattr(revisions, "bump_config_version", bump_version)
+
+        assert config_store.reload_settings(bump_version=False) is settings
+        apply_overlay.assert_called_once_with(settings)
+        bump_version.assert_not_called()
+
+
+class TestJWTAlgorithm:
+    def test_only_hs256_is_accepted(self):
+        assert Settings(JWT_ALGORITHM="HS256").JWT_ALGORITHM == "HS256"
+
+        with pytest.raises(ValidationError):
+            Settings(JWT_ALGORITHM="none")
+
+
 class TestValidatePositiveInt:
     def test_positive_passes(self):
         settings = Settings(ASYNC_QUERY_WORKERS=4)

@@ -14,6 +14,7 @@ import time
 from typing import Any, AsyncGenerator, Dict, List, Optional, Union
 
 from .protocols import AnswerGeneratorProtocol, RelevanceCheckerProtocol, RetrieverProtocol
+from ..citations.source_name import get_source_name
 
 logger = logging.getLogger(__name__)
 
@@ -78,11 +79,14 @@ def source_name_from_metadata(
     Returns:
         Source name string
     """
-    # Try common metadata keys in order of preference
-    for key in ["source", "title", "filename", "file_name", "name", "document_name"]:
+    # Canonical title-first chain, then historical/forward-compatible keys
+    name = get_source_name(metadata)
+    if name:
+        return name
+    for key in ["filename", "name", "document_name"]:
         if key in metadata and metadata[key]:
             return str(metadata[key])
-    
+
     return fallback
 
 

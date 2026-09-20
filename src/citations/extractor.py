@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional, Set
 
 from .config import CitationConfig
 from .models import Citation, VectorResults, WebResults
-from .source_name import clean_source_name
+from .source_name import clean_source_name, get_source_name
 from .source_type import SourceTypeResolver
 from ..retrieval.score_utils import normalize_score, DistanceMetric
 
@@ -55,14 +55,7 @@ class CitationExtractor:
             if relevance_score < self.config.min_relevance_score:
                 continue
 
-            raw_source_name = (
-                metadata.get("title")
-                or metadata.get("file_name")
-                or metadata.get("original_filename")
-                or metadata.get("parent_doc")
-                or metadata.get("source")
-                or f"Document {index + 1}"
-            )
+            raw_source_name = get_source_name(metadata) or f"Document {index + 1}"
             source_name = clean_source_name(raw_source_name) or raw_source_name
 
             snippet = (

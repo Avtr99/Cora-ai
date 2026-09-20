@@ -18,6 +18,7 @@ from loguru import logger
 from ..config import get_settings
 from ..utils.cache import query_cache
 from ..citations import CitationManager
+from ..citations.source_name import get_source_name
 from .prompts import (
     MAX_QUERY_LENGTH,
     MAX_CONTEXT_LENGTH,
@@ -363,14 +364,7 @@ class BaseRAGClient:
             if meta and isinstance(meta, dict):
                 # Prefer the extracted document title (from the converted markdown)
                 # over the raw filename, which may be a placeholder name.
-                src = (
-                    meta.get("title")
-                    or meta.get("file_name")
-                    or meta.get("original_filename")
-                    or meta.get("parent_doc")
-                    or meta.get("source")
-                    or ""
-                )
+                src = get_source_name(meta)
                 if src:
                     source_name = CitationManager.clean_source_name(src) or src
                     if source_name and source_name not in sources:

@@ -114,7 +114,7 @@ const TourStep = ({ onFinish }: TourStepProps): JSX.Element => {
         <button
           type="button"
           onClick={onFinish}
-          className="px-7 3xl:px-9 4xl:px-11 py-2.5 3xl:py-3 4xl:py-4 rounded-lg bg-brand-700 text-white font-poppins text-sm 3xl:text-base 4xl:text-lg font-semibold shadow-card-md transition-colors hover:bg-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-brand-500"
+          className="px-7 3xl:px-9 4xl:px-11 py-2.5 3xl:py-3 4xl:py-4 rounded-lg bg-brand-700 text-white font-poppins text-sm 3xl:text-base 4xl:text-lg font-semibold shadow-card-md transition-colors hover:bg-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-focus"
         >
           Start chatting
         </button>

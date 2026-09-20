@@ -188,7 +188,7 @@ const SetupPage = (): JSX.Element => {
  value={apiKey}
  onChange={(e) => setApiKey(e.target.value)}
  placeholder={settings?.has_api_key ? "••••••••••••" : "Enter your API key"}
- className="w-full px-4 3xl:px-5 py-3 3xl:py-4 4xl:py-5 rounded-lg border border-border-ui bg-surface-card text-text-primary font-inter text-sm 3xl:text-base 4xl:text-lg focus:border-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-200"
+ className="w-full px-4 3xl:px-5 py-3 3xl:py-4 4xl:py-5 rounded-lg border border-border-ui bg-surface-card text-text-primary font-inter text-sm 3xl:text-base 4xl:text-lg focus:border-brand-700 focus:outline-none focus:ring-2 focus:ring-focus"
  />
  </div>
  )}
@@ -204,7 +204,7 @@ const SetupPage = (): JSX.Element => {
  value={baseUrl}
  onChange={(e) => setBaseUrl(e.target.value)}
  placeholder="https://api.example.com/v1"
- className="w-full px-4 3xl:px-5 py-3 3xl:py-4 4xl:py-5 rounded-lg border border-border-ui bg-surface-card text-text-primary font-inter text-sm 3xl:text-base 4xl:text-lg focus:border-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-200"
+ className="w-full px-4 3xl:px-5 py-3 3xl:py-4 4xl:py-5 rounded-lg border border-border-ui bg-surface-card text-text-primary font-inter text-sm 3xl:text-base 4xl:text-lg focus:border-brand-700 focus:outline-none focus:ring-2 focus:ring-focus"
  />
  </div>
  )}
@@ -218,7 +218,7 @@ const SetupPage = (): JSX.Element => {
  <select
  value={modelMain}
  onChange={(e) => setModelMain(e.target.value)}
- className="w-full px-4 3xl:px-5 py-3 3xl:py-4 4xl:py-5 rounded-lg border border-border-ui bg-surface-card text-text-primary font-inter text-sm 3xl:text-base 4xl:text-lg focus:border-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-200"
+ className="w-full px-4 3xl:px-5 py-3 3xl:py-4 4xl:py-5 rounded-lg border border-border-ui bg-surface-card text-text-primary font-inter text-sm 3xl:text-base 4xl:text-lg focus:border-brand-700 focus:outline-none focus:ring-2 focus:ring-focus"
  >
  <option value="">Select a model...</option>
  {ollamaModels.map((m) => (
@@ -237,7 +237,7 @@ const SetupPage = (): JSX.Element => {
  value={modelMain}
  onChange={(e) => setModelMain(e.target.value)}
  placeholder={config.modelPlaceholder}
- className="w-full px-4 3xl:px-5 py-3 3xl:py-4 4xl:py-5 rounded-lg border border-border-ui bg-surface-card text-text-primary font-inter text-sm 3xl:text-base 4xl:text-lg focus:border-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-200"
+ className="w-full px-4 3xl:px-5 py-3 3xl:py-4 4xl:py-5 rounded-lg border border-border-ui bg-surface-card text-text-primary font-inter text-sm 3xl:text-base 4xl:text-lg focus:border-brand-700 focus:outline-none focus:ring-2 focus:ring-focus"
  />
  )}
  {preset === "ollama" && ollamaModels.length === 0 && !loadingModels && (
@@ -261,7 +261,7 @@ const SetupPage = (): JSX.Element => {
  type="button"
  onClick={() => void handleSave()}
  disabled={saving}
- className="px-6 3xl:px-8 py-3 3xl:py-4 4xl:py-5 rounded-lg bg-brand-700 text-white font-poppins text-sm 3xl:text-base 4xl:text-lg font-semibold shadow-md transition-colors hover:bg-brand-hover disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-brand-500"
+ className="px-6 3xl:px-8 py-3 3xl:py-4 4xl:py-5 rounded-lg bg-brand-700 text-white font-poppins text-sm 3xl:text-base 4xl:text-lg font-semibold shadow-md transition-colors hover:bg-brand-hover disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-focus"
  >
  {saving ? "Saving..." : settings?.is_configured ? "Update Settings" : "Save & Continue"}
  </button>

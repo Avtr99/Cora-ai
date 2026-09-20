@@ -40,7 +40,7 @@ const PricingPage: React.FC = () => {
         <nav aria-label="Breadcrumb" className="mb-8 md:mb-12 3xl:mb-10 4xl:mb-12">
           <Link
             to="/"
-            className="inline-flex min-h-touch items-center gap-2 3xl:gap-2.5 rounded-lg font-poppins text-sm md:text-base 3xl:text-lg 4xl:text-xl font-semibold text-brand-700 transition-colors duration-200 hover:text-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-4"
+            className="inline-flex min-h-touch items-center gap-2 3xl:gap-2.5 rounded-lg font-poppins text-sm md:text-base 3xl:text-lg 4xl:text-xl font-semibold text-brand-700 transition-colors duration-200 hover:text-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2"
           >
             <IconWrapper Icon={ChevronLeftIcon} size={16} color="currentColor" aria-hidden={true} className="md:!w-4.5 md:!h-4.5 3xl:!w-5 3xl:!h-5 4xl:!w-6 4xl:!h-6" />
             <span>Pricing &amp; valuation</span>

@@ -132,16 +132,37 @@ def test_custom_system_instruction_preserves_shared_rules(monkeypatch):
     monkeypatch.setattr(
         prompt_module,
         "get_settings",
-        lambda: SimpleNamespace(COLLECTION_SYSTEM_INSTRUCTION="An expert assistant for financial filings."),
+        lambda: SimpleNamespace(
+            COLLECTION_SYSTEM_INSTRUCTION="An expert assistant for financial filings.",
+            COLLECTION_NAME="Financial filings",
+        ),
     )
 
     instruction = prompt_module.get_system_instruction()
 
     assert "An expert assistant for financial filings." in instruction
+    assert "You are an expert assistant for Financial filings." in instruction
+    assert "I can only help with questions about Financial filings." in instruction
     assert "<security_protocol>" in instruction
     assert "NEVER disclose API keys" in instruction
     assert "<output_rules>" in instruction
     assert "voluntary carbon markets" not in instruction.lower()
+
+
+def test_custom_system_instruction_uses_generic_collection_scope(monkeypatch):
+    monkeypatch.setattr(
+        prompt_module,
+        "get_settings",
+        lambda: SimpleNamespace(
+            COLLECTION_SYSTEM_INSTRUCTION="An expert assistant for financial filings.",
+            COLLECTION_NAME=None,
+        ),
+    )
+
+    instruction = prompt_module.get_system_instruction()
+
+    assert "configured collection" in instruction
+    assert "questions related to this collection" in instruction
 
 
 def test_custom_registry_patterns_refresh_detection_tables(tmp_path, monkeypatch):

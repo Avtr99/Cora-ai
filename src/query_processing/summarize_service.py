@@ -13,6 +13,7 @@ import logging
 import time
 from typing import Any, Dict, List, Optional, Sequence
 
+from ..citations.source_name import get_source_name
 from ..evaluation.grounding_metrics import composite_grounding_score
 from ..retrieval.score_utils import normalize_score, DistanceMetric
 
@@ -192,14 +193,7 @@ async def summarize_document(
         meta = c["metadata"]
         dist = c["distance"]
         formatted_citations.append({
-            "source_name": (
-                meta.get("title")
-                or meta.get("file_name")
-                or meta.get("original_filename")
-                or meta.get("parent_doc")
-                or meta.get("source")
-                or "Unknown"
-            ),
+            "source_name": get_source_name(meta) or "Unknown",
             "snippet": c["content"][:350],
             "relevance_score": round(normalize_score(dist, DistanceMetric.COSINE_DISTANCE), 3),
             "document_id": meta.get("document_id"),

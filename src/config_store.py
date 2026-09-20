@@ -146,11 +146,11 @@ def get_settings() -> Settings:
     return _settings_instance
 
 
-def reload_settings() -> Settings:
+def reload_settings(*, bump_version: bool = True) -> Settings:
     """Re-read DB overlay and update the singleton.
 
     Call this after saving settings via the API so the new values take
-    effect without requiring a full server restart. Also bumps the
+    effect without requiring a full server restart. By default it also bumps the
     ``config_version`` observability counter so query responses and the status
     endpoint can report which config generation a request started under.
     """
@@ -158,8 +158,9 @@ def reload_settings() -> Settings:
     with _settings_lock:
         if _settings_instance is not None:
             _apply_db_overlay(_settings_instance)
-            from .db.revisions import bump_config_version
-            bump_config_version()
+            if bump_version:
+                from .db.revisions import bump_config_version
+                bump_config_version()
     return _settings_instance
 
 

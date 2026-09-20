@@ -2,8 +2,59 @@
 
 from typing import List, Optional, Tuple
 
+from loguru import logger
 
+from ..utils.security import verify_history_signature
 from .query_models import Message
+
+TRUSTED_HISTORY_ROLES = {"user", "assistant"}
+
+
+def resolve_trusted_history(
+    history: Optional[List[Message]],
+    *,
+    conversation_id: Optional[str],
+    history_signature: Optional[str],
+    signing_secret: Optional[str],
+    scope_key: str = "",
+    max_messages: int = 10,
+) -> Tuple[Optional[List[Message]], bool]:
+    """Verify client-provided history and discard it unless its signature is trusted."""
+    if not history:
+        return None, False
+    if not signing_secret:
+        logger.warning("History signing secret not configured. Discarding untrusted history.")
+        return None, False
+    if not conversation_id:
+        logger.warning("History provided without conversation_id. Discarding unassociated history.")
+        return None, False
+    if not history_signature:
+        logger.warning("History provided without signature. Discarding untrusted history.")
+        return None, False
+
+    history_window = history[-max_messages:]
+    history_list = [
+        {"role": message.role, "content": message.content}
+        for message in history_window
+    ]
+    if not verify_history_signature(
+        history_list,
+        conversation_id,
+        history_signature,
+        signing_secret,
+        scope_key=scope_key,
+    ):
+        logger.warning(
+            f"History signature verification FAILED for conversation {conversation_id}. "
+            "Discarding untrusted history."
+        )
+        return None, False
+
+    logger.debug(f"History signature verified for conversation {conversation_id}")
+    return [
+        message for message in history_window
+        if message.role in TRUSTED_HISTORY_ROLES
+    ], True
 
 
 def sanitize_history_messages(
@@ -26,6 +77,8 @@ def sanitize_history_messages(
 
     for message in history:
         role = message.role
+        if role not in TRUSTED_HISTORY_ROLES:
+            continue
         content = (message.content or "").strip()
 
         if content:

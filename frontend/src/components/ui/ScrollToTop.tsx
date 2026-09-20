@@ -104,7 +104,7 @@ export const ScrollToTop: React.FC<ScrollToTopProps> = ({
     >
       <button
         onClick={scrollToTop}
-        className={`${buttonSize} flex items-center justify-center rounded-full bg-surface-card/90 backdrop-blur-sm border border-border-ui shadow-scroll-btn text-text-muted transition-all duration-200 hover:shadow-card-md active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-brand-500 focus-visible:ring-offset-surface-card`}
+        className={`${buttonSize} flex items-center justify-center rounded-full bg-surface-card/90 backdrop-blur-sm border border-border-ui shadow-scroll-btn text-text-muted transition-all duration-200 hover:shadow-card-md active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-focus focus-visible:ring-offset-surface-card`}
         aria-label="Scroll to top"
       >
         <IconWrapper

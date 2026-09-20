@@ -315,7 +315,7 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({ backendReady, onUpload
             value={tags}
             onChange={(e) => setTags(e.target.value)}
             placeholder="e.g. legal, methodology"
-            className="mt-2 3xl:mt-3 h-9 3xl:h-11 4xl:h-12 w-full rounded-lg 3xl:rounded-xl border border-border-ui bg-surface-card px-3 3xl:px-4 font-inter text-body-sm 3xl:text-[15px] 4xl:text-base text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
+            className="mt-2 3xl:mt-3 h-9 3xl:h-11 4xl:h-12 w-full rounded-lg 3xl:rounded-xl border border-border-ui bg-surface-card px-3 3xl:px-4 font-inter text-body-sm 3xl:text-[15px] 4xl:text-base text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2"
           />
         )}
 

@@ -13,6 +13,7 @@ import hashlib
 from typing import Dict, Any, List, Optional
 from cachetools import TTLCache
 
+from .protocols import WebSearchResult, web_result_is_usable
 from .search_providers import SearchProvider
 from .tavily_search import TavilySearchProvider
 
@@ -20,6 +21,11 @@ from ..query_processing.quiz_utils import (
     build_quiz_instruction,
     should_generate_quiz,
     split_answer_and_quiz,
+)
+from ..query_processing.fallback_answers import (
+    NO_ANSWER_FOUND,
+    WEB_TIMEOUT_ANSWER,
+    WEB_UNAVAILABLE_ANSWER,
 )
 from ..query_processing.suggested_prompts import (
     should_generate_suggested_prompts,
@@ -47,6 +53,20 @@ def sanitize_kb_context(kb_context: str) -> str:
 
 def _kb_sources_to_dicts(kb_sources: List[str]) -> List[Dict[str, Any]]:
     return [{"title": s, "url": "", "snippet": "", "type": "knowledge_base"} for s in kb_sources]
+
+
+def _hybrid_failure_result(kb_sources: List[str], **flags: Any) -> WebSearchResult:
+    return {
+        "answer": "",
+        "sources": _kb_sources_to_dicts(kb_sources),
+        "kb_sources": kb_sources,
+        "web_sources": [],
+        "grounded": False,
+        "hybrid": False,
+        "truncated": bool(flags),
+        **flags,
+    }
+
 
 def parse_citations(text: str, valid_source_ids: List[str]) -> str:
     """Validate and normalize web citations to a single [Web, cite: N] format.
@@ -141,14 +161,14 @@ class WebSearchAgent:
         digest = hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:24]
         return f"{prefix}:{digest}"
 
-    def _get_cached(self, key: str) -> Dict[str, Any] | None:
+    def _get_cached(self, key: str) -> WebSearchResult | None:
         if key in self._search_cache:
             return copy.deepcopy(self._search_cache[key])
         if key in self._timeout_cache:
             return copy.deepcopy(self._timeout_cache[key])
         return None
 
-    def _cache_result(self, key: str, result: Dict[str, Any]) -> None:
+    def _cache_result(self, key: str, result: WebSearchResult) -> None:
         # Don't cache error responses; the LLM may recover (e.g. quota reset),
         # and the fallback provider should be allowed to retry on the next call.
         if result.get("error"):
@@ -156,9 +176,10 @@ class WebSearchAgent:
         if result.get("timed_out"):
             self._timeout_cache[key] = copy.deepcopy(result)
             return
-        self._search_cache[key] = copy.deepcopy(result)
+        if web_result_is_usable(result):
+            self._search_cache[key] = copy.deepcopy(result)
     
-    async def search(self, query: str, context: str = "", timeout_ms: int | None = None) -> Dict[str, Any]:
+    async def search(self, query: str, context: str = "", timeout_ms: int | None = None) -> WebSearchResult:
         cache_key = self._cache_key("web_search", {"query": (query or "").strip().lower(), "context": (context or "").strip().lower()})
 
         cached = self._get_cached(cache_key)
@@ -180,7 +201,16 @@ class WebSearchAgent:
                 web_sources.append({"title": res.title, "url": res.url, "snippet": res.content, "type": "web_search", "id": res.id})
                 valid_source_ids.append(res.id)
             search_results_text += "</search_results>"
-            
+            if not web_sources:
+                result: WebSearchResult = {
+                    "answer": NO_ANSWER_FOUND,
+                    "sources": [],
+                    "grounded": False,
+                    "truncated": False,
+                }
+                self._cache_result(cache_key, result)
+                return result
+
             include_quiz = should_generate_quiz(sanitized_query)
             quiz_instruction = build_quiz_instruction(include_quiz)
             include_suggested_prompts = should_generate_suggested_prompts(sanitized_query)
@@ -226,9 +256,10 @@ You are a helpful assistant with access to web search results.
             # Validate citations
             answer_text = parse_citations(answer_text, valid_source_ids)
             
-            result = {
+            result: WebSearchResult = {
                 "answer": answer_text,
                 "sources": web_sources,
+                "grounded": True,
                 "truncated": False,
                 "quiz": quiz_data,
                 "suggested_prompts": suggested_prompts,
@@ -237,18 +268,29 @@ You are a helpful assistant with access to web search results.
             return result
             
         except asyncio.TimeoutError:
-            result = {"answer": "Web search timed out.", "sources": [], "truncated": True, "timed_out": True}
+            result: WebSearchResult = {
+                "answer": WEB_TIMEOUT_ANSWER,
+                "sources": [],
+                "grounded": False,
+                "truncated": True,
+                "timed_out": True,
+            }
             self._cache_result(cache_key, result)
             return result
         except Exception as e:
             logger.error("Web search failed: %s", e)
-            return {"answer": "Web search is currently unavailable. Please try again or check that the Tavily API key is configured.", "sources": [], "truncated": True, "error": str(e)}
+            return {
+                "answer": WEB_UNAVAILABLE_ANSWER,
+                "sources": [],
+                "grounded": False,
+                "truncated": True,
+                "error": str(e),
+            }
             
-    async def search_with_kb_context(self, query: str, kb_context: str, kb_sources: List[str], timeout_ms: int | None = None) -> Dict[str, Any]:
+    async def search_with_kb_context(self, query: str, kb_context: str, kb_sources: List[str], timeout_ms: int | None = None) -> WebSearchResult:
         """Perform web search with knowledge base context for hybrid answers."""
         sanitized_query = sanitize_query(query)
         sanitized_kb_context = sanitize_kb_context(kb_context)
-        kb_fallback_snippet = sanitized_kb_context[:1000] if sanitized_kb_context else ""
 
         try:
             # Fetch search results
@@ -262,7 +304,9 @@ You are a helpful assistant with access to web search results.
                 web_sources.append({"title": res.title, "url": res.url, "snippet": res.content, "type": "web_search", "id": res.id})
                 valid_source_ids.append(res.id)
             search_results_text += "</search_results>"
-            
+            if not web_sources:
+                return _hybrid_failure_result(kb_sources)
+
             include_quiz = should_generate_quiz(sanitized_query)
             quiz_instruction = build_quiz_instruction(include_quiz)
             include_suggested_prompts = should_generate_suggested_prompts(sanitized_query)
@@ -312,29 +356,16 @@ You are an expert VCM assistant with access to web search results.
                 "sources": combined_sources,
                 "kb_sources": kb_sources,
                 "web_sources": web_sources,
-                "hybrid": True,
+                "grounded": True,
+                "hybrid": bool(answer_text),
                 "truncated": False,
                 "quiz": quiz_data,
                 "suggested_prompts": suggested_prompts,
             }
         except asyncio.TimeoutError:
-            return {
-                "answer": kb_fallback_snippet,
-                "sources": _kb_sources_to_dicts(kb_sources),
-                "kb_sources": kb_sources,
-                "web_sources": [],
-                "hybrid": False,
-                "truncated": True,
-                "timed_out": True,
-            }
+            # Empty answer + flags so callers can pick a real fallback instead
+            # of mistaking a raw KB snippet for a synthesized hybrid answer.
+            return _hybrid_failure_result(kb_sources, timed_out=True)
         except Exception as e:
             logger.error("Web search with KB context failed: %s", e)
-            return {
-                "answer": kb_fallback_snippet,
-                "sources": _kb_sources_to_dicts(kb_sources),
-                "kb_sources": kb_sources,
-                "web_sources": [],
-                "hybrid": False,
-                "truncated": True,
-                "error": str(e),
-            }
+            return _hybrid_failure_result(kb_sources, error=str(e))

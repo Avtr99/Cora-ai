@@ -17,7 +17,7 @@ const PricingExplorer: React.FC<PricingExplorerProps> = ({ activeForce, onForceC
       role="tabpanel"
       aria-labelledby={`pricing-tab-${activeForce}`}
       tabIndex={0}
-      className="rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-4"
+      className="rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2"
     >
       <motion.div
         key={activeForce}

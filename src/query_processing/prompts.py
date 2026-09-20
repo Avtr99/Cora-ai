@@ -12,6 +12,7 @@ import logging
 import re
 from datetime import datetime, timezone
 from typing import List, Optional
+from .fallback_answers import NO_ANSWER_FOUND
 from .quiz_utils import build_quiz_instruction
 from .suggested_prompts import build_suggested_prompts_instruction
 from ..config import get_settings
@@ -61,7 +62,7 @@ The current date is {current_date}. When reference data mentions future events, 
 
 <output_rules>
 1. Treat <reference_data> as your own innate expertise. Answer directly and authoritatively. NEVER mention the existence of "reference data", "context", "provided information", or a "knowledge base".
-2. If <reference_data> is empty OR the retrieved chunks do not actually address the user's question, state: "Information not found, try rephrasing your question again." Do not answer from unrelated material.
+2. If <reference_data> is empty OR the retrieved chunks do not actually address the user's question, state: "{non_answer}" Do not answer from unrelated material.
 3. Start your answer immediately with the core facts. Strictly prohibited phrases include: "Based on...", "According to...", "The provided context states...", or "Research shows...". 
 4. Match depth to the question: be concise for simple lookups, educational and thorough for conceptual or analytical questions.
 5. For factual questions (e.g., "What is X?"), explain the concept, its significance, and key mechanisms — not just a one-line definition.
@@ -72,10 +73,25 @@ The current date is {current_date}. When reference data mentions future events, 
 </output_rules>"""
 
 _VCM_IDENTITY = "You are an expert VCM (Voluntary Carbon Markets) Assistant."
-_COLLECTION_IDENTITY = "You are an expert assistant for the configured collection."
 _VCM_EXPERTISE_BLOCK = "Carbon credits (Gold Standard, Verra VCS, ACR, CAR), Project types, Verification, Policies, Carbon accounting, Market dynamics, Regulatory frameworks, CORSIA, Nature-based solutions."
 _VCM_SCOPE_GUARD = "I can only help with questions about voluntary carbon markets."
-_COLLECTION_SCOPE_GUARD = "I can only help with questions related to the configured collection."
+
+
+def _collection_identity(collection_name: str) -> str:
+    if collection_name:
+        return f"You are an expert assistant for {collection_name}."
+    return "You are an expert assistant for the configured collection."
+
+
+def _collection_scope_guard(collection_name: str) -> str:
+    """User-facing scope refusal — names the collection when one is set.
+
+    "The configured collection" is admin jargon that means nothing to an end
+    user; COLLECTION_NAME lets the refusal say what the assistant covers.
+    """
+    if collection_name:
+        return f"I can only help with questions about {collection_name}."
+    return "I can only help with questions related to this collection."
 
 
 # One instruction per structured mode. The context and the instruction must
@@ -107,22 +123,27 @@ _STRUCTURED_INSTRUCTIONS = {
 def get_system_instruction() -> str:
     """Return the system instruction with an optional collection expertise override.
 
-    The collection setting replaces the VCM expertise and scope wording while
-    preserving the shared security, temporal-awareness, and output rules.
+    Resolves the ``{non_answer}`` placeholder to the canonical non-answer
+    message (fallback_answers.NO_ANSWER_FOUND) so the instructed sentinel and
+    non-answer detection share one source of truth. The collection setting
+    replaces the VCM expertise and scope wording while preserving the shared
+    security, temporal-awareness, and output rules.
     """
+    instruction = VCM_SYSTEM_INSTRUCTION.replace("{non_answer}", NO_ANSWER_FOUND)
     settings = get_settings()
     collection_instruction = (settings.COLLECTION_SYSTEM_INSTRUCTION or "").strip()
     if not collection_instruction:
-        return VCM_SYSTEM_INSTRUCTION
-    return VCM_SYSTEM_INSTRUCTION.replace(
+        return instruction
+    collection_name = (settings.COLLECTION_NAME or "").strip()
+    return instruction.replace(
         _VCM_IDENTITY,
-        _COLLECTION_IDENTITY,
+        _collection_identity(collection_name),
     ).replace(
         _VCM_EXPERTISE_BLOCK,
         collection_instruction,
     ).replace(
         _VCM_SCOPE_GUARD,
-        _COLLECTION_SCOPE_GUARD,
+        _collection_scope_guard(collection_name),
     )
 
 

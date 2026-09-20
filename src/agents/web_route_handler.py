@@ -13,12 +13,14 @@ from .protocols import (
     ConfigProtocol,
     RetrieverProtocol,
     WebSearchProtocol,
+    web_result_is_usable,
 )
 from .reasoning_formatter import AgentStep
 from .route_processor_utils import (
     derive_web_timeout_ms,
     normalize_sources,
 )
+from ..query_processing.fallback_answers import WEB_RETRIEVAL_FAILED_ANSWER
 from ..utils.security import sanitize_error_message
 
 if TYPE_CHECKING:
@@ -84,10 +86,11 @@ class WebRouteHandler:
             result = await self.web_search.search(query, timeout_ms=web_timeout_ms)
             duration = (time.time() - step_start) * 1000
             timed_out = bool(result.get("timed_out"))
+            search_failed = not web_result_is_usable(result)
 
             steps.append(AgentStep(
                 name="Web Search",
-                status="fallback" if timed_out else "completed",
+                status="fallback" if search_failed else "completed",
                 duration_ms=round(duration, 2),
                 details={
                     "sources_found": len(result.get("sources", [])),
@@ -100,14 +103,14 @@ class WebRouteHandler:
             sources = [(s.get("title") or s.get("url") or "web") for s in result.get("sources", [])]
             # Mark web search failures/timeouts as error fallback so the frontend
             # treats the answer as a failed response (no recommendations, retry UI).
-            search_failed = bool(result.get("error")) or (timed_out and not sources)
             if search_failed:
                 sources = ["error_fallback"]
-
-            web_citations = self.citation_manager.extract_citations_from_web_results(
-                result,
-                max_citations=3
-            )
+                web_citations = []
+            else:
+                web_citations = self.citation_manager.extract_citations_from_web_results(
+                    result,
+                    max_citations=3
+                )
 
             coverage_score = self._compute_web_coverage_score(
                 citation_count=len(web_citations),
@@ -118,7 +121,7 @@ class WebRouteHandler:
             response = {
                 "answer": result.get("answer", ""),
                 "sources": sources if sources else ["web_search"],
-                "web_sources": result.get("sources", []),
+                "web_sources": [] if search_failed else result.get("sources", []),
                 "citations": web_citations,
                 "quiz": result.get("quiz"),
                 "suggested_prompts": result.get("suggested_prompts"),
@@ -144,7 +147,7 @@ class WebRouteHandler:
             ))
             
             return {
-                "answer": "I couldn't retrieve information from web search. Please try rephrasing your question, or check that the Tavily API key is configured correctly.",
+                "answer": WEB_RETRIEVAL_FAILED_ANSWER,
                 "sources": ["error_fallback"],
                 "web_sources": [],
                 "citations": [],
@@ -305,6 +308,12 @@ class WebRouteHandler:
             if web_timed_out:
                 web_failed = True
                 error_msg = "Web supplementation timed out"
+                result = kb_result.copy()
+            elif not web_result_is_usable(result):
+                # Synthesis returned nothing usable — keep the real KB answer
+                # rather than shipping an empty/non-answer as a "supplement".
+                web_failed = True
+                error_msg = "Web supplementation returned no usable answer"
                 result = kb_result.copy()
         except Exception as e:
             logger.error("Web supplementation failed: %s", e, exc_info=True)

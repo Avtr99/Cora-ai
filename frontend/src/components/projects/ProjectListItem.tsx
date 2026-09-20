@@ -114,7 +114,7 @@ export const ProjectListItem: React.FC<ProjectListItemProps> = ({
         disabled={compareDisabled && !isSelected}
         className={`absolute top-3 right-3 z-10 w-6 h-6 rounded flex items-center justify-center
           border transition-all flex-shrink-0
-          focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2
+          focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2
           ${isSelected
             ? 'border-brand-500 bg-brand-500 opacity-100'
             : compareDisabled
@@ -133,7 +133,7 @@ export const ProjectListItem: React.FC<ProjectListItemProps> = ({
       {/* Main clickable area */}
       <button
         type="button"
-        className="w-full text-left px-4 3xl:px-6 py-3 3xl:py-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500"
+        className="w-full text-left px-4 3xl:px-6 py-3 3xl:py-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
         onClick={() => onSelect(project)}
         aria-label={`View details for ${project.name}`}
       >

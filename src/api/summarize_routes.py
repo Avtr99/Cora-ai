@@ -34,7 +34,7 @@ async def summarize(req: SummarizeRequest):
     """
     try:
         # Get shared components from app state
-        retriever = await get_retriever()
+        retriever = get_retriever()
         gemini_client = get_gemini_client()
 
         result = await summarize_document(

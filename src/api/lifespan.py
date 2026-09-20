@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 from threading import Lock
 from loguru import logger
 
-from ..config import get_settings, get_collection_threshold
+from ..config import get_settings, reload_settings, get_collection_threshold
 from .async_query_jobs import get_async_query_job_manager
 from ..db.database import run_migrations
 from ..query_processing.llm_factory import create_llm_client, is_llm_configured
@@ -212,6 +212,7 @@ async def lifespan(app):
     # Run SQLite migrations synchronously before starting components
     try:
         run_migrations()
+        reload_settings(bump_version=False)
         logger.info("SQLite migrations completed successfully")
     except Exception as e:
         logger.error(f"Failed to run SQLite migrations: {e}")

@@ -1,4 +1,5 @@
 import hashlib
+import hmac
 from loguru import logger
 
 from ..config import get_settings
@@ -115,4 +116,4 @@ class MemorySecurity:
             logger.warning("verify_delete_token called with invalid user_id")
 
         # Use constant-time comparison to prevent timing attacks
-        return hashlib.compare_digest(expected, token)
+        return hmac.compare_digest(expected, token)

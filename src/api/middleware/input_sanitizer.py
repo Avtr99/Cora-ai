@@ -13,8 +13,7 @@ https://github.com/NirDiamant/agents-towards-production
 """
 import re
 import base64
-import html
-from typing import Optional, Tuple, List, Literal
+from typing import Optional, Tuple, List
 from dataclasses import dataclass
 from enum import Enum
 from loguru import logger
@@ -40,13 +39,6 @@ class SanitizationResult:
     sanitized_length: int
 
 
-def escape_html(text: str, context: Literal["text", "code"] = "text") -> str:
-    """Escape HTML by default; allow raw text only for explicit code context."""
-    if context == "code":
-        return text
-    return html.escape(text)
-
-
 class InputSanitizer:
     """
     Sanitizes user input to prevent prompt injection and other AI attacks.
@@ -57,7 +49,6 @@ class InputSanitizer:
     3. Prompt injection pattern detection
     4. Jailbreak attempt detection
     5. System prompt extraction attempts
-    6. HTML/script injection prevention
     """
     
     # Maximum allowed query length (characters)
@@ -154,13 +145,12 @@ class InputSanitizer:
             re.compile(p, re.IGNORECASE) for p in self.SOCIAL_ENGINEERING_PATTERNS
         ]
     
-    def sanitize(self, text: str, context: Literal["text", "code"] = "text") -> SanitizationResult:
+    def sanitize(self, text: str) -> SanitizationResult:
         """
         Sanitize user input and detect potential threats.
         
         Args:
             text: Raw user input
-            context: Sanitization context. Use "code" to preserve raw code snippets.
             
         Returns:
             SanitizationResult with safety assessment and sanitized text
@@ -185,23 +175,19 @@ class InputSanitizer:
             text = text[:self.max_length]
             threat_level = ThreatLevel.LOW
         
-        # 2. Context-aware HTML sanitization (defense-in-depth)
-        # Escape by default. Callers can explicitly opt into raw code behavior.
-        text = escape_html(text, context=context)
-        
-        # 3. Check for encoded content
+        # 2. Check for encoded content
         encoding_threats = self._detect_encoded_content(text)
         if encoding_threats:
             threats_detected.extend(encoding_threats)
             threat_level = max(threat_level, ThreatLevel.MEDIUM, key=lambda x: list(ThreatLevel).index(x))
         
-        # 4. Check for injection patterns
+        # 3. Check for injection patterns
         injection_threats = self._detect_injection_patterns(text)
         if injection_threats:
             threats_detected.extend(injection_threats)
             threat_level = ThreatLevel.HIGH
         
-        # 5. Check for social engineering
+        # 4. Check for social engineering
         social_threats = self._detect_social_engineering(text)
         if social_threats:
             threats_detected.extend(social_threats)
@@ -310,7 +296,7 @@ class OutputSanitizer:
         r"[A-Z]:\\[a-zA-Z0-9_\\]+",
         
         # Environment variables
-        r"\$\{?[A-Z_]+\}?",
+        r"\$\{[A-Z_][A-Z0-9_]*\}|\$[A-Z_][A-Z0-9_]*_[A-Z0-9_]*",
         
         # System prompt markers
         r"system\s*prompt\s*[:=]",

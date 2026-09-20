@@ -41,8 +41,8 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 }) => {
   const confirmClasses =
     variant === 'destructive'
-      ? 'bg-semantic-error-button text-white hover:bg-semantic-error-buttonHover focus-visible:ring-brand-500'
-      : 'bg-brand-700 text-white hover:bg-brand-hover focus-visible:ring-brand-500';
+      ? 'bg-semantic-error-button text-white hover:bg-semantic-error-buttonHover focus-visible:ring-focus'
+      : 'bg-brand-700 text-white hover:bg-brand-hover focus-visible:ring-focus';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -62,7 +62,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             type="button"
             onClick={() => onOpenChange(false)}
             disabled={isConfirming}
-            className="inline-flex h-9 3xl:h-10 4xl:h-11 items-center justify-center rounded-lg border border-border-ui px-4 3xl:px-5 4xl:px-6 font-poppins text-sm 3xl:text-base 4xl:text-lg font-semibold text-text-primary transition-colors hover:bg-surface-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:opacity-50"
+            className="inline-flex h-9 3xl:h-10 4xl:h-11 items-center justify-center rounded-lg border border-border-ui px-4 3xl:px-5 4xl:px-6 font-poppins text-sm 3xl:text-base 4xl:text-lg font-semibold text-text-primary transition-colors hover:bg-surface-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:opacity-50"
           >
             {cancelLabel}
           </button>

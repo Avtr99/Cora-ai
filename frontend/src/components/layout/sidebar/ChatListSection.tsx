@@ -147,7 +147,7 @@ export const ChatListSection: React.FC<ChatListSectionProps> = ({
                         const current = rowRefs.current.get(chat.id) || { title: null, delete: null };
                         rowRefs.current.set(chat.id, { ...current, delete: el });
                       }}
-                      className="opacity-0 group-hover:opacity-100 hover:text-semantic-error-icon transition-opacity duration-200 p-1 3xl:p-1.5 4xl:p-2 -mr-1 3xl:-mr-1.5 4xl:-mr-2 focus:outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 flex-shrink-0"
+                      className="opacity-0 group-hover:opacity-100 hover:text-semantic-error-icon transition-opacity duration-200 p-1 3xl:p-1.5 4xl:p-2 -mr-1 3xl:-mr-1.5 4xl:-mr-2 focus:outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 flex-shrink-0"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleDeleteChat(e, chat.id);

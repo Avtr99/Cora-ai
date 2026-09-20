@@ -4,7 +4,9 @@ Centralises runtime-checkable protocols used by route handlers and the
 orchestrator so they are defined once and imported consistently.
 """
 
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, Dict, List, NotRequired, Optional, Protocol, TypedDict, runtime_checkable
+
+from ..query_processing.fallback_answers import is_non_answer
 
 
 @runtime_checkable
@@ -79,6 +81,30 @@ class RelevanceCheckerProtocol(Protocol):
         ...
 
 
+class WebSearchResult(TypedDict):
+    answer: str
+    sources: List[Dict[str, Any]]
+    grounded: bool
+    web_sources: NotRequired[List[Dict[str, Any]]]
+    kb_sources: NotRequired[List[str]]
+    hybrid: NotRequired[bool]
+    timed_out: NotRequired[bool]
+    error: NotRequired[str]
+    truncated: NotRequired[bool]
+    timeout_ms: NotRequired[int]
+    quiz: NotRequired[Any]
+    suggested_prompts: NotRequired[Any]
+
+
+def web_result_is_usable(result: WebSearchResult) -> bool:
+    return (
+        result.get("grounded") is True
+        and not result.get("timed_out")
+        and not result.get("error")
+        and not is_non_answer(result.get("answer", ""))
+    )
+
+
 @runtime_checkable
 class WebSearchProtocol(Protocol):
     """Protocol for web search implementations."""
@@ -88,7 +114,7 @@ class WebSearchProtocol(Protocol):
         query: str,
         context: str = "",
         timeout_ms: Optional[int] = None,
-    ) -> Dict[str, Any]:
+    ) -> WebSearchResult:
         """Perform web search and return results."""
         ...
 
@@ -98,7 +124,7 @@ class WebSearchProtocol(Protocol):
         kb_context: str,
         kb_sources: List[str],
         timeout_ms: Optional[int] = None,
-    ) -> Dict[str, Any]:
+    ) -> WebSearchResult:
         """Search with knowledge base context."""
         ...
 

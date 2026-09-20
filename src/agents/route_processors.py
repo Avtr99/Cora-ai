@@ -21,6 +21,7 @@ from .kb_route_handler import KBRouteHandler
 from .web_route_handler import WebRouteHandler
 from .hybrid_route_handler import HybridRouteHandler
 from ..query_processing.citation_verifier import renumber_citation_markers
+from ..query_processing.fallback_answers import has_error_source_marker
 
 if TYPE_CHECKING:
     from .reasoning_formatter import AgentStep
@@ -143,7 +144,7 @@ class RouteProcessor:
                     if cleaned_name and cleaned_name.strip():
                         sources.append(cleaned_name)
             result["sources"] = sources
-        else:
+        elif not has_error_source_marker(result.get("sources")):
             result["sources"] = []
     
     async def process_kb_route(

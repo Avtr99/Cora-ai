@@ -60,7 +60,7 @@ export const SuggestedPrompts: React.FC<SuggestedPromptsProps> = ({ prompts, mes
             whileTap={isTyping ? {} : { scale: 0.98 }}
             onClick={() => handlePromptClick(prompt)}
             disabled={isTyping}
-            className={`group flex items-center gap-2 3xl:gap-2.5 4xl:gap-3 px-3.5 3xl:px-4 4xl:px-5 py-2 3xl:py-2.5 4xl:py-3 rounded-xl border text-left transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 ${
+            className={`group flex items-center gap-2 3xl:gap-2.5 4xl:gap-3 px-3.5 3xl:px-4 4xl:px-5 py-2 3xl:py-2.5 4xl:py-3 rounded-xl border text-left transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 ${
               isTyping
                 ? 'border-border-ui bg-surface-subtle/50 cursor-not-allowed opacity-50'
                 : 'border-border-ui bg-surface-card hover:bg-surface-subtle hover:shadow-sm hover:border-border-ui'

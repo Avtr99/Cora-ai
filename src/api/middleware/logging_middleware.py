@@ -4,6 +4,7 @@ Uses loguru for structured logging output.
 """
 import asyncio
 import logging
+import re
 import time
 import uuid
 from typing import Callable, Optional
@@ -148,6 +149,7 @@ class LoggingMiddleware(BaseHTTPMiddleware):
     """
     
     REQUEST_ID_HEADER = "X-Request-ID"
+    REQUEST_ID_PATTERN = re.compile(r"[A-Za-z0-9-]{1,64}")
     
     def __init__(
         self,
@@ -181,7 +183,12 @@ class LoggingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         """Process request with logging."""
         # Get or generate request ID
-        request_id = request.headers.get(self.REQUEST_ID_HEADER) or self._generate_request_id()
+        supplied_request_id = request.headers.get(self.REQUEST_ID_HEADER)
+        request_id = (
+            supplied_request_id
+            if supplied_request_id and self.REQUEST_ID_PATTERN.fullmatch(supplied_request_id)
+            else self._generate_request_id()
+        )
         
         # Set request ID in context
         token = request_id_ctx.set(request_id)

@@ -33,7 +33,7 @@ const HomePage: React.FC = () => {
             <button
               type="button"
               onClick={() => window.location.reload()}
-              className="px-5 3xl:px-6 4xl:px-7 py-2 3xl:py-2.5 rounded-lg bg-brand-700 text-white font-poppins text-sm 3xl:text-[15px] 4xl:text-base font-semibold shadow-md transition-colors hover:bg-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-brand-500"
+              className="px-5 3xl:px-6 4xl:px-7 py-2 3xl:py-2.5 rounded-lg bg-brand-700 text-white font-poppins text-sm 3xl:text-[15px] 4xl:text-base font-semibold shadow-md transition-colors hover:bg-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-focus"
             >
               Reload
             </button>

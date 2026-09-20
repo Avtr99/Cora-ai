@@ -165,7 +165,7 @@ export const ProjectFiltersV2: React.FC<ProjectFiltersV2Props> = ({
                 type="button"
                 onClick={() => setShowPrimaryMobile(!showPrimaryMobile)}
                 className={`inline-flex items-center gap-1.5 h-8 3xl:h-10 4xl:h-11 px-3 3xl:px-4 rounded-lg 3xl:rounded-xl font-inter text-xs 3xl:text-[13px] 4xl:text-sm font-medium transition-all
-                  border focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2
+                  border focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2
                   ${showPrimaryMobile || primaryActiveCount > 0
                     ? 'bg-brand-900 text-white border-brand-900'
                     : 'bg-surface-card text-text-secondary border-border-ui hover:border-border-ui'
@@ -205,7 +205,7 @@ export const ProjectFiltersV2: React.FC<ProjectFiltersV2Props> = ({
               type="button"
               onClick={() => setShowMore(!showMore)}
               className={`inline-flex items-center gap-1.5 h-8 3xl:h-10 4xl:h-11 px-3 3xl:px-4 rounded-lg 3xl:rounded-xl font-inter text-xs 3xl:text-[13px] 4xl:text-sm font-medium transition-all
-                border focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2
+                border focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2
                 ${showMore || secondaryActiveCount > 0
                   ? 'bg-brand-900 text-white border-brand-900'
                   : 'bg-surface-card text-text-secondary border-border-ui hover:border-text-muted hover:bg-surface-subtle'

@@ -76,7 +76,7 @@ export const QuizWidget: React.FC<QuizWidgetProps> = ({ quiz }) => {
               onClick={() => handleOptionClick(index)}
               whileHover={!isAnswered ? { y: -1 } : {}}
               whileTap={!isAnswered ? { scale: 0.995 } : {}}
-              className={`group relative flex items-center gap-3 3xl:gap-4 text-left px-3.5 3xl:px-4.5 4xl:px-5 py-2 3xl:py-2.5 4xl:py-3 sm:px-4 sm:py-2.5 rounded-lg border transition-all duration-300 ease-out outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 ${stateClass}`}
+              className={`group relative flex items-center gap-3 3xl:gap-4 text-left px-3.5 3xl:px-4.5 4xl:px-5 py-2 3xl:py-2.5 4xl:py-3 sm:px-4 sm:py-2.5 rounded-lg border transition-all duration-300 ease-out outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 ${stateClass}`}
             >
               {/* Letter Indicator */}
               <div className={`w-6 h-6 3xl:w-7 3xl:h-7 4xl:w-8 4xl:h-8 flex-shrink-0 flex items-center justify-center text-xs 3xl:text-sm 4xl:text-base font-bold transition-all duration-300 ${letterClass}`}>
@@ -131,7 +131,7 @@ export const QuizWidget: React.FC<QuizWidgetProps> = ({ quiz }) => {
                       onClick={handleTryAgain}
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
-                      className="inline-flex items-center gap-1.5 3xl:gap-2 font-inter font-semibold text-semantic-warning-text text-xs 3xl:text-sm px-4 3xl:px-5 py-2 3xl:py-2.5 4xl:py-3 rounded-lg bg-semantic-warning-bg border border-semantic-warning-border hover:bg-semantic-warning-iconBg hover:border-semantic-warning-border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
+                      className="inline-flex items-center gap-1.5 3xl:gap-2 font-inter font-semibold text-semantic-warning-text text-xs 3xl:text-sm px-4 3xl:px-5 py-2 3xl:py-2.5 4xl:py-3 rounded-lg bg-semantic-warning-bg border border-semantic-warning-border hover:bg-semantic-warning-iconBg hover:border-semantic-warning-border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2"
                     >
                       Give it another shot
                       <ArrowRight className="w-3.5 h-3.5 3xl:w-4 3xl:h-4 4xl:w-5 4xl:h-5 text-semantic-warning-icon" strokeWidth={2.5} />

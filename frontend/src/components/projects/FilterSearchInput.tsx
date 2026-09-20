@@ -24,7 +24,7 @@ export const FilterSearchInput: React.FC<FilterSearchInputProps> = ({
       aria-label={ariaLabel}
       className="w-full h-8 3xl:h-10 4xl:h-11 pl-8 3xl:pl-10 pr-8 font-inter text-xs 3xl:text-sm 4xl:text-base text-text-primary placeholder:text-text-muted
         bg-surface-base border border-border-ui rounded-lg
-        focus:outline-none focus:bg-surface-card focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
+        focus:outline-none focus:bg-surface-card focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2"
     />
     {value && (
       <button
