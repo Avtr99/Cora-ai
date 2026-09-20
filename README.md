@@ -460,6 +460,7 @@ every option. The most important ones:
 | `KB_MIN_TOP_RELEVANCE_SCORE` | 0.4 | Pre-generation gate; below this → web fallback. |
 | `QUERY_DOC_OVERLAP_THRESHOLD` | 0.0 (off) | Zero-cost lexical overlap guard. |
 | `COLLECTION_RELEVANCE_OVERRIDES` | — | JSON map of per-collection threshold overrides. |
+| `COLLECTION_NAME` | — | Human-readable name for a custom collection, used in scope-limit replies ("I can only help with questions about X."). |
 
 ---
 
