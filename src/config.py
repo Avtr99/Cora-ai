@@ -151,7 +151,7 @@ class Settings(BaseSettings):
 
     # --- API / server ---
     TIMEOUT: int = 30
-    UVICORN_HOST: str = "0.0.0.0"
+    UVICORN_HOST: str = "127.0.0.1"
     PORT: int = 8000
     RAG_TIMEOUT_MS: int = 45000  # End-to-end orchestrator timeout
 

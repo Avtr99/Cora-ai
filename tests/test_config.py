@@ -211,3 +211,13 @@ class TestValidateConversionPromptNotEmpty:
         with pytest.raises(ValidationError) as exc_info:
             Settings(DOCUMENT_LLM_CONVERSION_PROMPT=value)
         assert "must not be empty" in str(exc_info.value)
+
+
+class TestUvicornHost:
+    def test_defaults_to_loopback(self, monkeypatch):
+        monkeypatch.delenv("UVICORN_HOST", raising=False)
+        assert Settings(_env_file=None).UVICORN_HOST == "127.0.0.1"
+
+    def test_env_override(self, monkeypatch):
+        monkeypatch.setenv("UVICORN_HOST", "0.0.0.0")
+        assert Settings(_env_file=None).UVICORN_HOST == "0.0.0.0"

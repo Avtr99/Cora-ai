@@ -30,7 +30,7 @@
 │   │                          │      │                             │  │
 │   │  :8000  HTTP + SPA       │─────▶│  :6333  HTTP/gRPC           │  │
 │   │   ├─ /v1/*  API routes   │      │  (vector + memory store)    │  │
-│   │   ├─ /api/* SPA aliases  │      │                             │  │
+│   │   ├─ /api/* SPA aliases  │      │  no host port (internal)    │  │
 │   │   └─ /*     static SPA   │      │  Volume: qdrant_data        │  │
 │   │                          │      └─────────────────────────────┘  │
 │   └──────────┬───────────────┘                                       │
@@ -45,12 +45,17 @@
 │   │  writes Qdrant vectors   │                                       │
 │   └──────────┬───────────────┘                                       │
 │              │                                                       │
-│   Shared bind│ mount: ./data:/app/data                                │
-│   ┌──────────┴───────────────┐                                       │
-│   │  /app/data/              │                                       │
-│   │   ├─ cora.db             │  ← SQLite (cache, feedback, embeddings, jobs)│
-│   │   └─ documents/          │  ← uploaded/converted docs             │
-│   └──────────────────────────┘                                       │
+│   Volumes (shared by app + ingest-worker):                            │
+│   ┌──────────┴───────────────┐   ┌──────────────────────────────┐   │
+│   │  Named volume:           │   │  Bind mount: ./data          │   │
+│   │  cora_db_data            │   │  at /app/data/documents      │   │
+│   │  at /app/db/cora.db      │   │  uploaded/converted docs     │   │
+│   │  SQLite (cache, jobs,    │   │                              │   │
+│   │  feedback, embeddings)   │   │                              │   │
+│   └──────────────────────────┘   └──────────────────────────────┘   │
+│                                                                     │
+│   Host ports: app published on 127.0.0.1:8000 only                  │
+│   (CORA_BIND_ADDRESS=0.0.0.0 for LAN/remote); qdrant: none.         │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
             │

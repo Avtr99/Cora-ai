@@ -29,6 +29,7 @@ FROM --platform=linux/amd64 python:3.11-slim@sha256:b27df5841f3355e9473f9a516d38
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PORT=8000 \
+    UVICORN_HOST=0.0.0.0 \
     HOME=/app/data \
     HF_HOME=/app/data/.cache/huggingface \
     HF_DATASETS_CACHE=/app/data/.cache/datasets \
