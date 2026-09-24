@@ -239,9 +239,19 @@ docker compose up -d --build
 
 This starts three services:
 
-- `app` (FastAPI + built React SPA) on http://localhost:8000
+- `app` (FastAPI + built React SPA) on http://localhost:8000. The port binds to
+  localhost, so the app is reachable from this machine only.
 - `ingest-worker` (Docling PDF parser + Qdrant indexer; no exposed port; polls SQLite for jobs)
-- `qdrant` (vector database) on http://localhost:6333
+- `qdrant` (vector database). No host port is published; `app` and
+  `ingest-worker` reach it at `http://qdrant:6333` on the Compose network.
+
+> **Upgrading to 2.0:** the app port now binds to localhost, and `qdrant` no
+> longer publishes a host port. To reach Cora from other machines on your
+> network, set `CORA_BIND_ADDRESS=0.0.0.0` in `.env`. Also set `API_ACCESS_KEY`
+> and `ENABLE_API_KEY_PROTECTION=true`, and serve the app over HTTPS through a
+> reverse proxy. If your tools used `http://localhost:6333` to reach Qdrant,
+> run `docker compose exec app curl http://qdrant:6333/collections` instead, or
+> add a `docker-compose.override.yml` that maps `"127.0.0.1:6333:6333"`.
 
 The `app` and `ingest-worker` services share a `./data:/app/data` bind mount for uploaded
 documents and a named volume (`cora_db_data`) for the SQLite database. The DB is on a named
@@ -314,7 +324,8 @@ cd frontend && npm ci && npm run build && cd ..
 python -m src.api.main
 ```
 
-The backend runs on http://localhost:8000.
+The backend binds to `127.0.0.1` and runs on http://localhost:8000. To expose
+it to other machines, set `UVICORN_HOST=0.0.0.0` in `.env`.
 
 ### Frontend
 
