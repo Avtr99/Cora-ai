@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+# [2.0.0](https://github.com/Avtr99/Cora-ai/compare/v1.4.1...v2.0.0) (2026-09-24)
+
+
+* feat!: bind app port to localhost and stop publishing qdrant ([ef0f904](https://github.com/Avtr99/Cora-ai/commit/ef0f904ab26a87e3d671265a0982940370c864b9))
+
+
+### BREAKING CHANGES
+
+* The compose stack publishes the app on 127.0.0.1:8000
+only, and qdrant no longer has a host port. For LAN/remote access set
+CORA_BIND_ADDRESS=0.0.0.0 in .env together with API_ACCESS_KEY,
+ENABLE_API_KEY_PROTECTION=true, and HTTPS. Host tools that used
+localhost:6333 must use `docker compose exec app curl
+http://qdrant:6333/...` or a docker-compose.override.yml port mapping.
+A bare `python -m src.api.main` now binds 127.0.0.1; set
+UVICORN_HOST=0.0.0.0 to expose it. Containers still listen on 0.0.0.0
+via the Dockerfile ENV and the compose pin.
+
 ## [1.4.1](https://github.com/Avtr99/Cora-ai/compare/v1.4.0...v1.4.1) (2026-09-20)
 
 
