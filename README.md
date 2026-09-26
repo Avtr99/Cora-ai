@@ -267,8 +267,9 @@ SQLite needs for concurrent access from multiple containers. `docker-compose.yml
 ### 3. Verify
 
 ```bash
-curl http://127.0.0.1:8000/health   # liveness
-curl http://127.0.0.1:8000/ready    # readiness once initialized
+curl http://127.0.0.1:8000/live     # liveness: the process serves HTTP
+curl http://127.0.0.1:8000/ready    # 200 when Cora can answer queries, 503 before that
+curl http://127.0.0.1:8000/health   # summary dependency status (cached 15s)
 ```
 
 ### 4. Open the UI
@@ -428,8 +429,10 @@ Qdrant for vectors and conversation memory.
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/health` | Liveness |
-| GET | `/ready` | Readiness (components initialized) |
+| GET | `/live` | Liveness. Returns 200 while the process serves HTTP. |
+| GET | `/ready` | Readiness. Returns 200 when Cora can answer queries, else 503. A fresh install reports `setup_required` until you configure an LLM. |
+| GET | `/health` | Summary dependency status (`status`, `version`, `timestamp`). Cached for 15 seconds. |
+| GET | `/v1/health` | Full component detail. Needs the API key when `ENABLE_API_KEY_PROTECTION=true`. |
 | POST | `/v1/query` | Synchronous RAG query |
 | POST | `/v1/query/stream` | Streaming SSE query |
 | POST | `/v1/query/async` | Async queued query (returns `job_id`) |

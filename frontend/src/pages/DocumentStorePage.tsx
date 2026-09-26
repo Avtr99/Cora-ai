@@ -304,7 +304,7 @@ const DocumentStorePage: React.FC = () => {
             <button
               type="button"
               onClick={() => configQuery.refetch()}
-              className="inline-flex h-8 3xl:h-10 4xl:h-12 shrink-0 items-center gap-1.5 3xl:gap-2 rounded-lg 3xl:rounded-xl border border-border-ui bg-surface-card px-3 3xl:px-4 font-inter text-ui 3xl:text-sm 4xl:text-base font-semibold text-text-primary transition-colors hover:bg-surface-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 disabled:opacity-50"
+              className="inline-flex h-8 3xl:h-10 4xl:h-11 shrink-0 items-center gap-1.5 3xl:gap-2 rounded-lg 3xl:rounded-xl border border-border-ui bg-surface-card px-3 3xl:px-4 font-inter text-xs 3xl:text-[13px] 4xl:text-sm font-medium text-text-primary transition-all hover:border-text-muted hover:bg-surface-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={configQuery.isFetching}
             >
               <RefreshCw className={`h-3.5 w-3.5 3xl:h-4 3xl:w-4 4xl:h-5 4xl:w-5 ${configQuery.isFetching ? 'animate-spin' : ''}`} />
@@ -326,7 +326,7 @@ const DocumentStorePage: React.FC = () => {
             </div>
             <Link
               to="/settings"
-              className="inline-flex h-8 3xl:h-10 4xl:h-12 shrink-0 items-center gap-1.5 3xl:gap-2 rounded-lg 3xl:rounded-xl border border-border-ui bg-surface-card px-3 3xl:px-4 font-inter text-ui 3xl:text-sm 4xl:text-base font-semibold text-text-primary transition-colors hover:bg-surface-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2"
+              className="inline-flex h-8 3xl:h-10 4xl:h-11 shrink-0 items-center gap-1.5 3xl:gap-2 rounded-lg 3xl:rounded-xl border border-border-ui bg-surface-card px-3 3xl:px-4 font-inter text-xs 3xl:text-[13px] 4xl:text-sm font-medium text-text-primary transition-all hover:border-text-muted hover:bg-surface-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2"
             >
               <SettingsIcon className="h-3.5 w-3.5 3xl:h-4 3xl:w-4 4xl:h-5 4xl:w-5" />
               Open Settings
@@ -353,7 +353,7 @@ const DocumentStorePage: React.FC = () => {
                       type="button"
                       onClick={handleReindexAll}
                       disabled={anyBusy}
-                      className="inline-flex h-8 3xl:h-10 4xl:h-12 items-center gap-1.5 3xl:gap-2 rounded-lg 3xl:rounded-xl border border-border-ui px-3 3xl:px-4 4xl:px-5 font-inter text-ui 3xl:text-sm 4xl:text-base font-semibold text-text-primary hover:bg-surface-subtle disabled:opacity-50"
+                      className="inline-flex h-8 3xl:h-10 4xl:h-11 items-center gap-1.5 3xl:gap-2 rounded-lg 3xl:rounded-xl border border-border-ui bg-surface-card px-3 3xl:px-4 font-inter text-xs 3xl:text-[13px] 4xl:text-sm font-medium text-text-secondary transition-all hover:border-text-muted hover:bg-surface-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                       title="Re-chunk and re-embed all documents from their converted text"
                     >
                       <RefreshCw className={`h-3.5 w-3.5 3xl:h-4 3xl:w-4 4xl:h-5 4xl:w-5 ${reindexAllMutation.isPending ? 'animate-spin' : ''}`} />
@@ -363,7 +363,7 @@ const DocumentStorePage: React.FC = () => {
                       type="button"
                       onClick={handleClearAll}
                       disabled={anyBusy}
-                      className="inline-flex h-8 3xl:h-10 4xl:h-12 items-center gap-1.5 3xl:gap-2 rounded-lg 3xl:rounded-xl border border-semantic-error-border px-3 3xl:px-4 4xl:px-5 font-inter text-ui 3xl:text-sm 4xl:text-base font-semibold text-semantic-error-text hover:bg-semantic-error-bg disabled:opacity-50"
+                      className="inline-flex h-8 3xl:h-10 4xl:h-11 items-center gap-1.5 3xl:gap-2 rounded-lg 3xl:rounded-xl border border-semantic-error-border bg-surface-card px-3 3xl:px-4 font-inter text-xs 3xl:text-[13px] 4xl:text-sm font-medium text-semantic-error-text transition-all hover:bg-semantic-error-bg focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                       title="Delete all documents and remove them from the knowledge base"
                     >
                       <Trash2 className="h-3.5 w-3.5 3xl:h-4 3xl:w-4 4xl:h-5 4xl:w-5" />
@@ -546,7 +546,7 @@ export default function DocumentStorePageWrapper(): JSX.Element {
             <button
               type="button"
               onClick={() => window.location.reload()}
-              className="mt-6 inline-flex h-9 items-center gap-2 rounded-lg bg-brand-700 px-5 font-inter text-body-sm font-semibold text-white transition-colors hover:bg-brand-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-2"
+              className="mt-6 inline-flex h-9 items-center gap-2 rounded-lg bg-brand-700 px-5 font-poppins text-sm font-semibold text-white transition-colors hover:bg-brand-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2"
             >
               <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
               Reload

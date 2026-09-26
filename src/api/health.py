@@ -7,10 +7,16 @@ import asyncio
 from typing import Dict, Any, Optional
 from datetime import datetime, timezone
 from enum import Enum
+from cachetools import TTLCache
 from loguru import logger
 
 from ..config import get_settings
 from ..version import __version__
+
+
+HEALTH_CACHE_TTL_SECONDS = 15
+
+_health_cache: TTLCache = TTLCache(maxsize=1, ttl=HEALTH_CACHE_TTL_SECONDS)
 
 
 class HealthStatus(str, Enum):
@@ -87,66 +93,57 @@ async def check_qdrant_health() -> ComponentHealth:
     )
 
 
-async def check_gemini_health() -> ComponentHealth:
-    """Check Gemini API connectivity and context cache status."""
+async def check_llm_health() -> ComponentHealth:
+    """Check the configured LLM provider's connectivity and circuit status."""
     start = time.perf_counter()
-    
+
     try:
-        settings = get_settings()
-        
-        if not settings.GEMINI_API_KEY:
+        from .lifespan import get_llm_client
+
+        client = get_llm_client()
+        if client is None:
             return ComponentHealth(
-                name="gemini_api",
+                name="llm",
                 status=HealthStatus.UNHEALTHY,
-                message="GEMINI_API_KEY not configured"
+                message="No LLM client (configure a provider in Settings)"
             )
-        
-        # Check circuit breaker status
-        from .middleware.circuit_breaker import gemini_circuit
-        
-        circuit_state = gemini_circuit.state.value
+
+        # The client declares its own circuit (FallbackLLMClient delegates to
+        # its primary). A provider missing `circuit` raises into the outer
+        # except — loud failure, not a silent "unknown" state.
+        circuit_state = client.circuit.state.value
         latency = (time.perf_counter() - start) * 1000
-        
-        # Get SQLite cache status from the active LLM client
-        cache_status = {}
-        try:
-            from .lifespan import get_gemini_client
-            client = get_gemini_client()
-            if client and hasattr(client, "get_cache_status"):
-                cache_status = client.get_cache_status()
-            else:
-                cache_status = {"cache_enabled": False, "error": "LLM client not initialized"}
-        except Exception:
-            cache_status = {"cache_enabled": False, "error": "Could not get cache status"}
-        
+
+        cache_status = client.get_cache_status()
+
+        details = {
+            "provider": type(client).__name__,
+            "model": client.model_main,
+            "circuit_state": circuit_state,
+            "sqlite_cache_enabled": cache_status.get("cache_enabled", False),
+        }
+
         if circuit_state == "open":
             return ComponentHealth(
-                name="gemini_api",
+                name="llm",
                 status=HealthStatus.DEGRADED,
                 latency_ms=latency,
                 message="Circuit breaker open",
-                details={
-                    "circuit_state": circuit_state,
-                    "sqlite_cache": cache_status
-                }
+                details=details
             )
-        
+
         return ComponentHealth(
-            name="gemini_api",
+            name="llm",
             status=HealthStatus.HEALTHY,
             latency_ms=latency,
-            details={
-                "circuit_state": circuit_state,
-                "model": cache_status.get("model", "unknown"),
-                "sqlite_cache_enabled": cache_status.get("cache_enabled", False),
-            }
+            details=details
         )
     except Exception as e:
         latency = (time.perf_counter() - start) * 1000
-        logger.error(f"Gemini health check failed: {e}", exc_info=True)
-        
+        logger.error(f"LLM health check failed: {e}", exc_info=True)
+
         return ComponentHealth(
-            name="gemini_api",
+            name="llm",
             status=HealthStatus.UNHEALTHY,
             latency_ms=latency,
             message="Internal error during health check"
@@ -240,67 +237,76 @@ async def check_sqlite_cache_health() -> ComponentHealth:
     )
 
 
-async def run_health_checks(include_dependencies: bool = True) -> Dict[str, Any]:
+async def run_health_checks() -> Dict[str, Any]:
     """
     Run all health checks and return aggregated status.
-    
-    Args:
-        include_dependencies: Include external service checks
-        
+
+    The full dependency sweep is cached for HEALTH_CACHE_TTL_SECONDS.
+    On a cache hit, the cached dict is returned as-is (its ``timestamp``
+    is the time the sweep ran, so callers can see the cache age). On a
+    miss, all component checks run in parallel and the result is stored.
+    No lock: a concurrent miss runs at most one extra sweep, which is
+    acceptable.
+
     Returns:
         Health check results
     """
+    cached = _health_cache.get("sweep")
+    if cached is not None:
+        return cached
+
     start = time.perf_counter()
-    
+
     # Basic system health
     result = {
         "status": HealthStatus.HEALTHY.value,
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "version": __version__
     }
-    
-    if include_dependencies:
-        # Map check coroutines to their component names for error handling
-        check_definitions = [
-            ("qdrant", check_qdrant_health()),
-            ("gemini_api", check_gemini_health()),
-            ("embeddings", check_embeddings_health()),
-            ("cache", check_cache_health()),
-            ("sqlite_cache", check_sqlite_cache_health()),
-        ]
-        
-        # Run component checks in parallel
-        checks = await asyncio.gather(
-            *[check for _, check in check_definitions],
-            return_exceptions=True
-        )
-        
-        components = []
-        overall_status = HealthStatus.HEALTHY
-        
-        for (component_name, _), check in zip(check_definitions, checks):
-            if isinstance(check, Exception):
-                logger.error(f"Health check failed for {component_name}: {check}", exc_info=True)
-                components.append(
-                    ComponentHealth(
-                        name=component_name,
-                        status=HealthStatus.UNHEALTHY,
-                        message="Check failed"
-                    ).to_dict()
-                )
+
+    # Map check coroutines to their component names for error handling
+    check_definitions = [
+        ("qdrant", check_qdrant_health()),
+        ("llm", check_llm_health()),
+        ("embeddings", check_embeddings_health()),
+        ("cache", check_cache_health()),
+        ("sqlite_cache", check_sqlite_cache_health()),
+    ]
+
+    # Run component checks in parallel
+    checks = await asyncio.gather(
+        *[check for _, check in check_definitions],
+        return_exceptions=True
+    )
+
+    components = []
+    overall_status = HealthStatus.HEALTHY
+
+    for (component_name, _), check in zip(check_definitions, checks):
+        if isinstance(check, Exception):
+            logger.error(f"Health check failed for {component_name}: {check}", exc_info=True)
+            components.append(
+                ComponentHealth(
+                    name=component_name,
+                    status=HealthStatus.UNHEALTHY,
+                    message="Check failed"
+                ).to_dict()
+            )
+            overall_status = HealthStatus.UNHEALTHY
+        else:
+            components.append(check.to_dict())
+            if check.status == HealthStatus.UNHEALTHY:
                 overall_status = HealthStatus.UNHEALTHY
-            else:
-                components.append(check.to_dict())
-                if check.status == HealthStatus.UNHEALTHY:
-                    overall_status = HealthStatus.UNHEALTHY
-                elif check.status == HealthStatus.DEGRADED and overall_status != HealthStatus.UNHEALTHY:
-                    overall_status = HealthStatus.DEGRADED
-        
-        result["status"] = overall_status.value
-        result["components"] = components
-    
+            elif check.status == HealthStatus.DEGRADED and overall_status != HealthStatus.UNHEALTHY:
+                overall_status = HealthStatus.DEGRADED
+
+    result["status"] = overall_status.value
+    result["components"] = components
+
     result["total_latency_ms"] = round((time.perf_counter() - start) * 1000, 2)
-    
+
+    _health_cache["sweep"] = result
+
     return result
 
 
@@ -317,35 +323,37 @@ async def liveness_check() -> Dict[str, Any]:
 
 async def readiness_check() -> Dict[str, Any]:
     """
-    Readiness check for Kubernetes probes.
-    Checks if the application is ready to receive traffic.
-    
-    This checks both:
-    1. Component initialization status (retriever, gemini_client initialized)
-    2. External dependency health (Qdrant, APIs)
+    Readiness check for Kubernetes probes and container orchestrators.
+
+    "Ready" means "can answer queries": all critical components
+    (retriever, LLM client, orchestrator) finished initializing. It does
+    NOT run the dependency sweep — transient dependency failures are
+    reported by /health and must not flap the readiness probe.
+
+    Status values:
+    - "ready"          — initialization complete
+    - "setup_required" — no LLM provider configured yet (first-run setup)
+    - "failed"         — initialization finished with errors
+    - "initializing"   — still starting up
+
+    Error details are never included: this endpoint is public.
     """
     from .lifespan import get_initialization_status
-    
-    init_status = get_initialization_status()
-    
-    # First check: Are critical components initialized?
-    if not init_status["complete"]:
-        return {
-            "ready": False,
-            "status": "initializing",
-            "message": "Service components still initializing",
-            "components": init_status["components"],
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        }
-    
-    # Second check: Are external dependencies healthy?
-    result = await run_health_checks(include_dependencies=True)
-    
-    # Consider unhealthy components for readiness
-    is_ready = result["status"] != HealthStatus.UNHEALTHY.value
-    
+
+    init = get_initialization_status()
+
+    if init["complete"]:
+        status = "ready"
+    elif init["setup_required"]:
+        status = "setup_required"
+    elif init["errors"]:
+        status = "failed"
+    else:
+        status = "initializing"
+
     return {
-        "ready": is_ready,
-        "status": result["status"],
+        "ready": status == "ready",
+        "status": status,
+        "components": init["components"],
         "timestamp": datetime.now(timezone.utc).isoformat()
     }

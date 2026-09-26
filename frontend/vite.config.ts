@@ -94,7 +94,7 @@ export default defineConfig(({ mode }) => {
               target: apiBase,
               changeOrigin: true,
               secure: proxySecure,
-              rewrite: () => "/health",
+              rewrite: () => "/v1/health",
               configure: setApiKeyOnProxy,
             },
             "/api/v1/settings": {
@@ -184,14 +184,14 @@ export default defineConfig(({ mode }) => {
           // graph, which is what Vite is good at.
           manualChunks(id) {
             if (!id.includes('node_modules')) return undefined;
-            // Eagerly-used React core + router + tiny radix primitives
-            // consumed by `Button` (which `TermsOfServicePopup` imports).
+            // Eagerly-used React core, router, and the small radix primitives
+            // imported by the app shell.
             if (/[\\/]node_modules[\\/](react|react-dom|scheduler|react-router|react-router-dom|@remix-run[\\/]router|@radix-ui[\\/]react-(?:slot|compose-refs))[\\/]/.test(id)) {
               return 'react-vendor';
             }
-            // Class-name / variant utilities used across every page.
+            // Class-name utilities used across every page.
             // Note: tailwindcss-animate is a build-time plugin, not a runtime dep — excluded.
-            if (/[\\/]node_modules[\\/](clsx|tailwind-merge|class-variance-authority)[\\/]/.test(id)) {
+            if (/[\\/]node_modules[\\/](clsx|tailwind-merge)[\\/]/.test(id)) {
               return 'vendor-utils';
             }
             // framer-motion is used by many components across eager + lazy boundaries.

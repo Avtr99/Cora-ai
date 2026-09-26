@@ -39,6 +39,7 @@ class BaseRAGClient:
     """Provider-agnostic RAG logic shared by all LLM clients.
 
     Subclasses must implement:
+    - ``circuit`` property — the provider's circuit breaker
     - ``model_main`` property
     - ``model_lite`` property
     - ``generate_text()`` — for agent LLM calls
@@ -46,11 +47,20 @@ class BaseRAGClient:
     """
 
     def __init__(self):
-        self._sqlite_cache = None  # Lazily set from lifespan initialization
+        self._sqlite_cache = None  # Lazily set via attach_sqlite_cache()
+
+    def attach_sqlite_cache(self, cache) -> None:
+        """Attach the shared SQLite query cache to this client."""
+        self._sqlite_cache = cache
 
     # ------------------------------------------------------------------
     # Properties — must be implemented by subclasses
     # ------------------------------------------------------------------
+
+    @property
+    def circuit(self):
+        """Circuit breaker guarding this client's provider calls."""
+        raise NotImplementedError
 
     @property
     def model_main(self) -> str:

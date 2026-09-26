@@ -30,8 +30,40 @@ fields used by the frontend to decide whether the chat is usable:
 - `warnings` — List of configuration warnings (missing keys, dimension mismatch,
   unreachable Qdrant, etc.).
 
-Backend reachability is determined separately by the frontend via the
-`/health` endpoint, not by `/settings/status`.
+The frontend checks backend reachability separately through
+`/api/cora-health`, not through `/settings/status`. Any HTTP 2xx response means
+"reachable", even when a component reports `degraded` or `unhealthy`.
+
+### Health endpoints (`src/api/health.py`)
+
+| Endpoint | Question | Auth | Cost |
+|---|---|---|---|
+| `/live` | Does the process serve HTTP? | public | none |
+| `/ready` | Can it answer queries? 200 or 503 | public | in-memory flags |
+| `/health` | Overall dependency status (`status`, `version`, `timestamp` only) | public | cached sweep |
+| `/v1/health`, `/api/cora-health` | Full component detail | API key when protection is on | cached sweep |
+
+- `run_health_checks()` runs the component checks in parallel. A module-level
+  `TTLCache` (`HEALTH_CACHE_TTL_SECONDS = 15`) stores the result. `timestamp` is
+  the time of the sweep, so callers can see the cache age.
+- `check_llm_health()` reports the `llm` component for the active client. It
+  reads `client.circuit`, a property that every LLM client must define.
+  `GeminiClient` returns `gemini_circuit`, `OpenAICompatibleClient` returns its
+  own circuit, and `FallbackLLMClient` returns the circuit of its primary. A
+  missing client (`None`) gives `unhealthy`. An open circuit gives `degraded`.
+  A client without `circuit` gives `unhealthy`. The check does not read
+  `GEMINI_API_KEY`.
+- `readiness_check()` returns `ready`, `status`, `components`, and `timestamp`.
+  `status` is `ready`, `setup_required`, `failed`, or `initializing`. It reads
+  only in-memory flags from `get_initialization_status()`, including
+  `setup_required`. The response never contains error text.
+- `attach_sqlite_cache()` on an LLM client attaches the SQLite query cache.
+  `FallbackLLMClient` passes the cache to both inner clients.
+- `src/api/lifespan.py::_finalize_initialization()` starts the async job
+  manager, runs schema discovery, and sets
+  `initialization_complete`. Startup calls it. `hot_swap_llm_client()` also calls
+  it when the app started in setup mode, so `/ready` becomes 200 without a
+  restart.
 
 ### Empty KB response flag
 
@@ -68,7 +100,8 @@ row metadata and document-type indexes.
 
 ### `useChatReadiness` hook
 
-`frontend/src/hooks/useChatReadiness.ts` uses an explicit `/health` check plus
+`frontend/src/hooks/useChatReadiness.ts` uses an explicit reachability check
+(`checkHealth()`, which returns `reachable` for any HTTP 2xx) plus
 `GET /api/v1/settings/status` to derive the readiness state. `config` and
 `documents` status queries are only enabled once the health check confirms the
 backend is reachable, and the hook treats a failed health query as `backendDown`
@@ -126,7 +159,7 @@ uses a subtle icon card instead of a warning emoji.
 
 | State | Trigger | Banner copy | Disabled placeholder |
 |-------|---------|-------------|---------------------|
-| Backend down | health endpoint fails | "Backend is offline — start the server to use chat." | "Start the backend to use chat" |
+| Backend down | health endpoint is unreachable or returns non-2xx | "Backend is offline — start the server to use chat." | "Start the backend to use chat" |
 | LLM not configured | backend up, LLM not set | "AI model not configured. Configure AI model" | "Configure an AI model to use chat" |
 | No answer source | backend + LLM ready, KB empty and web search off | "Chat needs documents or web search enabled to answer." | "Add documents or enable web search to use chat" |
 
@@ -135,22 +168,29 @@ uses a subtle icon card instead of a warning emoji.
 Backend:
 - `tests/test_api.py::TestAPI::test_config_status_returns_chat_readiness_fields`
   verifies the new status fields.
+- `tests/test_health.py` covers the sweep cache, `check_llm_health()`, and the
+  four `readiness_check()` statuses.
+- `tests/test_lifespan_hot_swap.py` verifies that a hot-swap in setup mode
+  completes initialization once.
+- `tests/test_api.py` covers `/live`, `/ready` (200 and 503), and the summary-only
+  `/health`.
 
 Frontend:
 - `frontend/src/components/chat/ChatReadinessBanner.test.tsx` structural smoke
   test.
+- `frontend/src/services/cora/healthCheck.test.ts` verifies that a 2xx response
+  with a `degraded` or `unhealthy` body counts as reachable.
 - Existing `vitest` suite covers the streaming / query services.
 
-Run the relevant suites:
+Run the relevant suites. Run from the repository root.
 
 ```powershell
 # Backend
-cd "d:/Cora ai"
 pytest tests/test_api.py tests/test_citation_manager.py
 ruff check src/api/settings_routes/ src/agents/kb_route_handler.py src/agents/orchestrator.py src/agents/streaming_orchestrator.py
 
 # Frontend
-cd "d:/Cora ai/frontend"
+cd frontend
 npm run test -- --run
 npm run lint
 npm run build
@@ -454,17 +494,20 @@ was simplified to 'Captured with Copernicus Sentinel-2'.
 
 ### Testing
 
+Run from the repository root.
+
 ```powershell
 # Frontend
-cd "d:/Cora ai/frontend"
+cd frontend
 npm run test -- --run
 npm run lint
 npm run build
+cd ..
 
 # Backend
-cd "d:/Cora ai"
 pytest tests/test_citation_renumber.py tests/test_citation_manager.py
 ruff check src/query_processing/citation_verifier.py src/agents/
+```
 
 ## `frontend/src/components/chat/useChatScroll.ts`
 
@@ -478,7 +521,6 @@ Tracks the scroll position of the chat container (default selector `[data-chat-s
 - `scrollToBottom` performs a smooth scroll and a one-time corrective frame because virtualized `scrollHeight` can change while rows are being measured.
 
 **Used by:** `ChatScrollButton`, `ChatInterface` (only the `CHAT_CANCEL_AUTOSCROLL` event constant).
-```
 
 ## Query Cache Key: Model + Corpus + Config Version
 

@@ -33,25 +33,92 @@ def mock_process_query_core():
 
 class TestAPI:
     def test_health_check(self, test_client):
-        """Test health check endpoint"""
-        from unittest.mock import patch
-        
-        # Mock the Qdrant health check to return healthy
-        with patch('src.api.main.run_health_checks') as mock_run_checks:
-            mock_run_checks.return_value = {
-                "status": "healthy",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "components": {
-                    "qdrant": {"status": "healthy"}
-                }
-            }
-            
+        """Public /health returns a summary only — no component detail."""
+        full_result = {
+            "status": "healthy",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "version": "0.0.0-test",
+            "components": [{"name": "qdrant", "status": "healthy"}],
+            "total_latency_ms": 1.23,
+        }
+
+        with patch("src.api.main.run_health_checks", new=AsyncMock(return_value=full_result)):
             response = test_client.get("/health")
-            assert response.status_code == 200
-            data = response.json()
-            # Health check should return 'healthy' or 'degraded' (if other services fail)
-            assert data["status"] in ["healthy", "degraded"]
-            assert "timestamp" in data
+
+        assert response.status_code == 200
+        data = response.json()
+        assert set(data.keys()) == {"status", "version", "timestamp"}
+        assert data["status"] == "healthy"
+        assert data["version"] == "0.0.0-test"
+
+    def test_v1_health_returns_full_detail(self, test_client):
+        """/v1/health keeps the full component detail."""
+        full_result = {
+            "status": "healthy",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "version": "0.0.0-test",
+            "components": [{"name": "qdrant", "status": "healthy"}],
+            "total_latency_ms": 1.23,
+        }
+
+        with patch("src.api.main.run_health_checks", new=AsyncMock(return_value=full_result)):
+            response = test_client.get("/v1/health")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["components"] == [{"name": "qdrant", "status": "healthy"}]
+        assert data["total_latency_ms"] == 1.23
+
+    def test_ready_returns_200_when_ready(self, test_client):
+        """/ready returns 200 when the app can answer queries."""
+        with patch("src.api.main.readiness_check") as mock_readiness:
+            mock_readiness.return_value = {
+                "ready": True,
+                "status": "ready",
+                "components": {
+                    "retriever": True,
+                    "llm_client": True,
+                    "rag_orchestrator": True,
+                    "citation_manager": True,
+                },
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+
+            response = test_client.get("/ready")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["ready"] is True
+        assert data["status"] == "ready"
+
+    def test_ready_returns_503_when_not_ready(self, test_client):
+        """/ready returns 503 with the status body when not ready."""
+        with patch("src.api.main.readiness_check") as mock_readiness:
+            mock_readiness.return_value = {
+                "ready": False,
+                "status": "setup_required",
+                "components": {
+                    "retriever": True,
+                    "llm_client": False,
+                    "rag_orchestrator": False,
+                    "citation_manager": True,
+                },
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+
+            response = test_client.get("/ready")
+
+        assert response.status_code == 503
+        data = response.json()
+        assert data["ready"] is False
+        assert data["status"] == "setup_required"
+
+    def test_live_returns_200(self, test_client):
+        """/live always returns 200 while the process is running."""
+        response = test_client.get("/live")
+
+        assert response.status_code == 200
+        assert response.json()["status"] == "alive"
 
     def test_cors_does_not_allow_credentials(self):
         from fastapi.middleware.cors import CORSMiddleware

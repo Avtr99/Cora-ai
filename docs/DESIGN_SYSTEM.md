@@ -176,23 +176,31 @@ Placeholder text: `placeholder:text-muted-foreground/70`
 - Hover: darken ~10%, `shadow-sm`, scale 1.03
 - Active: `scale-[0.98]`; Focus: focus-primary ring; Motion: `transition-all duration-200 ease-out`
 
-### Button (shadcn/ui)
+### Buttons
 
-| Variant | Description |
-|---|---|
-| `default` | Brand color background |
-| `destructive` | Red background |
-| `outline` | Transparent with border |
-| `secondary` | Secondary brand bg |
-| `ghost` | No bg until hover |
-| `link` | Text link with underline |
+There is **no shadcn `Button` component** in this repo. `components.json` is present and the shadcn theme CSS variables are in `src/index.css`, but only the Radix primitives were generated (`dialog`, `popover`, `select`, `hover-card`). Every button is hand-written Tailwind. Two conventions cover nearly every call site.
 
-| Size | Classes |
+**Toolbar button** — search rows, card headers, `FilterDropdown`:
+
+`h-8 3xl:h-10 4xl:h-11 px-3 3xl:px-4 rounded-lg 3xl:rounded-xl border font-inter text-xs 3xl:text-[13px] 4xl:text-sm font-medium transition-all`
+
+| State | Classes |
 |---|---|
-| `default` | `h-10 px-4 py-2` |
-| `sm` | `h-9 rounded-md px-3` |
-| `lg` | `h-11 rounded-md px-8` |
-| `icon` | `h-10 w-10` |
+| Inactive | `bg-surface-card text-text-secondary border-border-ui hover:border-text-muted hover:bg-surface-subtle` |
+| Active (filter applied) | `bg-brand-900 text-white border-brand-900` |
+| Destructive | `bg-surface-card text-semantic-error-text border-semantic-error-border hover:bg-semantic-error-bg` |
+| Emphasis (banner CTA) | Inactive classes with `text-text-primary` |
+
+**Form button** — settings, onboarding, primary submit. Shared helpers in `src/components/settings/settingsPrimitives.tsx`:
+
+| Role | Classes |
+|---|---|
+| Primary | `px-5 py-2.5 rounded-lg bg-brand-700 text-white font-poppins text-sm font-semibold shadow-card-md hover:bg-brand-hover` |
+| Secondary | `px-5 py-2.5 rounded-lg border border-border-ui text-text-secondary font-poppins text-sm font-medium hover:bg-surface-subtle` |
+| Compact | `px-4 py-2 rounded-lg border border-border-ui bg-surface-card text-text-primary font-poppins text-sm font-medium hover:bg-surface-subtle` |
+| Large CTA (full-width submit, e.g. document upload) | `h-10 3xl:h-12 4xl:h-14 w-full rounded-lg 3xl:rounded-xl bg-brand-700 px-4 3xl:px-6 font-inter text-body-sm 3xl:text-[15px] 4xl:text-base font-semibold text-white hover:bg-brand-hover` |
+
+All buttons: `focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed`.
 
 ### CategoryCard
 - Base: white bg, `border border-[rgba(224,224,224,1)]`, `shadow-xs`, `rounded-2xl`

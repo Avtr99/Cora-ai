@@ -12,7 +12,7 @@ Main FastAPI application entry point. Routes and handlers are organized into:
 """
 from fastapi import FastAPI, HTTPException, Request, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import ORJSONResponse, StreamingResponse, FileResponse
+from fastapi.responses import JSONResponse, ORJSONResponse, StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ValidationError
 from typing import List, Dict, Any, Optional, Literal
@@ -91,11 +91,12 @@ app.add_middleware(
 
 # Add security middleware (security headers + optional API key auth)
 API_KEY_PROTECTED_PATHS = ["/v1", "/api", "/query"]
+API_KEY_EXCLUDED_PATHS = ["/health", "/live", "/ready", "/docs", "/redoc", "/openapi.json"]
 protected_paths = API_KEY_PROTECTED_PATHS if settings.ENABLE_API_KEY_PROTECTION else None
 app.add_middleware(
     SecurityMiddleware,
     protected_paths=protected_paths,
-    exclude_paths=["/health", "/live", "/ready", "/docs", "/redoc", "/openapi.json"]
+    exclude_paths=API_KEY_EXCLUDED_PATHS
 )
 
 # Add logging middleware
@@ -304,7 +305,7 @@ async def v1_get_query_async_status(job_id: str):
 @v1_router.get("/health")
 async def v1_health():
     """API v1 health check with component details."""
-    return await run_health_checks(include_dependencies=True)
+    return await run_health_checks()
 
 
 # =============================================================================
@@ -313,8 +314,9 @@ async def v1_health():
 
 @app.get("/health")
 async def health():
-    """Full health check with component details."""
-    return await run_health_checks(include_dependencies=True)
+    """Public summary health check (no component detail)."""
+    r = await run_health_checks()
+    return {"status": r["status"], "version": r["version"], "timestamp": r["timestamp"]}
 
 
 @app.get("/live")
@@ -330,9 +332,12 @@ async def live():
 async def ready():
     """
     Readiness probe endpoint for container orchestrators.
-    Checks if the application is ready to receive traffic.
+    Returns 200 when the app can answer queries, 503 otherwise.
     """
-    return await readiness_check()
+    result = await readiness_check()
+    if result["ready"]:
+        return result
+    return JSONResponse(status_code=503, content=result)
 
 
 @v1_router.get("/metrics")
@@ -405,8 +410,8 @@ app.include_router(public_router, prefix="/api")
 
 @app.get("/api/cora-health")
 async def api_cora_health():
-    """Health check alias for the SPA (maps to /health)."""
-    return await run_health_checks(include_dependencies=True)
+    """Health check alias for the SPA (maps to /v1/health — full component detail)."""
+    return await run_health_checks()
 
 @app.post("/api/cora-query")
 async def api_cora_query(query: Query, request: Request):

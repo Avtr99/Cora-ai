@@ -5,7 +5,10 @@ implement. Agents call ``generate_text()`` without knowing which provider is
 active.
 """
 
-from typing import Protocol, AsyncIterator, Optional, Any, runtime_checkable
+from typing import Protocol, AsyncIterator, Optional, Any, runtime_checkable, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..api.middleware.circuit_breaker import CircuitBreaker
 
 
 @runtime_checkable
@@ -16,6 +19,11 @@ class LLMClient(Protocol):
     - GeminiClient (via google-genai SDK)
     - OpenAICompatibleClient (via openai SDK — covers OpenAI, Ollama, OpenRouter, etc.)
     """
+
+    @property
+    def circuit(self) -> "CircuitBreaker":
+        """Circuit breaker guarding this client's provider calls."""
+        ...
 
     @property
     def model_main(self) -> str:
