@@ -91,19 +91,28 @@ The `app` process hosts:
 
 ### 3.1 Singleton lifecycle (`src/api/lifespan.py`)
 
-All heavy components are constructed **after** the server starts accepting connections, so health probes (`/health`) respond immediately even if a provider is unreachable. The `/ready` endpoint flips to `200` only when `initialization_complete == True`.
+All heavy components are constructed **after** the server starts accepting connections, so the liveness probe (`/live`) responds immediately even if a provider is unreachable. The Docker `HEALTHCHECK` uses `/live`. The `/ready` endpoint returns `503` until `initialization_complete == True`, then `200`. Its `status` field is `ready`, `setup_required` (no LLM configured), `failed` (initialization errors), or `initializing`. It never returns error text.
+
+A fresh install starts in setup mode without an LLM client. When the user saves an LLM in the UI, `hot_swap_llm_client()` calls `_finalize_initialization()`. This starts the async job manager and sets `initialization_complete`. No restart is necessary.
 
 ```
-startup
-  ├─ run_migrations()              ← SQLite schema (synchronous, blocking)
-  ├─ initialize_components()       ← async background task
-  │    ├─ LangChainRetriever       ← connects to Qdrant
-  │    ├─ LLMClient                  ← GeminiClient or OpenAICompatibleClient, validated lazily
-  │    ├─ StreamingRAGOrchestrator ← wires retriever + LLM + config
-  │    ├─ CitationManager
-  │    ├─ AsyncQueryJobManager     ← starts N worker tasks
-  │    └─ warmup_connections()     ← pre-warms Qdrant, Gemini, schema discovery, SQLite
-  └─ /ready becomes 200 once initialization_complete
+startup (lifespan)
+  ├─ run_migrations() + reload_settings()   ← SQLite schema (synchronous)
+  ├─ ensure_document_store_tables()         ← + recovery sweep (in_process dispatch only)
+  └─ initialize_components()                ← async background task
+       ├─ LangChainRetriever                ← connects to Qdrant
+       ├─ create_llm_client()               ← skipped in setup mode (setup_required = True)
+       ├─ _attach_sqlite_cache(client)      ← FallbackLLMClient passes it to both inner clients
+       ├─ _build_orchestrator(client)       ← StreamingRAGOrchestrator
+       ├─ CitationManager
+       ├─ publish client + orchestrator     ← under _llm_swap_lock
+       └─ _finalize_initialization()        ← async job workers + filter-field schema discovery
+            └─ initialization_complete = True → /ready 200 (503 before)
+
+hot_swap_llm_client()  (settings UI save)
+  ├─ create_llm_client() → _attach_sqlite_cache() → _build_orchestrator()
+  ├─ publish client + orchestrator under _llm_swap_lock; setup_required = False
+  └─ _finalize_initialization() if not initialization_complete
 ```
 
 Access in request handlers is via the module-level globals `retriever`, `llm_client`, `rag_orchestrator`, `citation_manager` — **not** via FastAPI's `Depends`. This is intentional: the lifespan owns them, and handlers read the globals. `get_gemini_client()` remains a backwards-compatible alias for `get_llm_client()`.
@@ -242,7 +251,7 @@ All external dependencies are swappable via env vars. The default stack uses hos
 | `SECRET_KEY` | **Auto-generated** | Signs conversation-history HMAC and pseudonymizes memory user IDs. Auto-generated on first run and persisted to SQLite. Set in `.env` only for multi-instance deployments that need to share signed history. |
 | `JWT_SECRET_KEY` | Only if auth endpoints are used | Optional |
 
-The app **starts successfully with no keys configured** — `/health` works, providers fail lazily on first use. This is by design, so health probes don't depend on external services.
+The app **starts successfully with no keys configured**. `/live` returns 200, `/ready` returns 503 `setup_required`, and providers fail lazily on first use. This is by design, so the container health probe does not depend on external services.
 
 ---
 
@@ -418,8 +427,9 @@ docker compose up -d --build
 #    Compose puts the SQLite DB on a named volume (cora_db_data) with WAL mode.
 
 # 3. Verify health
-curl http://127.0.0.1:8000/health    # liveness (always 200)
-curl http://127.0.0.1:8000/ready     # readiness (200 once initialized)
+curl http://127.0.0.1:8000/live      # liveness (200 while the process serves HTTP)
+curl http://127.0.0.1:8000/ready     # readiness (200 when it can answer queries, else 503)
+curl http://127.0.0.1:8000/health    # summary dependency status (cached 15s)
 
 # 4. Ingest documents (via running server — UI upload or POST /v1/documents)
 curl -X POST http://127.0.0.1:8000/v1/documents \

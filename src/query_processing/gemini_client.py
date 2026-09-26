@@ -74,6 +74,11 @@ class GeminiClient(BaseRAGClient):
         return getattr(settings, "GEMINI_MODEL_MAIN", "gemini-2.5-flash")
 
     @property
+    def circuit(self):
+        """LLMClient interface — shared Gemini circuit breaker."""
+        return gemini_circuit
+
+    @property
     def model_main(self) -> str:
         """LLMClient interface — alias for model_name."""
         return self.model_name

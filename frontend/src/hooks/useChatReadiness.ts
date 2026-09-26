@@ -75,7 +75,7 @@ export function useChatReadiness(): ChatReadiness {
     staleTime: 30_000,
     refetchOnWindowFocus: true,
     // Only fetch config when the backend is confirmed reachable.
-    enabled: healthQuery.data?.healthy === true,
+    enabled: healthQuery.data?.reachable === true,
   });
 
   const documentsQuery = useQuery({
@@ -87,7 +87,7 @@ export function useChatReadiness(): ChatReadiness {
       return hasActiveJobs ? 5000 : false;
     },
     staleTime: 30_000,
-    enabled: healthQuery.data?.healthy === true,
+    enabled: healthQuery.data?.reachable === true,
   });
 
   return useMemo<ChatReadiness>(() => {
@@ -96,7 +96,7 @@ export function useChatReadiness(): ChatReadiness {
 
     // Backend is considered down when the explicit health check fails, even if
     // TanStack Query still holds stale successful data from an earlier run.
-    const backendUp = !healthQuery.isError && healthQuery.data?.healthy === true;
+    const backendUp = !healthQuery.isError && healthQuery.data?.reachable === true;
     const backendDown = !backendUp;
 
     const pointsCount = config?.qdrant?.points_count;

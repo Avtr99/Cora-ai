@@ -146,7 +146,7 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({ document, isBu
             type="button"
             disabled={isDisabled}
             onClick={handleMarkReviewed}
-            className="inline-flex h-8 3xl:h-10 4xl:h-11 items-center gap-1.5 3xl:gap-2 rounded-lg 3xl:rounded-xl border border-semantic-success-border px-3 3xl:px-4 font-inter text-ui 3xl:text-[13px] 4xl:text-sm font-semibold text-semantic-success-text hover:bg-semantic-success-bg disabled:opacity-50"
+            className="inline-flex h-8 3xl:h-10 4xl:h-11 items-center gap-1.5 3xl:gap-2 rounded-lg 3xl:rounded-xl border border-semantic-success-border bg-surface-card px-3 3xl:px-4 font-inter text-xs 3xl:text-[13px] 4xl:text-sm font-medium text-semantic-success-text transition-all hover:bg-semantic-success-bg focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <CheckCircle2 className="h-3.5 w-3.5 3xl:h-4 3xl:w-4" />
             {isMarkingReviewed ? 'Marking...' : 'Mark reviewed'}

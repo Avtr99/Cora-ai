@@ -1,6 +1,6 @@
 import { HEALTH_CHECK_TIMEOUT_MS, HEALTH_ENDPOINT } from './config';
 
-export async function checkHealth(): Promise<{ status: string; healthy: boolean; httpStatus?: number }> {
+export async function checkHealth(): Promise<{ status: string; reachable: boolean; httpStatus?: number }> {
   const healthUrl = HEALTH_ENDPOINT;
 
   const controller = new AbortController();
@@ -18,20 +18,23 @@ export async function checkHealth(): Promise<{ status: string; healthy: boolean;
     if (!response.ok) {
       return {
         status: `http ${response.status} ${response.statusText}`,
-        healthy: false,
+        reachable: false,
         httpStatus: response.status,
       };
     }
 
+    // Any parseable 2xx response means the backend is reachable — even when a
+    // component reports degraded/unhealthy. Component detail belongs to the
+    // health/status UI, not the "is the backend up" gate.
     const data = await response.json();
     return {
       status: data.status || 'unknown',
-      healthy: data.status === 'healthy',
+      reachable: true,
       httpStatus: response.status,
     };
   } catch (error) {
     console.error('Health check failed:', error);
-    return { status: 'error', healthy: false };
+    return { status: 'error', reachable: false };
   } finally {
     clearTimeout(timeoutId);
   }

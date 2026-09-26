@@ -160,6 +160,37 @@ class TestAPIKeyProtection:
         response = client.get("/public")
         assert response.status_code == 200
 
+    def test_real_protected_and_excluded_lists(self):
+        """/health stays public while /v1/health requires an API key.
+
+        Uses the production path lists from src.api.main, proving that
+        excluding "/health" does not exempt "/v1/health" (prefix matching is
+        `path == excluded or path.startswith(excluded + "/")`).
+        """
+        from src.api.main import API_KEY_EXCLUDED_PATHS, API_KEY_PROTECTED_PATHS
+
+        app = FastAPI()
+
+        @app.get("/health")
+        def health():
+            return {"status": "ok"}
+
+        @app.get("/v1/health")
+        def v1_health():
+            return {"status": "ok"}
+
+        app.add_middleware(
+            SecurityMiddleware,
+            protected_paths=API_KEY_PROTECTED_PATHS,
+            exclude_paths=API_KEY_EXCLUDED_PATHS,
+        )
+        client = TestClient(app)
+
+        assert client.get("/health").status_code == 200
+        response = client.get("/v1/health")
+        assert response.status_code == 401
+        assert response.json()["error"] == "unauthorized"
+
 
 class TestRequestIDValidation:
     def test_valid_client_request_id_is_preserved(self, minimal_app: FastAPI):

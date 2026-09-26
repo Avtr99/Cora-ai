@@ -44,9 +44,17 @@ class FallbackLLMClient(BaseRAGClient):
         super().__init__()
         self.primary = primary
         self.fallback = fallback
-        # Note: _sqlite_cache is wired by lifespan on the inner clients (primary
-        # and fallback) directly. The wrapper never reads its own _sqlite_cache
-        # — persist_to_cache and check_query_cache both delegate to primary.
+
+    @property
+    def circuit(self):
+        """The primary provider's circuit breaker (fallback delegates calls to it)."""
+        return self.primary.circuit
+
+    def attach_sqlite_cache(self, cache) -> None:
+        """Attach the SQLite cache to the wrapper and both inner clients."""
+        super().attach_sqlite_cache(cache)
+        self.primary.attach_sqlite_cache(cache)
+        self.fallback.attach_sqlite_cache(cache)
 
     @property
     def model_main(self) -> str:

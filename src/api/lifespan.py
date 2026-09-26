@@ -31,23 +31,76 @@ _llm_swap_lock = asyncio.Lock()
 
 # Initialization state tracking
 initialization_complete = False
+setup_required = False  # True when the app booted without a configured LLM
 initialization_errors = []
 
 # Graceful shutdown state
 shutdown_event = asyncio.Event()
 
 
+async def _attach_sqlite_cache(client) -> None:
+    """Attach the shared SQLite query cache to an LLM client (non-critical).
+
+    ``FallbackLLMClient.attach_sqlite_cache`` propagates to its inner clients,
+    so callers only ever attach to the top-level client.
+    """
+    try:
+        from ..db.sqlite_cache import get_sqlite_cache
+        cache = await get_sqlite_cache()
+        if cache is not None:
+            client.attach_sqlite_cache(cache)
+    except Exception as e:
+        logger.warning(f"Failed to wire SQLite cache into LLM client (non-critical): {e}")
+
+
+async def _build_orchestrator(client):
+    """Build a StreamingRAGOrchestrator for ``client`` using the existing retriever.
+
+    Raises on failure — callers keep their own error handling (startup records
+    an init error; hot-swap returns a failure dict).
+    """
+    settings = get_settings()
+    from ..agents import OrchestratorConfig
+    from ..agents.streaming_orchestrator import StreamingRAGOrchestrator
+
+    orchestrator_config = OrchestratorConfig(
+        enable_rewriting=settings.ENABLE_QUERY_REWRITING,
+        use_quick_rewrite=settings.USE_QUICK_REWRITE,
+        enable_routing=settings.ENABLE_ROUTING,
+        retrieval_k=settings.ROUND1_K,
+        retrieval_threshold=settings.ROUND1_THRESHOLD,
+        retrieval_rounds=settings.DARTBOARD_ROUNDS,
+        kb_min_top_relevance_score=get_collection_threshold(
+            settings, "KB_MIN_TOP_RELEVANCE_SCORE"
+        ),
+        enable_web_search=settings.ENABLE_WEB_SEARCH,
+        enable_web_supplement_relevance_check=settings.ENABLE_WEB_SUPPLEMENT_RELEVANCE_CHECK,
+        web_supplement_relevance_confidence_threshold=getattr(
+            settings,
+            "WEB_SUPPLEMENT_RELEVANCE_CONFIDENCE_THRESHOLD",
+            0.8,
+        ),
+        enable_validation=settings.ENABLE_VALIDATION,
+        max_total_time_ms=settings.RAG_TIMEOUT_MS,
+    )
+
+    return await StreamingRAGOrchestrator.create(
+        llm_client=client,
+        retriever=retriever,
+        answer_generator=client,
+        config=orchestrator_config,
+    )
+
+
 async def initialize_components():
     """Initialize heavy components in background."""
-    global retriever, llm_client, rag_orchestrator, citation_manager, initialization_complete
+    global retriever, llm_client, rag_orchestrator, citation_manager, initialization_complete, setup_required
 
     # Clear previous initialization errors for fresh state
     initialization_errors.clear()
 
     # Import here to avoid triggering module-level get_settings() during app startup
     from ..retrieval.langchain_retriever import LangChainRetriever
-    from ..agents import OrchestratorConfig
-    from ..agents.streaming_orchestrator import StreamingRAGOrchestrator
     from ..citations import CitationManager
     
     settings = get_settings()
@@ -75,7 +128,8 @@ async def initialize_components():
     new_client = None
     new_orchestrator = None
     try:
-        if not is_llm_configured():
+        setup_required = not is_llm_configured()
+        if setup_required:
             logger.warning(
                 "No LLM provider configured. The app will start in setup mode. "
                 "Configure via /v1/settings/llm endpoint or .env file."
@@ -89,37 +143,13 @@ async def initialize_components():
         logger.error(error_msg, exc_info=True)
         initialization_errors.append({"component": "llm_client", "error": error_msg})
 
+    if new_client is not None:
+        await _attach_sqlite_cache(new_client)
+
     if retriever and new_client:
         try:
             logger.info("Initializing RAG Orchestrator...")
-
-            orchestrator_config = OrchestratorConfig(
-                enable_rewriting=settings.ENABLE_QUERY_REWRITING,
-                use_quick_rewrite=settings.USE_QUICK_REWRITE,
-                enable_routing=settings.ENABLE_ROUTING,
-                retrieval_k=settings.ROUND1_K,
-                retrieval_threshold=settings.ROUND1_THRESHOLD,
-                retrieval_rounds=settings.DARTBOARD_ROUNDS,
-                kb_min_top_relevance_score=get_collection_threshold(
-                    settings, "KB_MIN_TOP_RELEVANCE_SCORE"
-                ),
-                enable_web_search=settings.ENABLE_WEB_SEARCH,
-                enable_web_supplement_relevance_check=settings.ENABLE_WEB_SUPPLEMENT_RELEVANCE_CHECK,
-                web_supplement_relevance_confidence_threshold=getattr(
-                    settings,
-                    "WEB_SUPPLEMENT_RELEVANCE_CONFIDENCE_THRESHOLD",
-                    0.8,
-                ),
-                enable_validation=settings.ENABLE_VALIDATION,
-                max_total_time_ms=settings.RAG_TIMEOUT_MS,
-            )
-
-            new_orchestrator = await StreamingRAGOrchestrator.create(
-                llm_client=new_client,
-                retriever=retriever,
-                answer_generator=new_client,
-                config=orchestrator_config,
-            )
+            new_orchestrator = await _build_orchestrator(new_client)
             logger.info("RAG Orchestrator initialized successfully")
         except Exception as e:
             error_msg = f"Failed to initialize RAG Orchestrator: {type(e).__name__}: {str(e)}"
@@ -149,56 +179,57 @@ async def initialize_components():
 
     # Check critical components
     if retriever is None or llm_client is None or rag_orchestrator is None:
-        if not is_llm_configured():
+        if setup_required:
             logger.warning("LLM not configured — running in setup mode. Visit /setup to configure.")
         else:
             logger.critical("Critical components failed to initialize. Service cannot operate.")
             logger.critical(f"Initialization errors: {initialization_errors}")
         initialization_complete = False
     else:
+        await _finalize_initialization()
+
+
+async def _finalize_initialization() -> None:
+    """Complete initialization once all critical components exist.
+
+    Runs the steps that require a live retriever + LLM client + orchestrator:
+    start async query queue workers and pre-populate the filter-field schema
+    cache. Called from ``initialize_components()`` at startup and from
+    ``hot_swap_llm_client()`` when the app booted in setup mode (no LLM
+    configured at startup).
+    """
+    global initialization_complete
+
+    try:
+        settings = get_settings()
+
+        # Start async query queue workers (Phase 3)
+        async_job_manager = get_async_query_job_manager()
+        await async_job_manager.configure(
+            max_queue_size=settings.ASYNC_QUERY_QUEUE_MAX_SIZE,
+            job_ttl_seconds=settings.ASYNC_QUERY_JOB_TTL_SECONDS,
+        )
+        await async_job_manager.start(worker_count=settings.ASYNC_QUERY_WORKERS)
+
+        # Pre-populate the dynamic filter-field cache. This makes
+        # synchronous Qdrant scroll calls; doing it here (in a thread)
+        # keeps the first user query from blocking the event loop.
         try:
-            # Start async query queue workers (Phase 3)
-            async_job_manager = get_async_query_job_manager()
-            await async_job_manager.configure(
-                max_queue_size=settings.ASYNC_QUERY_QUEUE_MAX_SIZE,
-                job_ttl_seconds=settings.ASYNC_QUERY_JOB_TTL_SECONDS,
-            )
-            await async_job_manager.start(worker_count=settings.ASYNC_QUERY_WORKERS)
-
-            # Wire SQLite cache into LLM client for query-only cache lookups.
-            # For FallbackLLMClient, propagate to primary + fallback so delegated
-            # cache operations (persist_to_cache, check_query_cache) work correctly.
-            try:
-                from ..db.sqlite_cache import get_sqlite_cache
-                sqlite_cache = await get_sqlite_cache()
-                if llm_client is not None and sqlite_cache is not None:
-                    llm_client._sqlite_cache = sqlite_cache
-                    for inner in getattr(llm_client, "primary", None), getattr(llm_client, "fallback", None):
-                        if inner is not None:
-                            inner._sqlite_cache = sqlite_cache
-            except Exception as e:
-                logger.warning(f"Failed to wire SQLite cache into LLM client (non-critical): {e}")
-
-            # Pre-populate the dynamic filter-field cache. This makes
-            # synchronous Qdrant scroll calls; doing it here (in a thread)
-            # keeps the first user query from blocking the event loop.
-            try:
-                settings = get_settings()
-                collection_name = getattr(settings, "QDRANT_COLLECTION_NAME", None)
-                if collection_name:
-                    from ..retrieval.schema_discovery import discover_fields_from_payloads
-                    await asyncio.to_thread(discover_fields_from_payloads, collection_name)
-                    logger.info("Filter-field schema discovery completed")
-            except Exception as e:
-                logger.warning(f"Filter-field discovery failed (non-critical): {e}")
-
-            initialization_complete = True
-            logger.info("All components initialized successfully")
+            collection_name = getattr(settings, "QDRANT_COLLECTION_NAME", None)
+            if collection_name:
+                from ..retrieval.schema_discovery import discover_fields_from_payloads
+                await asyncio.to_thread(discover_fields_from_payloads, collection_name)
+                logger.info("Filter-field schema discovery completed")
         except Exception as e:
-            error_msg = f"Failed to initialize async query manager: {type(e).__name__}: {str(e)}"
-            logger.error(error_msg, exc_info=True)
-            initialization_errors.append({"component": "async_query_jobs", "error": error_msg})
-            initialization_complete = False
+            logger.warning(f"Filter-field discovery failed (non-critical): {e}")
+
+        initialization_complete = True
+        logger.info("All components initialized successfully")
+    except Exception as e:
+        error_msg = f"Failed to initialize async query manager: {type(e).__name__}: {str(e)}"
+        logger.error(error_msg, exc_info=True)
+        initialization_errors.append({"component": "async_query_jobs", "error": error_msg})
+        initialization_complete = False
 
 
 
@@ -324,7 +355,7 @@ async def hot_swap_llm_client() -> dict:
     Returns:
         Dict with success status and client type name, or error details.
     """
-    global llm_client, rag_orchestrator
+    global llm_client, rag_orchestrator, setup_required
 
     if not is_llm_configured():
         return {"success": False, "error": "No LLM provider configured"}
@@ -342,56 +373,14 @@ async def hot_swap_llm_client() -> dict:
             return {"success": False, "error": error_msg}
 
         # Wire SQLite cache into the new client (same as startup path).
-        # For FallbackLLMClient, propagate to primary + fallback so delegated
-        # cache operations (persist_to_cache, check_query_cache) work correctly.
-        try:
-            from ..db.sqlite_cache import get_sqlite_cache
-            sqlite_cache = await get_sqlite_cache()
-            if new_client is not None and sqlite_cache is not None:
-                new_client._sqlite_cache = sqlite_cache
-                # Propagate to inner clients if this is a wrapper
-                for inner in getattr(new_client, "primary", None), getattr(new_client, "fallback", None):
-                    if inner is not None:
-                        inner._sqlite_cache = sqlite_cache
-        except Exception as e:
-            logger.warning(f"Hot-swap: SQLite cache wiring failed (non-critical): {e}")
+        await _attach_sqlite_cache(new_client)
 
         new_orchestrator = None
         # Rebuild the orchestrator with the new client, reusing the existing
         # retriever and citation_manager.
         if retriever is not None:
             try:
-                settings = get_settings()
-                from ..agents import OrchestratorConfig
-                from ..agents.streaming_orchestrator import StreamingRAGOrchestrator
-
-                orchestrator_config = OrchestratorConfig(
-                    enable_rewriting=settings.ENABLE_QUERY_REWRITING,
-                    use_quick_rewrite=settings.USE_QUICK_REWRITE,
-                    enable_routing=settings.ENABLE_ROUTING,
-                    retrieval_k=settings.ROUND1_K,
-                    retrieval_threshold=settings.ROUND1_THRESHOLD,
-                    retrieval_rounds=settings.DARTBOARD_ROUNDS,
-                    kb_min_top_relevance_score=get_collection_threshold(
-                        settings, "KB_MIN_TOP_RELEVANCE_SCORE"
-                    ),
-                    enable_web_search=settings.ENABLE_WEB_SEARCH,
-                    enable_web_supplement_relevance_check=settings.ENABLE_WEB_SUPPLEMENT_RELEVANCE_CHECK,
-                    web_supplement_relevance_confidence_threshold=getattr(
-                        settings,
-                        "WEB_SUPPLEMENT_RELEVANCE_CONFIDENCE_THRESHOLD",
-                        0.8,
-                    ),
-                    enable_validation=settings.ENABLE_VALIDATION,
-                    max_total_time_ms=settings.RAG_TIMEOUT_MS,
-                )
-
-                new_orchestrator = await StreamingRAGOrchestrator.create(
-                    llm_client=new_client,
-                    retriever=retriever,
-                    answer_generator=new_client,
-                    config=orchestrator_config,
-                )
+                new_orchestrator = await _build_orchestrator(new_client)
                 logger.info("Hot-swap: RAG orchestrator rebuilt successfully")
             except Exception as e:
                 error_msg = f"Hot-swap: orchestrator rebuild failed: {type(e).__name__}: {e}"
@@ -405,6 +394,20 @@ async def hot_swap_llm_client() -> dict:
         llm_client = new_client
         if new_orchestrator is not None:
             rag_orchestrator = new_orchestrator
+        setup_required = False
+
+    # Setup-mode path: the app booted without an LLM, so the deferred
+    # initialization steps (job manager, schema discovery) never ran.
+    # Complete them now that all components exist.
+    if (
+        not initialization_complete
+        and retriever is not None
+        and llm_client is not None
+        and rag_orchestrator is not None
+    ):
+        logger.info("Hot-swap: completing deferred initialization")
+        await _finalize_initialization()
+
     return {
         "success": True,
         "client_type": type(new_client).__name__,
@@ -427,6 +430,7 @@ def get_initialization_status():
     """Get initialization status for health checks."""
     return {
         "complete": initialization_complete,
+        "setup_required": setup_required,
         "errors": initialization_errors,
         "components": {
             "retriever": retriever is not None,

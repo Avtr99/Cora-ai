@@ -121,6 +121,11 @@ class OpenAICompatibleClient(BaseRAGClient):
         return fallback
 
     @property
+    def circuit(self):
+        """LLMClient interface — dedicated circuit for this provider's base_url."""
+        return self._circuit
+
+    @property
     def model_main(self) -> str:
         return self._model_main
 

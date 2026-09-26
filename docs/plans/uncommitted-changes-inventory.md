@@ -124,7 +124,7 @@ Side-by-side comparison confirmed main's version is superior in every case.
 
 ## Execution summary
 
-1. Backed up 51 affected files to `D:\Cora ai_backup_20260706` (backup removed after verification)
+1. Backed up 51 affected files to a sibling backup directory outside the repository (backup removed after verification)
 2. `git reset --hard origin/main` — clean baseline with all main fixes
 3. Copied back 14 pure new-work tracked files from backup
 4. Re-applied 5 small changes on top of main (config_store, jobs, indexer, .gitignore, chatMessageCitations)

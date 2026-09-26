@@ -85,7 +85,7 @@ const OnboardingPage = (): JSX.Element => {
     checkHealth()
       .then((health) => {
         if (cancelled) return;
-        if (!health.healthy) {
+        if (!health.reachable) {
           setBackendDown(true);
           return;
         }
