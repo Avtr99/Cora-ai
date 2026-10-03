@@ -1,0 +1,13 @@
+{
+  // Threshold matches the old `npm audit --audit-level=high` step.
+  "high": true,
+  "allowlist": [
+    // braces stack-exhaustion DoS (GHSA-vfj7-8cjw-p6xm). Reached only through
+    // devDependencies: tailwindcss@3.4.x -> chokidar / micromatch -> braces.
+    // No patched release exists (braces@3.0.3 is latest); the only fix is
+    // tailwindcss@4, a breaking upgrade. The glob patterns are our own static
+    // tailwind content config at build time — no attacker input reaches them.
+    // Revisit on tailwindcss@4 migration.
+    "GHSA-vfj7-8cjw-p6xm"
+  ]
+}

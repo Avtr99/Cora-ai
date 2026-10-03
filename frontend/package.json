@@ -22,7 +22,7 @@
     "@tanstack/react-virtual": "^3.13.12",
     "clsx": "^2.1.1",
     "d3-geo": "^3.1.1",
-    "dompurify": "^3.4.12",
+    "dompurify": "^3.4.16",
     "framer-motion": "^12.7.4",
     "lucide-react": "^0.462.0",
     "prop-types": "^15.8.1",
@@ -46,7 +46,7 @@
     "js-yaml": "^4.3.2",
     "@babel/core": "^7.29.6",
     "minimatch": "^10.2.5",
-    "brace-expansion": "^5.0.8"
+    "brace-expansion": "^5.0.12"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.0",
@@ -58,6 +58,7 @@
     "@types/react-simple-maps": "^3.0.6",
     "@vitejs/plugin-react-swc": "^3.5.0",
     "@vitest/coverage-v8": "^4.1.11",
+    "audit-ci": "^7.1.0",
     "autoprefixer": "^10.4.20",
     "esbuild": "^0.28.1",
     "eslint": "^9.9.0",
