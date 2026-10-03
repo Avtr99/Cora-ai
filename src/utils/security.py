@@ -2,17 +2,13 @@
 Security utilities for path validation and input sanitization.
 
 This module provides functions to prevent path traversal attacks,
-validate file paths, and ensure the integrity of conversation history
-via HMAC signatures.
+validate file paths, and sanitize error messages and filenames.
 """
 import os
 import re
-import hmac
-import json
-import hashlib
 import logging
 from pathlib import Path
-from typing import Optional, List, Dict
+from typing import Optional, List
 
 
 logger = logging.getLogger(__name__)
@@ -251,91 +247,3 @@ def sanitize_error_message(error: str, context: str = "internal error") -> str:
         summary += f" ({exc_type})"
 
     return summary
-
-
-def sign_history(
-    history: List[Dict[str, str]], 
-    conversation_id: str, 
-    secret_key: str,
-    scope_key: str = "",
-    *,
-    allow_unsigned: bool = False,
-) -> str:
-    """
-    Sign conversation history, conversation ID, and scope using HMAC-SHA256.
-    
-    This ensures that:
-    1. History cannot be tampered with by the client.
-    2. History cannot be swapped between different conversations.
-    3. History is bound to the specific user/session scope if provided.
-    
-    Args:
-        history: List of messages (role, content)
-        conversation_id: Unique ID for the conversation
-        secret_key: Secret key for signing
-        scope_key: Optional scope identifier (e.g., user_id or session_id)
-        
-    Returns:
-        HMAC signature as a hexadecimal string. Only the message role/content
-        fields are included in the canonical payload; any additional keys on
-        history entries are ignored to keep signatures stable.
-    """
-    if not secret_key:
-        message = (
-            "Attempted to sign history but SECRET_KEY is not configured. "
-            "History signatures cannot be generated securely."
-        )
-        if allow_unsigned:
-            logger.warning(f"{message} Returning 'unsigned' placeholder for dev mode.")
-            return "unsigned"
-        raise RuntimeError(message)
-        
-    # Canonicalize the history to ensure stable signatures
-    canonical_history = [
-        {"role": m.get("role", ""), "content": m.get("content", "")}
-        for m in history
-    ]
-    
-    # Include conversation_id and scope in the payload to bind history
-    payload = {
-        "history": canonical_history,
-        "conversation_id": conversation_id,
-        "scope": scope_key if scope_key else "anonymous"
-    }
-    
-    payload_json = json.dumps(payload, sort_keys=True)
-    
-    return hmac.new(
-        secret_key.encode(),
-        payload_json.encode(),
-        hashlib.sha256
-    ).hexdigest()
-
-
-def verify_history_signature(
-    history: List[Dict[str, str]], 
-    conversation_id: str, 
-    signature: str, 
-    secret_key: str,
-    scope_key: str = ""
-) -> bool:
-    """
-    Verify the HMAC signature of conversation history, ID, and scope.
-    
-    Args:
-        history: List of messages
-        conversation_id: Unique ID for the conversation
-        signature: Hexadecimal signature to verify
-        secret_key: Secret key for signing
-        scope_key: Optional scope identifier
-        
-    Returns:
-        True if signature is valid, False otherwise
-    """
-    if not signature or not secret_key:
-        return False
-    if signature == "unsigned":
-        return False
-        
-    expected_signature = sign_history(history, conversation_id, secret_key, scope_key)
-    return hmac.compare_digest(expected_signature, signature)

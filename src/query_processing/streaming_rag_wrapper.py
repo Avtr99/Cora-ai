@@ -92,13 +92,13 @@ class StreamingRAGWrapper:
             query = sanitized_query
 
         from .post_processor import postprocess_answer
-        from .citation_verifier import (
-            deduplicate_inline_citations,
-            verify_citations,
-        )
+        from ..citations.check import check_citations, drop_markers
+        from ..citations.context import build_kb_context
+        from ..citations.markers import deduplicate_inline_citations
 
         try:
-            context_text, summaries, sources = self._base._prepare_context(vector_results)
+            ctx = build_kb_context(vector_results)
+            context_text, summaries, sources = ctx.text, ctx.summaries, ctx.sources
             context_fingerprint = self._base._build_context_fingerprint(
                 context_text, summaries, sources, resolved_query=resolved_query
             )
@@ -143,9 +143,25 @@ class StreamingRAGWrapper:
                 accumulated_answer, structured_mode=structured_mode
             )
 
-            # Verify and deduplicate citations in the final streamed answer.
-            if sources:
-                answer_text, _ = verify_citations(answer_text, sources)
+            # No retry while streaming — tokens are already sent. Check the
+            # final answer's marker numbers against the prompt's own
+            # <source index="N"> values and drop the invalid ones.
+            valid_kb_indices = {c.index for c in ctx.citations if c.index is not None}
+            if valid_kb_indices:
+                citation_errors = check_citations(
+                    answer_text, {"knowledge_base": valid_kb_indices}
+                )
+                if citation_errors:
+                    logger.info(
+                        "Dropping invalid streamed citation markers: {}",
+                        citation_errors,
+                    )
+                    answer_text = drop_markers(
+                        answer_text,
+                        lambda t, n: n in valid_kb_indices
+                        if t == "knowledge_base"
+                        else False,
+                    )
                 answer_text = deduplicate_inline_citations(answer_text)
 
             coverage_score = (
@@ -163,6 +179,7 @@ class StreamingRAGWrapper:
                 "sources": sources if sources else ["knowledge_base"],
                 "coverage_score": coverage_score,
                 "truncated": was_truncated,
+                "context_citations": [c.to_dict() for c in ctx.citations],
                 "meta": {
                     "model": self._base.model_main,
                     "tokens_in": None,

@@ -1,7 +1,6 @@
 """Shared query processing service used by API entry points."""
 
 import asyncio
-import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict
 
@@ -9,9 +8,10 @@ from fastapi import HTTPException, Request
 from loguru import logger
 
 from ..config import get_settings
+from ..db.chats import answer_id
 from ..db.revisions import get_revisions
+from ..citations.context import citations_from_result
 from ..query_processing.filter_extractor import extract_filters
-from ..utils.security import sign_history
 from ..agents.reasoning_formatter import create_timeout_response
 from .lifespan import (
     get_citation_manager,
@@ -20,12 +20,8 @@ from .lifespan import (
     get_retriever,
 )
 from .middleware import ThreatLevel, get_input_sanitizer, get_output_sanitizer
-from .query_history import (
-    format_history_string,
-    resolve_trusted_history,
-    sanitize_history_messages,
-)
-from .query_models import Message, Query, Response
+from .query_history import TurnContext, close_turn, format_history_string
+from .query_models import Query, Response
 from .query_sanitization import (
     log_blocked_threat,
     log_output_redaction,
@@ -35,17 +31,15 @@ from .query_sanitization import (
     sanitize_value,
 )
 
-HISTORY_CONTEXT_MAX_MESSAGES = 10  # The client's unsigned fallback history cap (FALLBACK_HISTORY_MAX) should be >= this.
-
 
 async def process_query_core(
     query: Query,
     request: Request,
+    ctx: TurnContext,
     *,
     include_reasoning: bool,
     include_metadata: bool,
     include_duration_ms: bool,
-    include_chat_history_in_orchestrator: bool,
 ) -> Response:
     """Shared query pipeline used by both API entry points."""
 
@@ -86,45 +80,24 @@ async def process_query_core(
         logger.warning("LLM client not initialized - service still starting up or not configured")
         raise HTTPException(status_code=503, detail="Service initializing or LLM not configured. Visit /setup to configure.")
 
-    # History scope key is reserved for future authenticated sessions.
-    # Currently None as no user auth is present.
-    history_scope_key = None
-
     settings = get_settings()
-    signing_secret = settings.SECRET_KEY
     timeout_ms = max(float(getattr(settings, "RAG_TIMEOUT_MS", 0) or 0), 0.0)
     timeout_seconds = timeout_ms / 1000.0
-    
-    original_history_present = bool(query.history)
-    history_window, history_verified = resolve_trusted_history(
-        query.history,
-        conversation_id=query.conversation_id,
-        history_signature=query.history_signature,
-        signing_secret=signing_secret,
-        scope_key=history_scope_key or "",
-        max_messages=HISTORY_CONTEXT_MAX_MESSAGES,
-    )
-
-    # Sanitize history once for both pipelines
-    cleaned_history = sanitize_history_messages(history_window)
-    scoped_history = cleaned_history
-
-    input_history_len = len(history_window) if history_window else 0
-    history_items_dropped = input_history_len - len(cleaned_history)
 
     if rag_orchestrator is not None:
         logger.debug("Using multi-agent RAG orchestrator")
-        
+
         # Orchestrator handles filter extraction internally to ensure
         # extracted filters take precedence over rewritten ones correctly.
         orchestrator_kwargs: Dict[str, Any] = {
             "query": safe_query,
             "metadata_filters": None,
         }
-        
-        if include_chat_history_in_orchestrator and scoped_history:
-            orchestrator_history = [{"role": m.role, "content": m.content} for m in scoped_history]
-            orchestrator_kwargs["chat_history"] = orchestrator_history
+
+        if ctx.history:
+            orchestrator_kwargs["chat_history"] = [
+                {"role": m.role, "content": m.content} for m in ctx.history
+            ]
 
         try:
             if timeout_seconds > 0:
@@ -151,8 +124,8 @@ async def process_query_core(
         if metadata_filters:
             logger.debug(f"Extracted filters: {metadata_filters}, cleaned query: '{cleaned_query}'")
 
-        if scoped_history:
-            history_context = format_history_string(scoped_history)
+        if ctx.history:
+            history_context = format_history_string(ctx.history)
             contextual_query = (
                 "Conversation history (context only):\n"
                 f"{history_context}\n\n"
@@ -173,12 +146,16 @@ async def process_query_core(
         )
 
         if citation_manager:
-            kb_citations = citation_manager.extract_citations_from_vector_results(
-                vector_results,
-                max_citations=5,
+            # Same canonical source records the prompt numbered — select the
+            # cited subset (and strip invalid markers) via finalize.
+            processed_results["citations"] = citations_from_result(processed_results)
+            citation_manager.finalize(
+                processed_results,
+                safe_query,
+                processed_results.get("coverage_score", 1.0),
             )
             citation_info = citation_manager.format_citations_for_response(
-                kb_citations,
+                processed_results["citations"],
                 include_snippets=True,
             )
             processed_results["citations"] = citation_info
@@ -201,30 +178,6 @@ async def process_query_core(
 
     log_output_redaction(request, redacted_items)
 
-    conversation_id = query.conversation_id or str(uuid.uuid4())
-
-    # Sign the exact request text the client sent, not the escaped/sanitized copy
-    # used for prompting. This makes the signature reproducible by the client.
-    new_history = []
-    if history_window:
-        new_history.extend([{"role": m.role, "content": m.content} for m in history_window])
-
-    new_history.append({"role": "user", "content": query.text})
-    new_history.append({"role": "assistant", "content": sanitized_answer})
-
-    new_history = new_history[-HISTORY_CONTEXT_MAX_MESSAGES:]
-
-    if signing_secret:
-        history_signature = sign_history(
-            new_history,
-            conversation_id,
-            signing_secret,
-            scope_key=history_scope_key or "",
-            allow_unsigned=False,
-        )
-    else:
-        history_signature = None
-
     sanitized_sources = sanitize_value(
         processed_results.get("sources") or ["knowledge_base"],
         output_sanitizer,
@@ -232,17 +185,11 @@ async def process_query_core(
     safe_sources = [str(s) for s in sanitized_sources if s] or ["knowledge_base"]
 
     sanitized_metadata = None
-    history_signals_triggered = history_items_dropped > 0 or (
-        history_verified is False and original_history_present
-    )
-
-    if include_metadata or history_signals_triggered:
+    if include_metadata:
         raw_metadata = processed_results.get("metadata") or {}
         sanitized_metadata = sanitize_metadata(
             raw_metadata,
             output_sanitizer,
-            history_verification_failed=original_history_present and not history_verified,
-            history_items_dropped=history_items_dropped,
             config_version=config_version,
         )
 
@@ -251,19 +198,25 @@ async def process_query_core(
         processed_results.get("suggested_prompts"), output_sanitizer
     )
 
-    return Response(
+    response = Response(
         answer=sanitized_answer,
         confidence=processed_results.get("confidence", 0.0),
         sources=safe_sources,
-        conversation_id=conversation_id,
+        conversation_id=ctx.conversation_id,
+        message_id=ctx.message_id,
+        answer_id=answer_id(ctx.message_id),
         timestamp=datetime.now(timezone.utc).isoformat(),
         citations=processed_results.get("citations"),
         reasoning_steps=sanitized_reasoning_steps,
         metadata=sanitized_metadata,
         quiz=sanitized_quiz,
         suggested_prompts=sanitized_suggested_prompts,
-        history_signature=history_signature,
-        history=[Message(**m) for m in new_history] if new_history else None,
         truncated=processed_results.get("truncated", False),
         config_version=config_version,
     )
+
+    # Store the turn from the raw result's failure shape (A8), not the
+    # sanitized response. ChatNotFound propagates.
+    await close_turn(ctx, query.text, response, processed_results)
+
+    return response

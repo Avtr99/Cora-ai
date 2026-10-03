@@ -42,12 +42,13 @@ def test_build_chunk_header_returns_empty_when_no_source(make_record):
     assert _build_chunk_header(record) == ""
 
 
-def test_chunk_markdown_prepends_header_to_markdown_chunks(document_store_env, monkeypatch, make_record):
+def test_chunk_markdown_prepends_header_to_headingless_markdown_chunks(document_store_env, monkeypatch, make_record):
+    """Heading-less markdown gets the record title prepended so every chunk
+    keeps its document identity."""
     from src.config import reset_settings_singleton
     from src.document_store.indexer import chunk_markdown
 
     monkeypatch.setenv("CHUNK_SIZE", "60")
-    monkeypatch.setenv("CHUNK_OVERLAP", "10")
     reset_settings_singleton()
 
     record = make_record(
@@ -71,6 +72,104 @@ def test_chunk_markdown_prepends_header_to_markdown_chunks(document_store_env, m
         assert chunk.page_content.startswith("VM0048: Monitoring\n\n"), chunk.page_content[:80]
         assert chunk.metadata["title"] == "VM0048: Monitoring"
         assert chunk.metadata["doc_store_id"] == "doc_test"
+
+
+def test_chunk_markdown_heading_context_comes_from_structure(document_store_env, monkeypatch, make_record):
+    """Headed chunks carry their heading ancestry (title + section path) via
+    contextualize() — no manual prepend, and the path lands in the ``section``
+    metadata that citations already read."""
+    from src.config import reset_settings_singleton
+    from src.document_store.indexer import chunk_markdown
+
+    monkeypatch.setenv("CHUNK_SIZE", "2000")
+    reset_settings_singleton()
+
+    record = make_record(
+        title="VM0048: Monitoring",
+        document_id="VM0048",
+        original_filename="VM0048.pdf",
+        converted_path="/tmp/VM0048.md",
+    )
+    text = (
+        "# VM0048: Monitoring\n\n"
+        "## Scope\n\n"
+        "Scope prose that says enough words to matter. " * 4
+        + "\n\n## Baseline\n\n"
+        + "Baseline prose describing the baseline scenario. " * 4
+    )
+
+    monkeypatch.setattr("src.document_store.indexer.read_markdown", lambda r: text)
+    monkeypatch.setattr("src.document_store.indexer.read_row_data_file", lambda r: ([], False))
+
+    chunks = chunk_markdown(record)
+    assert chunks
+    # Every chunk is anchored by the document title heading.
+    for chunk in chunks:
+        assert "VM0048: Monitoring" in chunk.page_content
+    # Section path is recorded; at least one chunk sits under a subsection.
+    sections = [c.metadata["section"] for c in chunks if c.metadata.get("section")]
+    assert any("Scope" in s or "Baseline" in s for s in sections)
+
+
+def test_chunk_markdown_keeps_tables_intact(document_store_env, monkeypatch, make_record):
+    """A large pipe table is chunked as a typed TableItem — no chunk may be a
+    bare separator/row fragment, and table chunks keep heading context."""
+    from src.config import reset_settings_singleton
+    from src.document_store.indexer import chunk_markdown
+
+    monkeypatch.setenv("CHUNK_SIZE", "300")
+    reset_settings_singleton()
+
+    record = make_record(
+        title="VM0015: Avoided Deforestation",
+        document_id="VM0015",
+        original_filename="VM0015.pdf",
+        converted_path="/tmp/VM0015.md",
+    )
+    rows = "\n".join(f"| parameter {i} | unit {i} | value {i} |" for i in range(40))
+    text = (
+        "# VM0015: Avoided Deforestation\n\n"
+        "## Parameters\n\n"
+        "Table 1: Parameters used in the methodology\n\n"
+        "| Parameter | Unit | Value |\n"
+        "|---|---|---|\n"
+        f"{rows}\n"
+    )
+
+    monkeypatch.setattr("src.document_store.indexer.read_markdown", lambda r: text)
+    monkeypatch.setattr("src.document_store.indexer.read_row_data_file", lambda r: ([], False))
+
+    chunks = chunk_markdown(record)
+    assert chunks
+    for chunk in chunks:
+        body = chunk.page_content
+        # No chunk may consist solely of separator/pipe-decoration lines.
+        nonblank = [ln for ln in body.splitlines() if ln.strip()]
+        assert not all(set(ln.strip()) <= set("|-: ") for ln in nonblank), body[:120]
+
+
+def test_chunk_markdown_populates_methodology_codes(document_store_env, monkeypatch, make_record):
+    """methodology_codes are still detected over the title + content."""
+    from src.config import reset_settings_singleton
+    from src.document_store.indexer import chunk_markdown
+
+    monkeypatch.setenv("CHUNK_SIZE", "2000")
+    reset_settings_singleton()
+
+    record = make_record(
+        title="VM0048: Monitoring",
+        document_id="VM0048",
+        original_filename="VM0048.pdf",
+        converted_path="/tmp/VM0048.md",
+    )
+    text = "# VM0048: Monitoring\n\nBody text discussing VM0048 requirements. " * 5
+
+    monkeypatch.setattr("src.document_store.indexer.read_markdown", lambda r: text)
+    monkeypatch.setattr("src.document_store.indexer.read_row_data_file", lambda r: ([], False))
+
+    chunks = chunk_markdown(record)
+    assert chunks
+    assert any("VM0048" in (c.metadata.get("methodology_codes") or []) for c in chunks)
 
 
 def test_chunk_markdown_prepends_header_to_dataset_rows(monkeypatch, make_record):
@@ -151,7 +250,6 @@ def test_chunk_markdown_first_chunk_keeps_existing_heading(document_store_env, m
     from src.document_store.indexer import chunk_markdown
 
     monkeypatch.setenv("CHUNK_SIZE", "100")
-    monkeypatch.setenv("CHUNK_OVERLAP", "10")
     reset_settings_singleton()
 
     record = make_record(
@@ -168,18 +266,18 @@ def test_chunk_markdown_first_chunk_keeps_existing_heading(document_store_env, m
     chunks = chunk_markdown(record)
     assert chunks
     first = chunks[0].page_content
-    assert first.startswith("VM0048: Monitoring\n\n")
-    assert "# VM0048: Monitoring" in first
+    # The title heading anchors the chunk via contextualize() — rendered as
+    # heading text, not raw markdown syntax.
+    assert "VM0048: Monitoring" in first
 
 
 def test_chunk_markdown_skips_header_when_no_source(document_store_env, monkeypatch, make_record):
-    """When both title and original_filename are empty, _prepend_header is a
-    no-op and chunks keep their original page_content (no empty-line prefix)."""
+    """When both title and original_filename are empty, the heading-less
+    fallback is a no-op and chunks keep their original page_content."""
     from src.config import reset_settings_singleton
     from src.document_store.indexer import chunk_markdown
 
     monkeypatch.setenv("CHUNK_SIZE", "100")
-    monkeypatch.setenv("CHUNK_OVERLAP", "10")
     reset_settings_singleton()
 
     record = make_record(
@@ -198,3 +296,35 @@ def test_chunk_markdown_skips_header_when_no_source(document_store_env, monkeypa
     for chunk in chunks:
         assert not chunk.page_content.startswith("\n\n")
         assert "Body text" in chunk.page_content
+
+
+def test_chunk_markdown_empty_text_returns_no_chunks(document_store_env, monkeypatch, make_record):
+    """An empty converted markdown yields zero chunks instead of a failed
+    parse."""
+    from src.document_store.indexer import chunk_markdown
+
+    record = make_record(converted_path="/tmp/empty.md")
+    monkeypatch.setattr("src.document_store.indexer.read_markdown", lambda r: "")
+    monkeypatch.setattr("src.document_store.indexer.read_row_data_file", lambda r: ([], False))
+
+    assert chunk_markdown(record) == []
+
+
+def test_chunk_markdown_malformed_markdown_still_chunks(document_store_env, monkeypatch, make_record):
+    """Malformed markdown (unclosed fence swallowing a table) must not crash
+    or lose the content — it degrades to bounded literal-text chunks."""
+    from src.document_store.indexer import chunk_markdown
+
+    record = make_record(
+        title="Doc",
+        original_filename="doc.pdf",
+        converted_path="/tmp/doc.md",
+    )
+    text = "# Doc\n\n```python\nunclosed code\n\n| a | b |\n|---|\n| 1 | 2\n\n---\n\ntail"
+
+    monkeypatch.setattr("src.document_store.indexer.read_markdown", lambda r: text)
+    monkeypatch.setattr("src.document_store.indexer.read_row_data_file", lambda r: ([], False))
+
+    chunks = chunk_markdown(record)
+    assert chunks
+    assert any("unclosed code" in c.page_content for c in chunks)

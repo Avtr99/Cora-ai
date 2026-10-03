@@ -32,19 +32,20 @@ const PrivacyPolicyPage: React.FC = () => {
       <LegalSection title="Information Collected and Stored" number={2}>
         <p className="font-semibold text-brand-primary">Local-First Data Storage</p>
         <p>
-          Cora AI does not require user accounts or logins. All data is stored locally on the
-          machine where the instance is deployed, using SQLite (for caches and metadata) and Qdrant
-          (for vector embeddings and conversation memory). No data leaves the machine unless an
-          external API provider is explicitly configured.
+          Each Cora AI instance has one built-in owner account. There is no sign-up. All data is
+          stored locally on the machine where the instance is deployed, using SQLite (for chats,
+          caches, and metadata) and Qdrant (for vector embeddings). No data leaves the machine
+          unless an external API provider is explicitly configured.
         </p>
 
         <p className="font-semibold text-brand-primary pt-2">Conversation History</p>
         <ul>
-          <li><strong>Chat messages:</strong> Your conversations are stored in the local Qdrant
-            instance under the <code>cora_memories</code> collection. User identifiers are
-            HMAC-hashed before storage for GDPR compliance.</li>
-          <li><strong>Session data:</strong> Chat sessions are stored locally in your browser via
-            local storage. You can clear this at any time from your browser settings.</li>
+          <li><strong>Chat messages:</strong> Your conversations are stored on the server in the
+            instance SQLite database under the owner account. They sync across the owner's devices.
+            Deleting a chat in the sidebar removes it from the server.</li>
+          <li><strong>Session data:</strong> When access-key protection is enabled, the server sets
+            one essential session cookie (<code>cora_session</code>). Sign-out deletes the session
+            on the server. The browser holds no chat data.</li>
         </ul>
 
         <p className="font-semibold text-brand-primary pt-2">Query and Cache Data</p>
@@ -159,10 +160,10 @@ const PrivacyPolicyPage: React.FC = () => {
             databases. The operator can query SQLite and Qdrant directly.</li>
           <li><strong>Right to Rectification:</strong> Request correction of inaccurate data stored
             in the system.</li>
-          <li><strong>Right to Erasure (Right to be Forgotten):</strong> You can clear your chat
-            history from your browser at any time. The operator can delete conversation memories via
-            the <code>DELETE /v1/memory/delete</code> API endpoint or by clearing the Qdrant
-            <code>cora_memories</code> collection.</li>
+          <li><strong>Right to Erasure (Right to be Forgotten):</strong> You can delete chats in
+            the sidebar, which removes them from the server. The operator can delete conversation
+            memories via the <code>DELETE /v1/memory/delete</code> API endpoint or by clearing the
+            Qdrant <code>cora_memories</code> collection.</li>
           <li><strong>Right to Data Portability:</strong> Data can be exported from SQLite (standard
             SQL dumps) and Qdrant (via the Qdrant API) in machine-readable formats.</li>
           <li><strong>Right to Object:</strong> Object to processing by disabling the relevant
@@ -178,8 +179,9 @@ const PrivacyPolicyPage: React.FC = () => {
           Data retention is controlled by the operator. The default behaviour is:
         </p>
         <ul>
-          <li><strong>Chat history:</strong> Stored in the browser's local storage until cleared by
-            the user. Conversation memory in Qdrant persists until explicitly deleted.</li>
+          <li><strong>Chat history:</strong> Stored in the instance SQLite database until you
+            delete the chat or the operator removes the data. Chats are included in the operator's
+            SQLite backup. Conversation memory in Qdrant persists until explicitly deleted.</li>
           <li><strong>Query cache:</strong> Automatically expires after 24 hours.</li>
           <li><strong>Embedding cache:</strong> Persists until the corresponding documents are
             deleted or the database is cleared.</li>

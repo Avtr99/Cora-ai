@@ -180,3 +180,5 @@ frontend/.screenshots/
 
 docs/SCALING_INGESTION.md
 docs/plans/self-hosting-hardening.md
+documentation.md
+docs/plans/table-aware-chunking.md

@@ -59,7 +59,15 @@ async def get_token(request: TokenRequest):
     ```
     """
     settings = get_settings()
-    if not settings.ENABLE_INSECURE_TOKEN_ENDPOINT:
+    # Requires API-key protection too: without it the endpoint is reachable
+    # by anyone who can hit the API, and it mints a JWT for ANY user_id —
+    # i.e. unauthenticated access to every user's memory. With protection on,
+    # only an instance-credential holder (X-API-Key or session cookie) can
+    # reach this handler in the first place.
+    if not (
+        settings.ENABLE_INSECURE_TOKEN_ENDPOINT
+        and settings.ENABLE_API_KEY_PROTECTION
+    ):
         raise HTTPException(status_code=404, detail="Endpoint not available")
     
     try:

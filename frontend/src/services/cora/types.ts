@@ -5,9 +5,8 @@ export type { AgentReasoningStep };
 export interface QueryRequest {
   text: string;
   conversation_id?: string;
+  message_id?: string;
   session_id?: string;
-  history?: ChatHistoryMessage[];
-  history_signature?: string; // HMAC signature for history verification
   include_debug?: boolean;
 }
 
@@ -19,6 +18,16 @@ export interface CitationDetail {
   section: string | null;
   url: string | null;
   snippet: string | null;
+  // The prompt position (N in [cite_kb: N] / [Web, cite: N]). Absent for
+  // marker-less citations (e.g. structured datasets).
+  index?: number;
+  // Which marker namespace `index` belongs to. A web result can carry
+  // source_type "knowledge_base" (file-like display classification) while
+  // still being numbered among web results.
+  marker_type?: 'knowledge_base' | 'web';
+  // Identity of the underlying document (doc store ID for KB chunks, URL
+  // for web results); chunks sharing it merge into one badge.
+  document_key?: string;
   // VCM metadata surfaced from the source document (registry, publisher,
   // version_number, document_id, methodology_codes, etc.). Present for KB
   // citations when the source carries VCM metadata; absent for web citations.
@@ -70,9 +79,6 @@ export interface ResponseMetadata {
   };
   timeout_reason?: string | null;
   total_time_ms: number;
-  // History verification warnings
-  history_verification_failed?: boolean;
-  history_items_dropped?: number;
   // True when the KB route retrieved zero documents and web search was disabled.
   kb_empty?: boolean;
 }
@@ -89,13 +95,13 @@ export interface QueryResponse {
   confidence: number;
   sources: string[];
   conversation_id: string;
+  message_id?: string;
+  answer_id?: string;
   timestamp: string;
   citations: CitationResponse | null;
   reasoning_steps: ReasoningStep[] | null;
   metadata?: ResponseMetadata;
   quiz: QuizResponse | null;
-  history_signature?: string; // HMAC signature for history verification
-  history?: ChatHistoryMessage[]; // Canonical signed history to echo on next turn (backend-windowed, bounded)
   suggested_prompts?: string[];
 }
 
@@ -104,19 +110,14 @@ export interface CoraResponse {
   confidence?: number;
   sources?: string[];
   conversationId?: string;
+  messageId?: string;
+  answerId?: string;
   timestamp?: string;
   agentReasoning?: AgentReasoningStep[];
   citations?: CitationResponse;
   metadata?: ResponseMetadata;
   quiz?: QuizResponse;
-  historySignature?: string; // HMAC signature for history verification
-  history?: ChatHistoryMessage[]; // Canonical signed history to echo on next turn (backend-windowed, bounded)
   suggestedPrompts?: string[];
-}
-
-export interface ChatHistoryMessage {
-  role: 'user' | 'assistant' | 'system';
-  content: string;
 }
 
 export interface QueryCoraOptions {

@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { decodeSourceLabel, parseCitationSources, preprocessContent } from './chatMessageCitations.utils';
+import {
+  buildCitationNumberMap,
+  markerNumbersToGlobal,
+  decodeSourceLabel,
+  parseCitationSources,
+  preprocessContent,
+} from './chatMessageCitations.utils';
 import type { CitationSource } from './CitationBadges';
 
 describe('decodeSourceLabel', () => {
@@ -235,5 +241,191 @@ describe('parseCitationSources', () => {
     expect(result).toEqual([
       { label: 'vm0047 arr v1.0', type: 'knowledge_base' },
     ] as CitationSource[]);
+  });
+
+  it('keeps two indexed details without document_key as separate badges', () => {
+    const result = parseCitationSources({
+      details: [
+        {
+          source_name: 'VM0007 Methodology',
+          source_type: 'knowledge_base',
+          index: 1,
+          marker_type: 'knowledge_base',
+        },
+        {
+          source_name: 'VM0007 Methodology',
+          source_type: 'knowledge_base',
+          index: 2,
+          marker_type: 'knowledge_base',
+        },
+      ],
+    });
+
+    expect(result).toHaveLength(2);
+    expect(result[0]).toEqual({
+      label: 'VM0007 Methodology',
+      type: 'knowledge_base',
+      indices: [1],
+      markerType: 'kb',
+    });
+    expect(result[1]).toEqual({
+      label: 'VM0007 Methodology',
+      type: 'knowledge_base',
+      indices: [2],
+      markerType: 'kb',
+    });
+  });
+
+  it('merges indexed details that share a document_key into one badge', () => {
+    const result = parseCitationSources({
+      details: [
+        {
+          source_name: 'VM0007 Methodology',
+          source_type: 'knowledge_base',
+          index: 1,
+          marker_type: 'knowledge_base',
+          document_key: 'key-a',
+          page_number: 2,
+        },
+        {
+          source_name: 'VM0042 Standard',
+          source_type: 'knowledge_base',
+          index: 2,
+          marker_type: 'knowledge_base',
+          document_key: 'key-b',
+        },
+        {
+          source_name: 'VM0007 Methodology',
+          source_type: 'knowledge_base',
+          index: 3,
+          marker_type: 'knowledge_base',
+          document_key: 'key-a',
+          page_number: 5,
+        },
+      ],
+    });
+
+    expect(result).toHaveLength(2);
+    expect(result[0]).toEqual({
+      label: 'VM0007 Methodology',
+      type: 'knowledge_base',
+      indices: [1, 3],
+      pages: [2, 5],
+      markerType: 'kb',
+    });
+    expect(result[1]).toEqual({
+      label: 'VM0042 Standard',
+      type: 'knowledge_base',
+      indices: [2],
+      markerType: 'kb',
+    });
+
+    const map = buildCitationNumberMap(result);
+    expect(map['kb:1']).toBe(1);
+    expect(map['kb:3']).toBe(1);
+    expect(map['kb:2']).toBe(2);
+  });
+
+  it('does not merge the same document_key across kb and web namespaces', () => {
+    const result = parseCitationSources({
+      details: [
+        {
+          source_name: 'Shared Doc',
+          source_type: 'knowledge_base',
+          index: 1,
+          marker_type: 'knowledge_base',
+          document_key: 'shared',
+        },
+        {
+          source_name: 'Example Article',
+          source_type: 'web',
+          url: 'https://example.com/a',
+          index: 1,
+          marker_type: 'web',
+          document_key: 'shared',
+        },
+      ],
+    });
+
+    expect(result).toHaveLength(2);
+    expect(result[0].markerType).toBe('kb');
+    expect(result[1].markerType).toBe('web');
+  });
+
+  it('still deduplicates identical unindexed details', () => {
+    const result = parseCitationSources({
+      details: [
+        { source_name: 'VM0007', source_type: 'knowledge_base' },
+        { source_name: 'VM0007', source_type: 'knowledge_base' },
+      ],
+    });
+
+    expect(result).toHaveLength(1);
+  });
+});
+
+describe('buildCitationNumberMap', () => {
+  it('maps kb:N marker keys to global source positions using the backend index', () => {
+    const sources: CitationSource[] = [
+      { label: 'Doc A', type: 'knowledge_base', indices: [1], markerType: 'kb' },
+      { label: 'Doc B', type: 'knowledge_base', indices: [2], markerType: 'kb' },
+      { label: 'example.com', url: 'https://example.com', type: 'web', indices: [1], markerType: 'web' },
+    ];
+
+    const map = buildCitationNumberMap(sources);
+
+    expect(map['kb:1']).toBe(1);
+    expect(map['kb:2']).toBe(2);
+    expect(map['web:1']).toBe(3);
+  });
+
+  it('handles sparse indices — the prompt index, not the list position, is the key', () => {
+    // Only chunk 7 was cited and shown; [cite_kb: 7] must still resolve.
+    const sources: CitationSource[] = [
+      { label: 'Doc G', type: 'knowledge_base', indices: [7], markerType: 'kb' },
+    ];
+
+    const map = buildCitationNumberMap(sources);
+
+    expect(map['kb:7']).toBe(1);
+    expect(map['kb:1']).toBeUndefined();
+  });
+
+  it('maps legacy unindexed payloads positionally per type', () => {
+    const sources: CitationSource[] = [
+      { label: 'Doc A', type: 'knowledge_base' },
+      { label: 'Doc B', type: 'knowledge_base' },
+      { label: 'example.com', url: 'https://example.com', type: 'web' },
+    ];
+
+    const map = buildCitationNumberMap(sources);
+
+    expect(map['kb:1']).toBe(1);
+    expect(map['kb:2']).toBe(2);
+    expect(map['web:1']).toBe(3);
+  });
+});
+
+describe('markerNumbersToGlobal', () => {
+  const map = buildCitationNumberMap([
+    // Ten chunks of one document merged into a single badge at position 1.
+    { label: 'Doc A', type: 'knowledge_base', indices: [1, 2, 3, 4, 5], markerType: 'kb' },
+    { label: 'Doc B', type: 'knowledge_base', indices: [6], markerType: 'kb' },
+    { label: 'example.com', url: 'https://example.com', type: 'web', indices: [1], markerType: 'web' },
+  ]);
+
+  it('collapses a marker list that resolves to one merged badge', () => {
+    // Model emitted [cite_kb: 1, 2, 3, 4, 5] — all the same document.
+    expect(markerNumbersToGlobal('kb', [1, 2, 3, 4, 5], map)).toEqual([1]);
+  });
+
+  it('keeps distinct badge positions in order and drops unmapped numbers', () => {
+    expect(markerNumbersToGlobal('kb', [1, 6, 99], map)).toEqual([1, 2]);
+    expect(markerNumbersToGlobal('web', [1], map)).toEqual([3]);
+  });
+
+  it('returns empty when nothing maps', () => {
+    expect(markerNumbersToGlobal('kb', [9], map)).toEqual([]);
+    expect(markerNumbersToGlobal('kb', [1], undefined)).toEqual([]);
   });
 });

@@ -7,6 +7,14 @@ export interface CitationSource {
   label: string;
   url?: string;
   type: 'knowledge_base' | 'web';
+  // Prompt positions (N in [cite_kb: N] / [Web, cite: N]) this badge answers
+  // to — several when chunks of the same document merged into one badge.
+  // Absent/empty for legacy payloads.
+  indices?: number[];
+  // Page numbers of the merged chunks, sorted ascending, when known.
+  pages?: number[];
+  // Which marker namespace `indices` belongs to ('kb' or 'web'), when known.
+  markerType?: 'kb' | 'web';
 }
 
 interface CitationBadgesProps {
@@ -153,6 +161,8 @@ const CitationBadge: React.FC<{ number: number; source: CitationSource }> = ({ n
   const displayName = getSourceDisplayName(source.label);
   const safeUrl = source.url ? sanitizeUrl(source.url) : null;
   const isKB = source.type === 'knowledge_base';
+  const pagesText = source.pages?.length ? `p. ${source.pages.join(', ')}` : '';
+  const titleLabel = pagesText ? `${source.label} (${pagesText})` : source.label;
 
   const badgeContent = (
     <>
@@ -171,6 +181,12 @@ const CitationBadge: React.FC<{ number: number; source: CitationSource }> = ({ n
       <span className="font-inter font-normal text-xs 3xl:text-sm 4xl:text-base leading-[1.4] text-text-primary truncate whitespace-nowrap min-w-0 max-w-[40vw] sm:max-w-[240px] md:max-w-[120px] lg:max-w-[150px] 3xl:max-w-[180px] 4xl:max-w-[220px]">
         {displayName}
       </span>
+      {/* Page numbers of the merged chunks */}
+      {source.pages?.length ? (
+        <span className="font-inter font-normal text-xs 3xl:text-sm 4xl:text-base leading-[1.4] text-text-muted whitespace-nowrap shrink-0">
+          {pagesText}
+        </span>
+      ) : null}
     </>
   );
 
@@ -184,8 +200,8 @@ const CitationBadge: React.FC<{ number: number; source: CitationSource }> = ({ n
         target="_blank"
         rel="noopener noreferrer"
         className={interactiveBadgeClass}
-        aria-label={`Open source ${source.label} (opens in a new tab)`}
-        title={`Open ${source.label}`}
+        aria-label={`Open source ${titleLabel} (opens in a new tab)`}
+        title={`Open ${titleLabel}`}
       >
         {badgeContent}
         <ExternalLink className="h-2.5 w-2.5 3xl:h-3 3xl:w-3 4xl:h-3.5 4xl:w-3.5 text-text-muted ml-0.5" />
@@ -195,7 +211,7 @@ const CitationBadge: React.FC<{ number: number; source: CitationSource }> = ({ n
   }
 
   return (
-    <span className={baseBadgeClass} title={source.label}>
+    <span className={baseBadgeClass} title={titleLabel}>
       {badgeContent}
     </span>
   );

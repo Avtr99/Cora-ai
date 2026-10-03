@@ -8,7 +8,22 @@ from typing import Any, Dict, List, Optional
 
 @dataclass
 class Citation:
-    """Represents a single citation with source information."""
+    """Represents a single citation with source information.
+
+    ``index`` is the prompt position (``N`` in ``<source index="N">`` /
+    ``[cite_kb: N]`` / ``[Web, cite: N]`` markers). ``None`` for citations
+    that exist without a marker (e.g. a structured dataset).
+
+    ``marker_type`` is the marker namespace the index belongs to —
+    ``"knowledge_base"`` or ``"web"``. A web result can carry
+    ``source_type="knowledge_base"`` (file-like display classification) while
+    still being numbered among web results, so the namespace is recorded
+    explicitly; it falls back to ``source_type`` when unset.
+
+    ``document_key`` is the identity of the underlying document — the doc
+    store ID for KB chunks, the URL for web results — used only to group
+    chunks of the same document for display.
+    """
 
     source_id: str
     source_name: str
@@ -19,9 +34,30 @@ class Citation:
     section: Optional[str] = None
     url: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
+    index: Optional[int] = None
+    marker_type: Optional[str] = None
+    document_key: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Citation":
+        """Rebuild a Citation from a ``to_dict()`` payload, tolerating missing keys."""
+        return cls(
+            source_id=str(data.get("source_id", "")),
+            source_name=str(data.get("source_name", "")),
+            source_type=str(data.get("source_type", "knowledge_base")),
+            content_snippet=str(data.get("content_snippet", "")),
+            relevance_score=float(data.get("relevance_score") or 0.0),
+            page_number=data.get("page_number"),
+            section=data.get("section"),
+            url=data.get("url"),
+            metadata=data.get("metadata"),
+            index=data.get("index"),
+            marker_type=data.get("marker_type"),
+            document_key=data.get("document_key"),
+        )
 
     def to_display_format(self) -> str:
         parts = [self.source_name]

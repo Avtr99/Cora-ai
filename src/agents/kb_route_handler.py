@@ -27,6 +27,7 @@ from .route_processor_utils import (
     source_name_from_metadata,
     try_serve_cached_answer,
 )
+from ..citations.context import citations_from_result
 from ..query_processing.fallback_answers import is_non_answer
 
 if TYPE_CHECKING:
@@ -279,12 +280,9 @@ class KBRouteHandler:
             }
         ))
         
-        # Extract citations
-        kb_citations = self.citation_manager.extract_citations_from_vector_results(
-            vector_results,
-            max_citations=5
-        )
-        result["citations"] = kb_citations
+        # Citations come from the prompt context itself — one per chunk the
+        # model saw, numbered exactly as its <source index="N"> tags.
+        result["citations"] = citations_from_result(result)
         
         # A structured scroll already visited every matching row, and the
         # answer generator has set coverage accordingly. Web search can only

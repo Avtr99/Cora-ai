@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Optional, List, Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 
 
 class Settings(BaseSettings):
@@ -83,8 +83,10 @@ class Settings(BaseSettings):
 
     # --- Chunking (indexing-time; see src/document_store/indexer.py) ---
     # A/B test winner (see CLAUDE.md); changing requires re-indexing existing documents.
+    # Docling HybridChunker treats this as a character budget via a
+    # char-counting tokenizer — there is no overlap knob; adjacent-context
+    # comes from merge_peers and the heading ancestry instead.
     CHUNK_SIZE: int = 1500
-    CHUNK_OVERLAP: int = 300
 
     # --- Multi-round retrieval (expansion-pool design; see CLAUDE.md) ---
     # Round 2 only expands the candidate pool before a single rerank pass — it is not a refinement pass.
@@ -138,9 +140,6 @@ class Settings(BaseSettings):
     ENABLE_VALIDATOR_PROMPT_REPETITION: bool = True
     PROMPT_REPETITION_CONTEXT_THRESHOLD: Optional[int] = 12000
 
-    # --- Citations ---
-    CITATION_MIN_RELEVANCE_SCORE: float = 0.3
-
     # --- Agent in-memory cache TTLs (dedup rapid-fire duplicates on warm instances) ---
     ROUTE_CACHE_TTL: int = 600
     REWRITE_CACHE_TTL: int = 600
@@ -163,10 +162,11 @@ class Settings(BaseSettings):
     # --- Security ---
     API_ACCESS_KEY: Optional[str] = None  # Optional key for protected endpoints
     CORS_ORIGINS: str = "http://localhost:3000,http://localhost:8080,http://localhost:8000,http://localhost:5000,http://localhost:5001"
-    SECRET_KEY: Optional[str] = None  # Required for history HMAC signing, validated on use
+    SECRET_KEY: Optional[str] = None  # Fallback for memory anonymization (MEMORY_SECRET_KEY preferred); auto-generated on first run
     MEMORY_SECRET_KEY: Optional[str] = None  # Preferred for memory anonymization; falls back to SECRET_KEY
     PII_REDACTION_ENABLED: bool = True  # GDPR compliance before memory storage
     ENABLE_API_KEY_PROTECTION: bool = False
+    AUTH_COOKIE_SECURE: bool = True  # Set false only for plain-HTTP testing (Safari on http://localhost, LAN IPs)
     ENABLE_TEST_ENDPOINT: bool = False  # Dev-only test query endpoint
     MAX_REQUEST_BODY_SIZE_BYTES: int = 5 * 1024 * 1024
 
@@ -257,7 +257,7 @@ class Settings(BaseSettings):
         "CONVERSATIONAL_MAX_OUTPUT_TOKENS", "SUBQUERY_CANDIDATES",
         "DOCUMENT_INGESTION_CONCURRENCY", "EMBEDDING_BATCH_SIZE",
         "QDRANT_UPSERT_BATCH_SIZE", "INGEST_WORKER_STALE_SWEEP_EVERY_N_POLLS",
-        "CHUNK_SIZE", "CHUNK_OVERLAP",
+        "CHUNK_SIZE",
     )
     @classmethod
     def validate_positive_int(cls, v: int, info) -> int:
@@ -301,6 +301,16 @@ class Settings(BaseSettings):
             )
         return mode
 
+    @model_validator(mode="after")
+    def validate_api_access_key(self) -> "Settings":
+        """Require a strong API_ACCESS_KEY when endpoint protection is enabled."""
+        if self.ENABLE_API_KEY_PROTECTION and len(self.API_ACCESS_KEY or "") < 32:
+            raise ValueError(
+                'ENABLE_API_KEY_PROTECTION=true requires API_ACCESS_KEY with at least 32 characters. '
+                'Generate one with: python -c "import secrets; print(secrets.token_hex(32))"'
+            )
+        return self
+
     _validated_filter_fields: Optional[List[str]] = None
 
     def get_validated_allowed_filter_fields(self) -> List[str]:
@@ -330,7 +340,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         env_ignore_empty=True,
-        extra="ignore"
+        extra="ignore",
+        hide_input_in_errors=True,
     )
 
 

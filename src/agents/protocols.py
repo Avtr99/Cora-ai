@@ -4,9 +4,12 @@ Centralises runtime-checkable protocols used by route handlers and the
 orchestrator so they are defined once and imported consistently.
 """
 
-from typing import Any, Dict, List, NotRequired, Optional, Protocol, TypedDict, runtime_checkable
+from typing import TYPE_CHECKING, Any, Dict, List, NotRequired, Optional, Protocol, TypedDict, runtime_checkable
 
 from ..query_processing.fallback_answers import is_non_answer
+
+if TYPE_CHECKING:
+    from ..citations.context import KBContext
 
 
 @runtime_checkable
@@ -121,8 +124,7 @@ class WebSearchProtocol(Protocol):
     async def search_with_kb_context(
         self,
         query: str,
-        kb_context: str,
-        kb_sources: List[str],
+        kb: "KBContext",
         timeout_ms: Optional[int] = None,
     ) -> WebSearchResult:
         """Search with knowledge base context."""

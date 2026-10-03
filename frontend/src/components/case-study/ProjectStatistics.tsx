@@ -1,17 +1,13 @@
 import React, { useId } from 'react';
 import { CHIP, GAUGE } from '@/lib/colors';
 
-/** Parse a formatted number string (e.g. '211,636') into a number */
+/** Parse a formatted number string (e.g. '290,025') into a number */
 function parseFormattedNumber(value: string): number {
   return Number(value.replace(/,/g, '')) || 0;
 }
 
 interface ProjectStatisticsProps {
   carbonSequestered: string;
-  permanenceRisk: {
-    percentage: number;
-    label: string;
-  };
   bufferPool?: string;
   creditsIssued?: string;
   creditsRetired?: string;
@@ -27,7 +23,7 @@ const CreditChart = ({
   retiredPercent, 
   remainingPercent,
   source 
-}: { retiredPercent: number; remainingPercent: number; source: string }) => {
+}: { retiredPercent: number; remainingPercent: number; source?: string }) => {
   const chartTitleId = useId();
   const chartDescId = `${chartTitleId}-desc`;
 
@@ -114,9 +110,11 @@ const CreditChart = ({
         </div>
 
         {/* Source text */}
-        <div className="text-text-muted text-xs 3xl:text-[15px] 4xl:text-lg font-inter font-medium leading-[16px] 3xl:leading-[20px] text-center lg:text-right mt-1 lg:mt-2 3xl:mt-3">
-          Source: {source}
-        </div>
+        {source && (
+          <div className="text-text-muted text-xs 3xl:text-[15px] 4xl:text-lg font-inter font-medium leading-[16px] 3xl:leading-[20px] text-center lg:text-right mt-1 lg:mt-2 3xl:mt-3">
+            Source: {source}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -128,17 +126,16 @@ const CreditChart = ({
  */
 export const ProjectStatistics = ({
   carbonSequestered,
-  permanenceRisk,
-  bufferPool = '32,882',
-  creditsIssued = '211,636',
-  creditsRetired = '167,291',
-  source = 'VCS',
+  bufferPool,
+  creditsIssued,
+  creditsRetired,
+  source,
 }: ProjectStatisticsProps) => {
   const labelId = useId();
 
   // Compute actual retired percentage from credits data
-  const issued = parseFormattedNumber(creditsIssued);
-  const retired = parseFormattedNumber(creditsRetired);
+  const issued = creditsIssued ? parseFormattedNumber(creditsIssued) : 0;
+  const retired = creditsRetired ? parseFormattedNumber(creditsRetired) : 0;
   const rawRetiredPercent = issued > 0 ? Math.round((retired / issued) * 100) : 0;
   const retiredPercent = Math.min(Math.max(rawRetiredPercent, 0), 100);
   const remainingPercent = 100 - retiredPercent;
@@ -157,24 +154,30 @@ export const ProjectStatistics = ({
             
             {/* Chips - wrapped together in a row */}
             <div className="flex flex-wrap gap-3 md:gap-5 3xl:gap-6 4xl:gap-8">
-              <div className="flex flex-col gap-0.5 3xl:gap-1">
-                <span className="text-text-muted text-xs md:text-xs 3xl:text-[15px] 4xl:text-lg font-inter font-medium">Buffer Pool</span>
-                <div className="flex items-center justify-center py-1 3xl:py-1.5 4xl:py-2 px-2.5 3xl:px-3.5 rounded-lg" style={{ backgroundColor: CHIP.positive.bg }}>
-                  <span className="font-inter font-semibold text-xs md:text-xs 3xl:text-[15px] 4xl:text-lg text-text-primary">{bufferPool}</span>
+              {bufferPool && (
+                <div className="flex flex-col gap-0.5 3xl:gap-1">
+                  <span className="text-text-muted text-xs md:text-xs 3xl:text-[15px] 4xl:text-lg font-inter font-medium">Buffer Pool</span>
+                  <div className="flex items-center justify-center py-1 3xl:py-1.5 4xl:py-2 px-2.5 3xl:px-3.5 rounded-lg" style={{ backgroundColor: CHIP.positive.bg }}>
+                    <span className="font-inter font-semibold text-xs md:text-xs 3xl:text-[15px] 4xl:text-lg text-text-primary">{bufferPool}</span>
+                  </div>
                 </div>
-              </div>
-              <div className="flex flex-col gap-0.5 3xl:gap-1">
-                <span className="text-text-muted text-xs md:text-xs 3xl:text-[15px] 4xl:text-lg font-inter font-medium">Credits issued</span>
-                <div className="flex items-center justify-center py-1 3xl:py-1.5 4xl:py-2 px-2.5 3xl:px-3.5 rounded-lg" style={{ backgroundColor: CHIP.neutral.bg }}>
-                  <span className="font-inter font-semibold text-xs md:text-xs 3xl:text-[15px] 4xl:text-lg text-text-primary">{creditsIssued}</span>
+              )}
+              {creditsIssued && (
+                <div className="flex flex-col gap-0.5 3xl:gap-1">
+                  <span className="text-text-muted text-xs md:text-xs 3xl:text-[15px] 4xl:text-lg font-inter font-medium">Credits issued</span>
+                  <div className="flex items-center justify-center py-1 3xl:py-1.5 4xl:py-2 px-2.5 3xl:px-3.5 rounded-lg" style={{ backgroundColor: CHIP.neutral.bg }}>
+                    <span className="font-inter font-semibold text-xs md:text-xs 3xl:text-[15px] 4xl:text-lg text-text-primary">{creditsIssued}</span>
+                  </div>
                 </div>
-              </div>
-              <div className="flex flex-col gap-0.5 3xl:gap-1">
-                <span className="text-text-muted text-xs md:text-xs 3xl:text-[15px] 4xl:text-lg font-inter font-medium">Credits retired</span>
-                <div className="flex items-center justify-center py-1 3xl:py-1.5 4xl:py-2 px-2.5 3xl:px-3.5 rounded-lg" style={{ backgroundColor: CHIP.info.bg }}>
-                  <span className="font-inter font-semibold text-xs md:text-xs 3xl:text-[15px] 4xl:text-lg text-text-primary">{creditsRetired}</span>
+              )}
+              {creditsRetired && (
+                <div className="flex flex-col gap-0.5 3xl:gap-1">
+                  <span className="text-text-muted text-xs md:text-xs 3xl:text-[15px] 4xl:text-lg font-inter font-medium">Credits retired</span>
+                  <div className="flex items-center justify-center py-1 3xl:py-1.5 4xl:py-2 px-2.5 3xl:px-3.5 rounded-lg" style={{ backgroundColor: CHIP.info.bg }}>
+                    <span className="font-inter font-semibold text-xs md:text-xs 3xl:text-[15px] 4xl:text-lg text-text-primary">{creditsRetired}</span>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
           

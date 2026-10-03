@@ -1,8 +1,8 @@
+import { apiFetch } from '../apiFetch';
 import { sanitizeInput } from '@/lib/security';
 import { API_STREAM_ENDPOINT, API_TIMEOUT_MS, ENABLE_DEBUG_REASONS, IS_PROD } from './config';
 import { buildAgentReasoning } from './agentReasoning';
 import {
-  ChatHistoryMessage,
   CoraResponse,
   QueryCoraOptions,
   QueryRequest,
@@ -18,7 +18,7 @@ import {
  * returning unexpected shapes. Only `answer` is required; every other
  * field gets a sensible default so the UI can degrade gracefully.
  */
-function validateQueryResponse(value: unknown): QueryResponse {
+export function validateQueryResponse(value: unknown): QueryResponse {
   if (value === null || typeof value !== 'object') {
     throw new Error('Invalid response: expected an object');
   }
@@ -36,43 +36,47 @@ function validateQueryResponse(value: unknown): QueryResponse {
       : [];
   };
 
-  const rawHistory = obj.history;
-  const history: ChatHistoryMessage[] | undefined =
-    Array.isArray(rawHistory) &&
-    rawHistory.every(
-      h =>
-        h &&
-        typeof h === 'object' &&
-        typeof (h as Record<string, unknown>).role === 'string' &&
-        typeof (h as Record<string, unknown>).content === 'string' &&
-        ((h as Record<string, unknown>).role === 'user' ||
-          (h as Record<string, unknown>).role === 'assistant' ||
-          (h as Record<string, unknown>).role === 'system')
-    )
-      ? (rawHistory as ChatHistoryMessage[])
-      : undefined;
-
   return {
     answer: obj.answer,
     confidence: typeof obj.confidence === 'number' ? obj.confidence : 0,
     sources: ensureArray('sources'),
     conversation_id: typeof obj.conversation_id === 'string' ? obj.conversation_id : '',
+    message_id: typeof obj.message_id === 'string' ? obj.message_id : undefined,
+    answer_id: typeof obj.answer_id === 'string' ? obj.answer_id : undefined,
     timestamp: typeof obj.timestamp === 'string' ? obj.timestamp : '',
     citations: (obj.citations as QueryResponse['citations']) ?? null,
     reasoning_steps: (obj.reasoning_steps as QueryResponse['reasoning_steps']) ?? null,
     metadata: obj.metadata as QueryResponse['metadata'],
     quiz: (obj.quiz as QueryResponse['quiz']) ?? null,
-    history_signature: typeof obj.history_signature === 'string' ? obj.history_signature : undefined,
-    history,
     suggested_prompts: ensureArray('suggested_prompts'),
+  };
+}
+
+/**
+ * Map a validated backend `QueryResponse` to the UI-facing `CoraResponse`.
+ * Shared by the live streaming path and the server-chat loader (chatsApi).
+ */
+export function toCoraResponse(result: QueryResponse): CoraResponse {
+  return {
+    text: result.answer,
+    confidence: result.confidence,
+    sources: result.sources,
+    conversationId: result.conversation_id,
+    messageId: result.message_id,
+    answerId: result.answer_id,
+    timestamp: result.timestamp,
+    agentReasoning: buildAgentReasoning(result),
+    citations: result.citations,
+    metadata: result.metadata,
+    quiz: result.quiz,
+    suggestedPrompts: result.suggested_prompts,
   };
 }
 
 export async function queryCoraStream(
   question: string,
   conversationId?: string,
-  history?: ChatHistoryMessage[],
-  historySignature?: string,
+  messageId?: string,
   callbacks: StreamingCallbacks = {},
   options: QueryCoraOptions = {}
 ): Promise<CoraResponse> {
@@ -120,12 +124,8 @@ export async function queryCoraStream(
   if (sanitizedConversationId) {
     requestBody.conversation_id = sanitizedConversationId;
   }
-  // Include conversation history for context-aware answers (max 50 messages)
-  if (history && history.length > 0) {
-    requestBody.history = history.slice(-50);
-  }
-  if (historySignature) {
-    requestBody.history_signature = historySignature;
+  if (messageId) {
+    requestBody.message_id = sanitizeInput(messageId);
   }
 
   const controller = new AbortController();
@@ -141,7 +141,7 @@ export async function queryCoraStream(
   try {
     timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
 
-    const response = await fetch(`${API_STREAM_ENDPOINT}?tokens=false`, {
+    const response = await apiFetch(`${API_STREAM_ENDPOINT}?tokens=false`, {
       method: 'POST',
       headers,
       body: JSON.stringify(requestBody),
@@ -185,22 +185,7 @@ export async function queryCoraStream(
     if (!contentType.includes('text/event-stream')) {
       console.warn('[SSE] Expected text/event-stream but got:', contentType);
       const rawResult = await response.json();
-      const result = validateQueryResponse(rawResult);
-      const agentReasoning = buildAgentReasoning(result);
-      const coraResponse: CoraResponse = {
-        text: result.answer,
-        confidence: result.confidence,
-        sources: result.sources,
-        conversationId: result.conversation_id,
-        timestamp: result.timestamp,
-        agentReasoning,
-        citations: result.citations,
-        metadata: result.metadata,
-        quiz: result.quiz,
-        historySignature: result.history_signature,
-        history: result.history,
-        suggestedPrompts: result.suggested_prompts,
-      };
+      const coraResponse = toCoraResponse(validateQueryResponse(rawResult));
       onResult?.(coraResponse);
       onDone?.();
       return coraResponse;
@@ -231,24 +216,6 @@ export async function queryCoraStream(
       }
 
       return event.status || 'processing';
-    };
-
-    const buildResultResponse = (result: QueryResponse): CoraResponse => {
-      const agentReasoning = buildAgentReasoning(result);
-      return {
-        text: result.answer,
-        confidence: result.confidence,
-        sources: result.sources,
-        conversationId: result.conversation_id,
-        timestamp: result.timestamp,
-        agentReasoning,
-        citations: result.citations,
-        metadata: result.metadata,
-        quiz: result.quiz,
-        historySignature: result.history_signature,
-        history: result.history,
-        suggestedPrompts: result.suggested_prompts,
-      };
     };
 
     const extractQueryResponse = (parsed: Record<string, unknown>): QueryResponse | null => {
@@ -400,7 +367,7 @@ export async function queryCoraStream(
               }
 
               case 'result': {
-                finalResponse = buildResultResponse(normalizedEvent.payload);
+                finalResponse = toCoraResponse(normalizedEvent.payload);
                 onResult?.(finalResponse);
                 break;
               }

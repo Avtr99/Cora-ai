@@ -1,9 +1,11 @@
 import React, { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Settings, BookOpen, Info } from 'lucide-react';
+import { Settings, BookOpen, Info, LogOut } from 'lucide-react';
 import { useClickAway } from '@/hooks/useClickAway';
 import SettingsDialog from '@/components/settings/SettingsDialog';
 import { useSettingsDialogStore } from '@/store/settingsDialogStore';
+import { useAuthStore } from '@/store/authStore';
+import { logout } from '@/services/authApi';
 
 interface UserMenuProps {
   isCollapsed: boolean;
@@ -16,6 +18,8 @@ export const UserMenu: React.FC<UserMenuProps> = ({ isCollapsed, isMobile, setMo
   const settingsOpen = useSettingsDialogStore((s) => s.open);
   const closeSettings = useSettingsDialogStore((s) => s.closeSettings);
   const openSettings = useSettingsDialogStore((s) => s.openSettings);
+  const authStatus = useAuthStore((s) => s.status);
+  const setAuthStatus = useAuthStore((s) => s.setStatus);
   const menuRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
@@ -54,6 +58,19 @@ export const UserMenu: React.FC<UserMenuProps> = ({ isCollapsed, isMobile, setMo
       setMobileOpen(false);
     }
     navigate('/onboarding');
+  };
+
+  const handleSignOut = async () => {
+    setOpen(false);
+    if (isMobile && setMobileOpen) {
+      setMobileOpen(false);
+    }
+    try {
+      await logout();
+    } catch (err) {
+      console.error('Sign-out failed:', err);
+    }
+    setAuthStatus('required');
   };
 
   return (
@@ -116,6 +133,16 @@ export const UserMenu: React.FC<UserMenuProps> = ({ isCollapsed, isMobile, setMo
               <BookOpen className="h-4 w-4 text-text-muted" strokeWidth={1.75} />
               Getting started guide
             </button>
+            {authStatus === 'authenticated' && (
+              <button
+                type="button"
+                onClick={() => void handleSignOut()}
+                className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 font-inter text-sm text-text-primary transition-colors hover:bg-surface-subtle text-left"
+              >
+                <LogOut className="h-4 w-4 text-text-muted" strokeWidth={1.75} />
+                Sign out
+              </button>
+            )}
           </div>
         )}
       </div>

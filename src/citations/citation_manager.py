@@ -10,14 +10,14 @@ from typing import Any, Dict, List, Optional
 from loguru import logger
 
 from ..query_processing.conversational_classifier import is_conversational_query
+from ..query_processing.fallback_answers import has_error_source_marker
+from .check import drop_markers, marker_type, select_cited
 from .config import (
     CitationConfig,
     _ALL_KB_EXTENSIONS,
-    _STOP_WORDS,
     _TRIVIAL_ANSWER_PATTERNS,
 )
 from .extractor import CitationExtractor
-from .filter import CitationFilter
 from .formatter import CitationFormatter
 from .models import Citation
 from .sanitizer import SnippetSanitizer
@@ -28,69 +28,76 @@ from .source_type import SourceTypeResolver
 class CitationManager:
     """
     Manages citations for RAG responses.
-    
-    Extracts, deduplicates, and formats citations from retrieval results.
-    """
-    
-    def __init__(
-        self,
-        min_relevance_score: float = 0.3,
-        config: Optional[CitationConfig] = None,
-    ):
-        self.config = config or CitationConfig(min_relevance_score=min_relevance_score)
-        self.min_relevance_score = self.config.min_relevance_score
-        self.safe_metadata_fields = {
-            "file_name", "original_filename", "parent_doc", "source", "page_number",
-            "section", "registry", "category", "document_id", "version_number", "title",
-            "publisher", "registry_document_id", "methodology_codes",
-        }
 
+    Citations carry the prompt's own numbering (``index`` + ``marker_type``);
+    ``finalize`` selects the cited subset and never renumbers.
+    """
+
+    def __init__(self, config: Optional[CitationConfig] = None):
+        self.config = config or CitationConfig()
         self._kb_extensions = _ALL_KB_EXTENSIONS
-        self._stop_words = _STOP_WORDS
 
         self._source_type_resolver = SourceTypeResolver(self.config)
         self._snippet_sanitizer = SnippetSanitizer()
         self._extractor = CitationExtractor(
             config=self.config,
-            safe_metadata_fields=self.safe_metadata_fields,
             source_type_resolver=self._source_type_resolver,
         )
-        self._filter = CitationFilter(self.config)
         self._formatter = CitationFormatter(self._snippet_sanitizer)
-
-    def _extract_extension(self, value: str) -> str:
-        return self._source_type_resolver._extract_extension(value)
-
-    def _determine_source_type(self, source: Dict[str, Any], title: str, url: str) -> str:
-        return self._source_type_resolver.resolve(source, title, url)
-
-    def extract_citations_from_vector_results(
-        self,
-        vector_results: Dict[str, Any],
-        max_citations: int = 5,
-    ) -> List[Citation]:
-        return self._extractor.extract_from_vector_results(
-            vector_results=vector_results,
-            max_citations=max_citations,
-        )
 
     def extract_citations_from_web_results(
         self,
         web_results: Dict[str, Any],
-        max_citations: int = 3,
     ) -> List[Citation]:
-        return self._extractor.extract_from_web_results(
-            web_results=web_results,
-            max_citations=max_citations,
-        )
+        return self._extractor.extract_from_web_results(web_results=web_results)
 
-    def merge_citations(
+    def finalize(
         self,
-        kb_citations: List[Citation],
-        web_citations: List[Citation],
-        max_total: int = 5,
-    ) -> List[Citation]:
-        return self._filter.merge(kb_citations, web_citations, max_total=max_total)
+        result: Dict[str, Any],
+        query: str,
+        coverage_score: float = 1.0,
+    ) -> None:
+        """Select the displayed citations from the answer's own markers.
+
+        ``result["citations"]`` must hold every citable Citation (KB context
+        chunks plus web results, each carrying ``index`` and ``marker_type``).
+        Marker numbers map one-to-one onto those indices — nothing is
+        renumbered, sorted, or capped here.
+        """
+        available = result.get("citations") or []
+        answer = result.get("answer") or ""
+
+        cited = select_cited(available, answer)
+        if self.should_suppress_citations(query, answer, cited, coverage_score):
+            cited = []
+            answer = drop_markers(answer, lambda _type, _n: False)
+        else:
+            keep = {
+                (marker_type(citation), citation.index)
+                for citation in cited
+                if citation.index is not None
+            }
+            answer = drop_markers(answer, lambda t, n: (t, n) in keep)
+
+        result["answer"] = answer
+        result["citations"] = cited
+        result["_citations_finalized"] = True
+
+        if cited:
+            sources = []
+            for citation in cited:
+                source_name = getattr(citation, "source_name", None)
+                if source_name is None:
+                    continue
+                if citation.source_type == "web":
+                    sources.append(source_name)
+                else:
+                    cleaned_name = clean_source_name(source_name)
+                    if cleaned_name and cleaned_name.strip():
+                        sources.append(cleaned_name)
+            result["sources"] = sources
+        elif not has_error_source_marker(result.get("sources")):
+            result["sources"] = []
 
     def _sanitize_snippet(self, snippet: str) -> str:
         return self._snippet_sanitizer.sanitize(snippet)
@@ -98,23 +105,6 @@ class CitationManager:
     @staticmethod
     def clean_source_name(name: str) -> str:
         return clean_source_name(name)
-
-    def _normalize_tokens(self, words: set) -> set:
-        return self._filter._normalize_tokens(words)
-
-    def filter_citations_by_answer(
-        self,
-        citations: List[Citation],
-        answer: str,
-        query: str = "",
-        min_match_threshold: int = 1,
-    ) -> List[Citation]:
-        return self._filter.filter_by_answer(
-            citations=citations,
-            answer=answer,
-            query=query,
-            min_match_threshold=min_match_threshold,
-        )
 
     @staticmethod
     def is_conversational_query(query: str) -> bool:

@@ -23,16 +23,18 @@ interface SearchBarProps {
 
 export const SearchBar: React.FC<SearchBarProps> = ({ onTypingStateChange, variant = 'composer' }) => {
   const [message, setMessage] = useState("");
-  const { sendMessage, stopActiveRequest, isTyping } = useChatContext();
+  const { sendMessage, stopActiveRequest, isTyping, isLoadingMessages } = useChatContext();
   const { chatReady, isLoading, disabledPlaceholder } = useChatReadiness();
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const isMobileViewport = useIsMobile();
   const shouldReduceMotion = useReducedMotion();
 
-  // The composer is disabled while the backend is unreachable or while the
-  // chat is not ready (no KB docs and no web search). Ongoing generations keep
-  // the stop button active.
-  const inputDisabled = isLoading || (!isTyping && !chatReady);
+  // The composer is disabled while the backend is unreachable, while the
+  // chat is not ready (no KB docs and no web search), or while the active
+  // chat's messages are still loading from the server. Ongoing generations
+  // keep the stop button active.
+  const inputDisabled = isLoading || isLoadingMessages || (!isTyping && !chatReady);
+  const inputPlaceholder = isLoadingMessages ? 'Loading chat...' : disabledPlaceholder;
 
   const handleTypeChar = (char: string) => {
     const ta = textareaRef.current;
@@ -198,9 +200,9 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onTypingStateChange, varia
               autoGrow(e.currentTarget, rowsLimit);
             }}
             onKeyDown={handleKeyDown}
-            placeholder={inputDisabled ? disabledPlaceholder : (isLarge ? "Ask me anything about the VCM" : "Type your message")}
+            placeholder={inputDisabled ? inputPlaceholder : (isLarge ? "Ask me anything about the VCM" : "Type your message")}
             aria-label="Chat message input"
-            title={inputDisabled ? disabledPlaceholder : "Enter to send • Shift+Enter for newline"}
+            title={inputDisabled ? inputPlaceholder : "Enter to send • Shift+Enter for newline"}
             enterKeyHint="send"
             autoCapitalize="sentences"
             disabled={inputDisabled}
@@ -214,7 +216,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onTypingStateChange, varia
           <motion.button
             aria-label={isTyping ? "Stop generating response" : "Send message"}
             onClick={isTyping ? handleStopRequest : handleSubmit}
-            title={inputDisabled ? disabledPlaceholder : (isTyping ? "Stop generating response" : "Enter to send • Shift+Enter for newline")}
+            title={inputDisabled ? inputPlaceholder : (isTyping ? "Stop generating response" : "Enter to send • Shift+Enter for newline")}
             disabled={inputDisabled || (!isTyping && message.trim() === '')}
             aria-busy={isTyping}
             className={`${buttonStyles.className} group`}

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { useActiveChat } from '@/store/chatStore.simple';
+import { useActiveChat, useChatStore } from '@/store/chatStore.simple';
 import { ChatMessageItem } from './ChatMessageItem';
 import { useScrollContainer } from './useScrollContainer';
 import { CHAT_CANCEL_AUTOSCROLL } from './useChatScroll';
@@ -23,6 +23,10 @@ const DEFAULT_MESSAGE_ESTIMATE_SIZE = 200;
  */
 export const ChatInterface: React.FC = () => {
   const activeChat = useActiveChat();
+  // True while this chat's messages are being fetched from the server.
+  const isLoadingMessages = useChatStore((state) =>
+    activeChat ? state.loadingChatIds.includes(activeChat.id) : false
+  );
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const { parentScrollRef, scrollContainer } = useScrollContainer(scrollContainerRef);
 
@@ -125,6 +129,19 @@ export const ChatInterface: React.FC = () => {
     window.addEventListener(CHAT_CANCEL_AUTOSCROLL, handleCancelAutoScroll);
     return () => window.removeEventListener(CHAT_CANCEL_AUTOSCROLL, handleCancelAutoScroll);
   }, []);
+
+  // Loading state: the chat exists on the server but its turns are still
+  // being fetched. Rendered instead of the empty state so the message area
+  // does not flash "Start the conversation" before the messages arrive.
+  if (activeChat && activeChat.messages.length === 0 && isLoadingMessages) {
+    return (
+      <div className="w-full flex-1 flex items-center justify-center">
+        <div className="animate-pulse text-text-muted font-inter text-sm 3xl:text-base 4xl:text-lg">
+          Loading chat...
+        </div>
+      </div>
+    );
+  }
 
   // Empty state
   if (!activeChat || activeChat.messages.length === 0) {

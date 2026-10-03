@@ -6,7 +6,7 @@ import { Copy, ExternalLink } from 'lucide-react';
 import type { Components } from 'react-markdown';
 import { sanitizeInput, sanitizeUrl } from '@/lib/security';
 import { CitationGroup, InlineCitationPill } from './chatMessageCitations';
-import { preprocessContent, CITATION_INTERNAL_URL } from './chatMessageCitations.utils';
+import { preprocessContent, markerNumbersToGlobal, CITATION_INTERNAL_URL } from './chatMessageCitations.utils';
 import { GlossaryHydrator } from './glossary/GlossaryHydrator';
 
 type MarkdownLinkProps = React.AnchorHTMLAttributes<HTMLAnchorElement> & {
@@ -82,10 +82,8 @@ const REMARK_PLUGINS = [remarkGfm];
 const REHYPE_PLUGINS = [rehypeSanitize];
 const DISALLOWED_ELEMENTS = ['script', 'style', 'iframe', 'object', 'embed', 'form', 'input', 'button'];
 
-export interface CitationNumberMap {
-  kb: number[];
-  web: number[];
-}
+/** Maps marker references ("kb:N" / "web:N") to 1-based source list positions. */
+export type CitationNumberMap = Record<string, number>;
 
 interface ChatMarkdownContentProps {
   content: string;
@@ -167,15 +165,9 @@ export const ChatMarkdownContent: React.FC<ChatMarkdownContentProps> = ({
             return null;
           }
 
-          // Map backend per-type numbers (KB 1..N, Web 1..M) to the single
+          // Map backend per-type numbers (kb:1..N, web:1..M) to the single
           // global sequence used by the source list.
-          const map = citationNumberMap;
-          const globalNumbers = localNumbers
-            .map((n: number) => {
-              const list = type === 'kb' ? map?.kb : map?.web;
-              return list && n >= 1 && n <= list.length ? list[n - 1] : undefined;
-            })
-            .filter((n: number | undefined): n is number => n !== undefined);
+          const globalNumbers = markerNumbersToGlobal(type, localNumbers, citationNumberMap);
 
           if (globalNumbers.length === 0) {
             return null;

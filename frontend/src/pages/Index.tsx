@@ -37,7 +37,7 @@ const PROMPT_CARDS = [
 
 const Index: React.FC = () => {
   const { isCollapsed } = useSidebar();
-  const { activeChat, isTyping, sendMessage, createNewChat } = useChatContext();
+  const { activeChat, isTyping, sendMessage, createNewChat, isLoadingMessages } = useChatContext();
   const { userProfile } = useUserContext();
   const isMobile = useIsMobile();
   const { chatReady } = useChatReadiness();
@@ -209,7 +209,7 @@ const Index: React.FC = () => {
               <div className="flex-grow flex flex-col relative">
                 <div className="flex-grow min-h-0">
                   <AnimatePresence mode="wait">
-                    {activeChat && activeChat.messages.length > 0 ? (
+                    {activeChat && (activeChat.messages.length > 0 || isLoadingMessages) ? (
                       <motion.div
                         key="chat-interface"
                         initial={{ opacity: 0, y: 20 }}

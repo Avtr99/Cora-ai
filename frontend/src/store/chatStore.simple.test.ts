@@ -1,30 +1,23 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { useChatStore, useActiveChat, useChatById } from './chatStore.simple';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { useChatStore, removeLegacyChatHistory } from './chatStore.simple';
+import { useAuthStore } from './authStore';
 import type { Chat } from './chatStore.types';
-
-// Mock validateAndSanitizeChatHistory to avoid importing DOMPurify
-vi.mock('./chatStore.utils', () => ({
-  validateAndSanitizeChatHistory: (data: Chat[]) => data,
-}));
 
 const createMockChat = (id: string, title: string = `Chat ${id}`): Chat => ({
   id,
   title,
   messages: [],
-  createdAt: new Date('2024-01-01'),
+  updatedAt: new Date('2024-01-01'),
   shownRecommendations: [],
+  messagesLoaded: true,
 });
 
 describe('useChatStore', () => {
   beforeEach(() => {
-    // Reset store to initial state before each test
-    useChatStore.setState({ chats: [], activeChatId: null });
-    // Clear localStorage
+    // Reset stores to initial state before each test
+    useChatStore.setState({ chats: [], activeChatId: null, listStatus: 'idle', loadingChatIds: [] });
+    useAuthStore.setState({ status: 'unknown' });
     localStorage.clear();
-  });
-
-  afterEach(() => {
-    vi.clearAllMocks();
   });
 
   describe('addChat', () => {
@@ -91,6 +84,31 @@ describe('useChatStore', () => {
     });
   });
 
+  describe('touchChat', () => {
+    it('applies updates, bumps updatedAt, and moves the chat to the top', () => {
+      const chat1 = createMockChat('chat-1');
+      const chat2 = createMockChat('chat-2');
+      useChatStore.setState({ chats: [chat1, chat2] });
+
+      useChatStore.getState().touchChat('chat-2', { title: 'New Title' });
+
+      const state = useChatStore.getState();
+      expect(state.chats[0].id).toBe('chat-2');
+      expect(state.chats[0].title).toBe('New Title');
+      expect(state.chats[0].updatedAt.getTime()).toBeGreaterThan(chat2.updatedAt.getTime());
+      expect(state.chats[1].id).toBe('chat-1');
+    });
+
+    it('does nothing for an unknown chat', () => {
+      const chat1 = createMockChat('chat-1');
+      useChatStore.setState({ chats: [chat1] });
+
+      useChatStore.getState().touchChat('missing', { title: 'X' });
+
+      expect(useChatStore.getState().chats[0].id).toBe('chat-1');
+    });
+  });
+
   describe('deleteChat', () => {
     it('removes a chat by ID', () => {
       const chat = createMockChat('chat-1');
@@ -122,15 +140,6 @@ describe('useChatStore', () => {
 
       expect(useChatStore.getState().activeChatId).toBe('chat-2');
     });
-
-    it('handles deleting non-existent chat gracefully', () => {
-      const chat = createMockChat('chat-1');
-      useChatStore.getState().addChat(chat);
-
-      useChatStore.getState().deleteChat('non-existent');
-
-      expect(useChatStore.getState().chats).toHaveLength(1);
-    });
   });
 
   describe('setActiveChat', () => {
@@ -141,18 +150,6 @@ describe('useChatStore', () => {
       useChatStore.getState().setActiveChat('chat-1');
 
       expect(useChatStore.getState().activeChatId).toBe('chat-1');
-    });
-
-    it('warns and does not set when chat does not exist', () => {
-      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-      useChatStore.getState().setActiveChat('non-existent');
-
-      expect(useChatStore.getState().activeChatId).toBeNull();
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('non-existent')
-      );
-      consoleSpy.mockRestore();
     });
 
     it('allows clearing active chat with null', () => {
@@ -168,8 +165,8 @@ describe('useChatStore', () => {
 
   describe('setChats', () => {
     it('replaces all chats', () => {
-      const chat1 = createMockChat('chat-1');
-      useChatStore.getState().addChat(chat1);
+      const chat = createMockChat('chat-1');
+      useChatStore.getState().addChat(chat);
 
       const newChats = [createMockChat('chat-3'), createMockChat('chat-4')];
       useChatStore.getState().setChats(newChats);
@@ -180,32 +177,82 @@ describe('useChatStore', () => {
   });
 
   describe('clearAll', () => {
-    it('removes all chats and clears active chat', () => {
+    it('resets chats, active chat, listStatus, and loading ids', () => {
+      const chat = createMockChat('chat-1');
+      useChatStore.getState().addChat(chat);
+      useChatStore.getState().setActiveChat('chat-1');
+      useChatStore.setState({ listStatus: 'ready', loadingChatIds: ['chat-1'] });
+
+      useChatStore.getState().clearAll();
+
+      const state = useChatStore.getState();
+      expect(state.chats).toHaveLength(0);
+      expect(state.activeChatId).toBeNull();
+      expect(state.listStatus).toBe('idle');
+      expect(state.loadingChatIds).toEqual([]);
+    });
+  });
+
+  describe('loading state', () => {
+    it('marks and unmarks a chat as loading', () => {
+      useChatStore.getState().markChatLoading('chat-1');
+      expect(useChatStore.getState().loadingChatIds).toEqual(['chat-1']);
+
+      // Idempotent while already loading
+      useChatStore.getState().markChatLoading('chat-1');
+      expect(useChatStore.getState().loadingChatIds).toEqual(['chat-1']);
+
+      useChatStore.getState().unmarkChatLoading('chat-1');
+      expect(useChatStore.getState().loadingChatIds).toEqual([]);
+    });
+  });
+
+  describe('memory-only persistence', () => {
+    it('does not write chat data to localStorage', () => {
       const chat = createMockChat('chat-1');
       useChatStore.getState().addChat(chat);
       useChatStore.getState().setActiveChat('chat-1');
 
-      useChatStore.getState().clearAll();
+      expect(localStorage.getItem('chat-history')).toBeNull();
+    });
+  });
 
-      expect(useChatStore.getState().chats).toHaveLength(0);
-      expect(useChatStore.getState().activeChatId).toBeNull();
+  describe('sign-out cleanup', () => {
+    it('clears the store when auth status becomes required', () => {
+      const chat = createMockChat('chat-1');
+      useChatStore.getState().addChat(chat);
+      useChatStore.getState().setActiveChat('chat-1');
+      useChatStore.setState({ listStatus: 'ready' });
+
+      useAuthStore.getState().setStatus('required');
+
+      const state = useChatStore.getState();
+      expect(state.chats).toHaveLength(0);
+      expect(state.activeChatId).toBeNull();
+      expect(state.listStatus).toBe('idle');
+    });
+
+    it('keeps the store for other auth transitions', () => {
+      const chat = createMockChat('chat-1');
+      useChatStore.getState().addChat(chat);
+
+      useAuthStore.getState().setStatus('authenticated');
+
+      expect(useChatStore.getState().chats).toHaveLength(1);
     });
   });
 });
 
 describe('useActiveChat', () => {
-  it('returns the active chat object', () => {
-    const chat: Chat = {
-      id: 'active-1',
-      title: 'Active Chat',
-      messages: [],
-      createdAt: new Date(),
-      shownRecommendations: [],
-    };
+  beforeEach(() => {
+    useChatStore.setState({ chats: [], activeChatId: null });
+    useAuthStore.setState({ status: 'unknown' });
+  });
 
+  it('returns the active chat object', () => {
+    const chat = createMockChat('active-1', 'Active Chat');
     useChatStore.setState({ chats: [chat], activeChatId: 'active-1' });
 
-    // useActiveChat is a hook - test via store state directly
     const activeChat = useChatStore.getState().chats.find(
       c => c.id === useChatStore.getState().activeChatId
     );
@@ -216,47 +263,22 @@ describe('useActiveChat', () => {
     useChatStore.setState({ chats: [], activeChatId: null });
     expect(useChatStore.getState().activeChatId).toBeNull();
   });
-
-  it('returns null when active chat ID does not exist', () => {
-    useChatStore.setState({ chats: [], activeChatId: 'missing' });
-    const activeChat = useChatStore.getState().chats.find(
-      c => c.id === 'missing'
-    );
-    expect(activeChat).toBeUndefined();
-  });
 });
 
-describe('useChatById', () => {
-  it('finds chat by ID', () => {
-    const chat: Chat = {
-      id: 'search-1',
-      title: 'Searchable',
-      messages: [],
-      createdAt: new Date(),
-      shownRecommendations: [],
-    };
-
-    useChatStore.setState({ chats: [chat] });
-
-    const found = useChatStore.getState().chats.find(c => c.id === 'search-1');
-    expect(found).toEqual(chat);
+describe('removeLegacyChatHistory', () => {
+  beforeEach(() => {
+    localStorage.clear();
   });
 
-  it('returns null for null chatId', () => {
-    const result = null; // Hook handles null internally
-    expect(result).toBeNull();
+  it('removes the old localStorage chat key', () => {
+    localStorage.setItem('chat-history', JSON.stringify({ state: { chats: [] } }));
+
+    removeLegacyChatHistory();
+
+    expect(localStorage.getItem('chat-history')).toBeNull();
   });
-});
 
-describe('store persistence', () => {
-  it('only persists chats array (not activeChatId)', () => {
-    const chat = createMockChat('persist-1');
-    useChatStore.setState({ chats: [chat], activeChatId: 'persist-1' });
-
-    // The persist middleware's partialize config should only save chats
-    // We verify by checking the store state structure
-    const state = useChatStore.getState();
-    expect(state.chats).toBeDefined();
-    expect(state.activeChatId).toBeDefined();
+  it('does not throw when the key is absent', () => {
+    expect(() => removeLegacyChatHistory()).not.toThrow();
   });
 });

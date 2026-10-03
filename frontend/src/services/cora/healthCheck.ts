@@ -1,3 +1,4 @@
+import { apiFetch } from '../apiFetch';
 import { HEALTH_CHECK_TIMEOUT_MS, HEALTH_ENDPOINT } from './config';
 
 export async function checkHealth(): Promise<{ status: string; reachable: boolean; httpStatus?: number }> {
@@ -10,7 +11,7 @@ export async function checkHealth(): Promise<{ status: string; reachable: boolea
     // Avoid stale cached responses from service workers or browser cache when
     // the backend has gone offline. A fresh health check is essential because
     // the chat UI prioritizes this signal over config/documents status.
-    const response = await fetch(
+    const response = await apiFetch(
       `${healthUrl}?_t=${Date.now()}`,
       { signal: controller.signal, cache: 'no-store' },
     );

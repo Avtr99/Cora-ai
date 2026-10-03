@@ -18,7 +18,7 @@ from loguru import logger
 from ..db import async_query_jobs as job_store
 
 
-JobProcessor = Callable[[Dict[str, Any], str], Awaitable[Dict[str, Any]]]
+JobProcessor = Callable[[Dict[str, Any], str, str], Awaitable[Dict[str, Any]]]
 MAX_PAYLOAD_BYTES = 32 * 1024
 _DEFAULT_INTERNAL_ERROR_MESSAGE = "Internal error processing query"
 
@@ -95,7 +95,6 @@ class AsyncQueryJobManager:
                 raise RuntimeError("Async query processor is not registered")
 
             self._shutdown_event.clear()
-            await asyncio.to_thread(job_store.ensure_schema)
             await self._recover_jobs()
             self._workers = [
                 asyncio.create_task(self._worker_loop(worker_id=i + 1))
@@ -138,8 +137,8 @@ class AsyncQueryJobManager:
 
         logger.info("Async query job manager stopped")
 
-    async def enqueue(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        """Enqueue a new async query job, or return an existing one by idempotency key."""
+    async def enqueue(self, payload: Dict[str, Any], user_id: str) -> Dict[str, Any]:
+        """Enqueue a new async query job for ``user_id``, or return an existing one by idempotency key."""
         if not self._running:
             raise RuntimeError("Async query service is not ready")
 
@@ -151,6 +150,7 @@ class AsyncQueryJobManager:
             if client_request_id:
                 existing = await asyncio.to_thread(
                     job_store.find_active_job_by_client_request_id,
+                    user_id,
                     client_request_id,
                     time.time(),
                 )
@@ -169,6 +169,7 @@ class AsyncQueryJobManager:
                 job_id,
                 validated_payload,
                 submitted_at,
+                user_id,
                 client_request_id,
             )
             self._queue.put_nowait(job_id)
@@ -180,9 +181,9 @@ class AsyncQueryJobManager:
                 "queue_depth": queue_depth + 1,
             }
 
-    async def get_job(self, job_id: str) -> Optional[Dict[str, Any]]:
-        """Get public job details by ID."""
-        return await asyncio.to_thread(job_store.get_job_public, job_id)
+    async def get_job(self, job_id: str, user_id: str) -> Optional[Dict[str, Any]]:
+        """Get public job details by ID, scoped to the owning user."""
+        return await asyncio.to_thread(job_store.get_job_public, job_id, user_id)
 
     async def _queue_depth(self) -> int:
         return await asyncio.to_thread(job_store.count_queued_jobs)
@@ -233,7 +234,7 @@ class AsyncQueryJobManager:
                 if not isinstance(payload, dict):
                     continue
 
-                result = await self._processor(payload, job_id)  # type: ignore[misc]
+                result = await self._processor(payload, job_id, job["user_id"])  # type: ignore[misc]
 
                 completed_at = _utc_now_iso()
                 expires_at = time.time() + self._job_ttl_seconds

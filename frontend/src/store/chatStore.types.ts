@@ -1,5 +1,5 @@
 import { RecommendationType } from '@/components/chat/RecommendationCard';
-import { ChatHistoryMessage, CitationResponse, ResponseMetadata, QuizResponse } from '@/services/cora/types';
+import { CitationResponse, ResponseMetadata, QuizResponse } from '@/services/cora/types';
 import { AgentReasoningStep } from '@/types/reasoning';
 
 export type { AgentReasoningStep };
@@ -27,17 +27,19 @@ export interface Message {
 }
 
 /**
- * Represents a chat conversation with messages and metadata
+ * Represents a chat conversation with messages and metadata.
+ *
+ * Chats persist on the server (Phase 7). The browser holds them in memory
+ * only: `messagesLoaded` is false for server-listed chats until their turns
+ * are fetched via the chats API.
  */
 export interface Chat {
   id: string;
   title: string;
   messages: Message[];
-  createdAt: Date;
+  updatedAt: Date;
   shownRecommendations: string[]; // Track specific recommendation IDs shown, not just topic types
-  backendConversationId?: string; // Canonical conversation ID returned by backend
-  historySignature?: string; // HMAC signature for history verification (from backend)
-  history?: ChatHistoryMessage[]; // Canonical signed history echoed by the backend (last 10 turns, backend-windowed)
+  messagesLoaded: boolean; // True once the chat's turns are in `messages` (server-loaded or created locally)
 }
 
 /**

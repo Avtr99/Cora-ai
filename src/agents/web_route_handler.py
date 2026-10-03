@@ -20,7 +20,12 @@ from .route_processor_utils import (
     derive_web_timeout_ms,
     normalize_sources,
 )
-from ..query_processing.fallback_answers import WEB_RETRIEVAL_FAILED_ANSWER
+from ..citations.context import build_kb_context
+from ..query_processing.fallback_answers import (
+    WEB_RETRIEVAL_FAILED_ANSWER,
+    is_non_answer,
+    is_refusal,
+)
 from ..utils.security import sanitize_error_message
 
 if TYPE_CHECKING:
@@ -86,7 +91,10 @@ class WebRouteHandler:
             result = await self.web_search.search(query, timeout_ms=web_timeout_ms)
             duration = (time.time() - step_start) * 1000
             timed_out = bool(result.get("timed_out"))
-            search_failed = not web_result_is_usable(result)
+            # Failures are the branches that set timed_out/error. A deliberate
+            # non-answer (NO_ANSWER_FOUND) sets neither — it is a valid result
+            # and must not get failed-response styling.
+            search_failed = timed_out or bool(result.get("error"))
 
             steps.append(AgentStep(
                 name="Web Search",
@@ -107,10 +115,7 @@ class WebRouteHandler:
                 sources = ["error_fallback"]
                 web_citations = []
             else:
-                web_citations = self.citation_manager.extract_citations_from_web_results(
-                    result,
-                    max_citations=3
-                )
+                web_citations = self.citation_manager.extract_citations_from_web_results(result)
 
             coverage_score = self._compute_web_coverage_score(
                 citation_count=len(web_citations),
@@ -212,54 +217,6 @@ class WebRouteHandler:
         else:
             return 0.2
     
-    def _build_limited_context(
-        self,
-        documents: List[str],
-        max_chars: int = 10000,
-        truncation_marker: str = "[...additional documents truncated...]"
-    ) -> str:
-        """
-        Build context string from documents with size limit.
-        
-        Args:
-            documents: List of document strings
-            max_chars: Maximum character limit for context
-            truncation_marker: Marker to append when truncated
-            
-        Returns:
-            Joined context string within size limit
-        """
-        if not documents:
-            return ""
-        
-        context_parts = []
-        current_length = 0
-        
-        for doc in documents:
-            # Account for separator ("\n\n" = 2 chars) except for first doc
-            separator_len = 2 if context_parts else 0
-            doc_len = len(doc)
-            
-            # Check if adding this doc would exceed limit (including truncation marker)
-            projected_len = current_length + separator_len + doc_len + len(truncation_marker)
-            if projected_len > max_chars:
-                # If context_parts is empty, this is the first (and only) doc - truncate it to fit
-                if not context_parts:
-                    available_space = max_chars - separator_len - len(truncation_marker)
-                    if available_space > 0:
-                        truncated_doc = doc[:available_space]
-                        context_parts.append(truncated_doc + truncation_marker)
-                    break
-                # Only add truncation marker if we have content and it fits within limit
-                if current_length + separator_len + len(truncation_marker) <= max_chars:
-                    context_parts.append(truncation_marker)
-                break
-            
-            context_parts.append(doc)
-            current_length += separator_len + doc_len
-        
-        return "\n\n".join(context_parts)
-    
     async def supplement(
         self,
         query: str,
@@ -286,12 +243,11 @@ class WebRouteHandler:
             Supplemented result dict
         """
         step_start = time.time()
-        
-        # Build kb_context with size limit to respect token/memory limits
-        documents = vector_results.get("documents", [])
-        kb_context = self._build_limited_context(documents, max_chars=10000)
-        kb_sources = kb_result.get("sources", [])
-        
+
+        # Build the canonical KB context — the same <source index="N">
+        # numbering the KB answer's markers and citations already use.
+        kb = build_kb_context(vector_results)
+
         web_failed = False
         error_msg = None
         web_timed_out = False
@@ -300,8 +256,7 @@ class WebRouteHandler:
         try:
             result = await self.web_search.search_with_kb_context(
                 query=query,
-                kb_context=kb_context,
-                kb_sources=kb_sources,
+                kb=kb,
                 timeout_ms=web_timeout_ms,
             )
             web_timed_out = bool(result.get("timed_out"))
@@ -314,7 +269,13 @@ class WebRouteHandler:
                 # rather than shipping an empty/non-answer as a "supplement".
                 web_failed = True
                 error_msg = "Web supplementation returned no usable answer"
+                web_answer = result.get("answer", "")
                 result = kb_result.copy()
+                if is_refusal(web_answer) and is_non_answer(result.get("answer", "")):
+                    # Out-of-domain query and the KB had nothing — surface the
+                    # scope refusal instead of the generic non-answer.
+                    result["answer"] = web_answer
+                    error_msg = "Out-of-scope query — scope refusal returned"
         except Exception as e:
             logger.error("Web supplementation failed: %s", e, exc_info=True)
             result = kb_result.copy()
@@ -350,31 +311,22 @@ class WebRouteHandler:
             details=step_details
         ))
         
-        # Merge citations. Extract web citations from the raw web source dicts
-        # (result["web_sources"]) before result["sources"] is normalized to plain
-        # strings, otherwise the URLs and source types are lost and the citations
-        # get filtered out by the finalizer.
-        kb_citations = self.citation_manager.extract_citations_from_vector_results(
-            vector_results,
-            max_citations=5
-        )
+        # Citations are the exact source records the markers point at: the
+        # KB context chunks plus one per web result. Extract web citations from
+        # the raw web source dicts (result["web_sources"]) before
+        # result["sources"] is normalized to plain strings, otherwise the URLs
+        # and source types are lost.
         web_citations = self.citation_manager.extract_citations_from_web_results(
-            {"sources": result.get("web_sources", [])},
-            max_citations=3
+            {"sources": result.get("web_sources", [])}
         )
-        merged_citations = self.citation_manager.merge_citations(
-            kb_citations,
-            web_citations,
-            max_total=5
-        )
-        result["citations"] = merged_citations
-        
-        # Use coverage_score from result if available, otherwise compute from merged citations
+        result["citations"] = kb.citations + web_citations
+
+        # Use coverage_score from result if available, otherwise compute from citations
         coverage_score = result.get("coverage_score")
         if coverage_score is None:
             # Compute based on citation coverage using canonical helper
             coverage_score = self._compute_merged_coverage_score(
-                len(merged_citations)
+                len(result["citations"])
             )
         
         if finalize_citations_callback:

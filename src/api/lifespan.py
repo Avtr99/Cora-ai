@@ -112,8 +112,17 @@ async def initialize_components():
         logger.warning(
             "--- SECURITY WARNING --- "
             "SECRET_KEY is not configured and could not be auto-generated. "
-            "Conversation history will be DISCARDED for all requests because it cannot be securely verified. "
+            "Memory user-ID anonymization will fail unless MEMORY_SECRET_KEY is set. "
             "Set SECRET_KEY in .env or ensure the SQLite database is writable."
+        )
+
+    if settings.ENABLE_INSECURE_TOKEN_ENDPOINT:
+        logger.warning(
+            "--- SECURITY WARNING --- "
+            "ENABLE_INSECURE_TOKEN_ENDPOINT is on: POST /v1/auth/token issues JWTs "
+            "for any user_id to any caller that passes instance authentication. "
+            "It is only reachable when ENABLE_API_KEY_PROTECTION is also on; "
+            "keep it disabled on shared deployments."
         )
     
     try:
@@ -159,11 +168,7 @@ async def initialize_components():
     
     try:
         logger.info("Initializing Citation Manager...")
-        citation_manager = CitationManager(
-            min_relevance_score=get_collection_threshold(
-                settings, "CITATION_MIN_RELEVANCE_SCORE"
-            )
-        )
+        citation_manager = CitationManager()
         logger.info("Citation Manager initialized successfully")
     except Exception as e:
         error_msg = f"Failed to initialize Citation Manager: {type(e).__name__}: {str(e)}"

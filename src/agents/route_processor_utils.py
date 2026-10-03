@@ -15,6 +15,7 @@ from typing import Any, AsyncGenerator, Dict, List, Optional, Union
 
 from .protocols import AnswerGeneratorProtocol, RelevanceCheckerProtocol, RetrieverProtocol
 from ..citations.source_name import get_source_name
+from ..query_processing.fallback_answers import is_refusal
 
 logger = logging.getLogger(__name__)
 
@@ -567,6 +568,12 @@ async def check_answer_relevance(
     """
     if not getattr(config, "enable_web_supplement_relevance_check", True):
         logger.debug("Web supplement relevance check disabled by config")
+        return False, ""
+
+    # A scope refusal is terminal — validating it against the query would flag
+    # it "irrelevant" and overwrite it with a web fallback, answering the very
+    # question that was refused.
+    if is_refusal(answer):
         return False, ""
 
     if not validator:

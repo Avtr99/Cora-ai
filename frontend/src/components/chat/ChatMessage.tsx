@@ -9,7 +9,7 @@ import './markdown-styles.css';
 import { useChatContext } from '@/contexts/useChatContext';
 import { useUserContext } from '@/contexts/useUserContext';
 import { ChatMarkdownContent } from './ChatMarkdownContent';
-import { parseCitationSources } from './chatMessageCitations.utils';
+import { parseCitationSources, buildCitationNumberMap } from './chatMessageCitations.utils';
 import type { CitationNumberMap } from './ChatMarkdownContent';
 import { MessageFeedback } from './MessageFeedback';
 import { QuizWidget } from './QuizWidget';
@@ -47,7 +47,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAgentReas
 
   // Find the user's query message for feedback context.
   // Select only the messages array to avoid recomputing when unrelated chat
-  // properties (e.g. title, backendConversationId) change.
+  // properties (e.g. title, updatedAt) change.
   const messages = activeChat?.messages;
   const userQuery = useMemo(() => {
     if (isUser || !messages) return '';
@@ -122,23 +122,13 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAgentReas
     return [];
   }, [isUser, isErrorMessage, isCancelledMessage, isPending, message.citations, message.sources]);
 
-  // Build a single global numbering sequence for all sources. The backend emits
-  // per-type citations (KB 1..N, Web 1..M); we map those to the global index of
-  // the matching source in sourceLinks so the inline markers and the source list
-  // share one linear, unbroken sequence.
-  const citationNumberMap = useMemo<CitationNumberMap>(() => {
-    const kb: number[] = [];
-    const web: number[] = [];
-    sourceLinks.forEach((source, index) => {
-      const globalNumber = index + 1;
-      if (source.type === 'knowledge_base') {
-        kb.push(globalNumber);
-      } else {
-        web.push(globalNumber);
-      }
-    });
-    return { kb, web };
-  }, [sourceLinks]);
+  // Map per-type marker numbers (kb:1..N, web:1..M) to the global index of the
+  // matching source in sourceLinks. Sources carry their prompt positions in
+  // `indices`; legacy payloads without them keep the per-type ordinal.
+  const citationNumberMap = useMemo<CitationNumberMap>(
+    () => buildCitationNumberMap(sourceLinks),
+    [sourceLinks],
+  );
 
   const shouldShowRecommendations = !isUser && !isErrorMessage && !isCancelledMessage && !isPending && message.triggeredRecommendationIds && message.triggeredRecommendationIds.length > 0;
 

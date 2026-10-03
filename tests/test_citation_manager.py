@@ -15,27 +15,31 @@ from src.citations.citation_manager import (
     _ALL_KB_EXTENSIONS,
 )
 from src.citations.config import _EXTENSION_STRIP_RE
+from src.citations.context import KBContext, build_kb_context
 from src.query_processing.fallback_answers import NO_ANSWER_FOUND
 
 
 class TestSourceTypeClassification:
     """Test that source_type is correctly set for KB and web sources."""
-    
+
     def setup_method(self):
-        self.manager = CitationManager(min_relevance_score=0.3)
-    
+        self.manager = CitationManager()
+
     def test_kb_citations_use_knowledge_base_type(self):
-        """KB citations from vector results should use 'knowledge_base' as source_type."""
+        """KB citations from the context builder should use 'knowledge_base'."""
         vector_results = {
             "documents": ["Document content about carbon pricing."],
             "metadatas": [{"file_name": "carbon_pricing.md", "id": "doc_1"}],
             "distances": [0.2]  # High relevance
         }
-        
-        citations = self.manager.extract_citations_from_vector_results(vector_results)
-        
+
+        ctx = build_kb_context(vector_results)
+        citations = ctx.citations
+
         assert len(citations) == 1
         assert citations[0].source_type == "knowledge_base"
+        assert citations[0].index == 1
+        assert citations[0].marker_type == "knowledge_base"
     
     def test_web_citations_default_to_web_type(self):
         """Web citations without explicit type should default to 'web'."""
@@ -118,36 +122,6 @@ class TestSourceTypeClassification:
         assert len(citations) == 1
         assert citations[0].source_type == "web"
     
-    def test_merged_citations_preserve_source_types(self):
-        """Merged citations should preserve their original source types."""
-        kb_citations = [
-            Citation(
-                source_id="kb_1",
-                source_name="KB Document",
-                source_type="knowledge_base",
-                content_snippet="KB content",
-                relevance_score=0.9
-            )
-        ]
-        
-        web_citations = [
-            Citation(
-                source_id="web_1",
-                source_name="Web Article",
-                source_type="web",
-                content_snippet="Web content",
-                relevance_score=0.8,
-                url="https://example.com"
-            )
-        ]
-        
-        merged = self.manager.merge_citations(kb_citations, web_citations)
-        
-        assert len(merged) == 2
-        source_types = {c.source_name: c.source_type for c in merged}
-        assert source_types["KB Document"] == "knowledge_base"
-        assert source_types["Web Article"] == "web"
-
     def test_web_source_explicit_score_preferred(self):
         """When provided, source relevance_score should be used over rank heuristic."""
         web_results = {
@@ -157,7 +131,7 @@ class TestSourceTypeClassification:
             ]
         }
 
-        citations = self.manager.extract_citations_from_web_results(web_results, max_citations=5)
+        citations = self.manager.extract_citations_from_web_results(web_results)
 
         assert len(citations) == 2
         assert citations[0].relevance_score == 0.42
@@ -211,36 +185,42 @@ class TestSnippetSanitization:
 
 class TestCitationExtraction:
     """Test basic citation extraction functionality."""
-    
+
     def setup_method(self):
-        self.manager = CitationManager(min_relevance_score=0.3)
-    
-    def test_relevance_score_filter(self):
-        """Citations below min_relevance_score should be filtered out."""
+        self.manager = CitationManager()
+
+    def test_no_relevance_score_filter(self):
+        """Every chunk placed in the prompt is citable — no score threshold."""
         # With normalize_score: score = 1 - (distance / 2)
-        # distance=0.2 → score=0.9 (pass), distance=1.6 → score=0.2 (filtered, < 0.3)
+        # distance=0.2 → score=0.9, distance=1.6 → score=0.2
         vector_results = {
             "documents": ["Good content", "Bad content"],
             "metadatas": [{"file_name": "good.md"}, {"file_name": "bad.md"}],
-            "distances": [0.2, 1.6]  # First is high relevance, second is low
+            "distances": [0.2, 1.6]
         }
-        
-        citations = self.manager.extract_citations_from_vector_results(vector_results)
-        
-        assert len(citations) == 1
-        assert "Good" in citations[0].source_name  # cleaned: extension stripped, title-cased
-    
-    def test_max_citations_limit(self):
-        """Should respect max_citations parameter."""
+
+        citations = build_kb_context(vector_results).citations
+
+        # Both chunks are in the prompt, so both are citable; the score is
+        # still normalized for display but never filters a chunk out.
+        assert len(citations) == 2
+        assert citations[0].relevance_score == 0.9
+        assert citations[1].relevance_score == 0.2
+        assert "Good" in citations[0].source_name
+        assert "Bad" in citations[1].source_name
+
+    def test_no_citations_cap(self):
+        """Every chunk placed in the prompt gets a citation — no cap."""
         vector_results = {
             "documents": ["Doc 1", "Doc 2", "Doc 3", "Doc 4", "Doc 5"],
             "metadatas": [{"file_name": f"doc_{i}.md"} for i in range(5)],
             "distances": [0.1] * 5
         }
-        
-        citations = self.manager.extract_citations_from_vector_results(vector_results, max_citations=3)
-        
-        assert len(citations) == 3
+
+        citations = build_kb_context(vector_results).citations
+
+        assert len(citations) == 5
+        assert [c.index for c in citations] == [1, 2, 3, 4, 5]
 
     def test_title_preferred_over_filename_for_source_name(self):
         """The extractor must prefer metadata.title over file_name/source.
@@ -263,7 +243,7 @@ class TestCitationExtraction:
             "distances": [0.1],
         }
 
-        citations = self.manager.extract_citations_from_vector_results(vector_results)
+        citations = build_kb_context(vector_results).citations
 
         assert len(citations) == 1
         # The citation must use the title, not the filename.
@@ -489,22 +469,8 @@ class TestFormatCitationsForResponse:
         # No metadata key emitted for web citations without metadata
         assert "metadata" not in detail
 
-    def test_extractor_preserves_all_allowlisted_fields(self):
-        """Extractor allowlist should retain all VCM fields (curator trims later)."""
-        from src.citations.extractor import CitationExtractor
-        from src.citations.config import CitationConfig
-
-        config = CitationConfig(min_relevance_score=0.0)
-        extractor = CitationExtractor(
-            config=config,
-            # Use the production allowlist (matches CitationManager)
-            safe_metadata_fields={
-                "file_name", "parent_doc", "source", "page_number",
-                "section", "registry", "category", "document_id", "version_number", "title",
-                "publisher", "registry_document_id", "methodology_codes",
-            },
-        )
-
+    def test_context_builder_preserves_all_allowlisted_fields(self):
+        """Context builder allowlist should retain all VCM fields (curator trims later)."""
         vector_results = {
             "documents": ["VM0047 ARR methodology content"],
             "metadatas": [{
@@ -521,7 +487,7 @@ class TestFormatCitationsForResponse:
             "distances": [0.2],
         }
 
-        citations = extractor.extract_from_vector_results(vector_results)
+        citations = build_kb_context(vector_results).citations
         assert len(citations) == 1
         md = citations[0].metadata
 
@@ -615,267 +581,168 @@ class TestCleanSourceName:
         assert result == "ACM0003: A/R Large Scale Consolidated Methodology v02.0"
 
 
-class TestCitationFiltering:
-    """Test filter_citations_by_answer() for Phase 3."""
-    
+class TestCitationSelection:
+    """Test select_cited() / finalize(): prompt indices are canonical."""
+
     def setup_method(self):
         self.manager = CitationManager()
-    
-    def test_filter_by_source_name_match(self):
-        """Citations with source name in answer should be kept."""
-        citations = [
-            Citation(
-                source_id="doc_1",
-                source_name="Carbon Pricing Guide",
-                source_type="knowledge_base",
-                content_snippet="Information about carbon pricing mechanisms.",
-                relevance_score=0.9
-            ),
-            Citation(
-                source_id="doc_2",
-                source_name="Unrelated Document",
-                source_type="knowledge_base",
-                content_snippet="Completely different topic.",
-                relevance_score=0.8
-            )
-        ]
-        answer = "According to the Carbon Pricing Guide, there are several mechanisms..."
-        
-        filtered = self.manager.filter_citations_by_answer(citations, answer)
-        
-        assert len(filtered) == 1
-        assert filtered[0].source_name == "Carbon Pricing Guide"
-    
-    def test_filter_by_snippet_terms(self):
-        """Citations with matching snippet terms should be kept."""
-        citations = [
-            Citation(
-                source_id="doc_1",
-                source_name="Climate Report",
-                source_type="knowledge_base",
-                content_snippet="The renewable energy sector has seen significant growth in wind and solar power.",
-                relevance_score=0.9
-            ),
-            Citation(
-                source_id="doc_2",
-                source_name="Other Report",
-                source_type="knowledge_base",
-                content_snippet="Unrelated content about cooking recipes.",
-                relevance_score=0.8
-            )
-        ]
-        answer = "The renewable energy sector including wind and solar power has grown significantly."
-        
-        filtered = self.manager.filter_citations_by_answer(citations, answer)
-        
-        # First citation should pass due to matching terms
-        assert any(c.source_name == "Climate Report" for c in filtered)
 
-    def test_ratio_filter_rejects_long_boilerplate_with_few_overlaps(self):
-        """Long domain boilerplate snippets should not pass on a few shared terms."""
-        citations = [
-            Citation(
-                source_id="doc_1",
-                source_name="Boilerplate",
-                source_type="knowledge_base",
-                content_snippet=(
-                    "carbon project methodology protocol verification baseline additional guidance "
-                    "registry issuance reductions permanence monitoring leakage quantification "
-                    "conservative assumptions uncertainty boundaries eligibility validation "
-                    "auditor accreditation assurance framework governance implementation details"
-                ),
-                relevance_score=0.9,
-            )
-        ]
-        answer = "This answer only mentions carbon protocol verification in passing."
-
-        filtered = self.manager.filter_citations_by_answer(citations, answer)
-        assert filtered == []
-
-    def test_ratio_filter_keeps_dense_short_overlap(self):
-        """Short focused snippets with dense overlap should pass."""
-        citations = [
-            Citation(
-                source_id="doc_1",
-                source_name="Focused Snippet",
-                source_type="knowledge_base",
-                content_snippet="verification workflow requires baseline monitoring and leakage checks",
-                relevance_score=0.9,
-            )
-        ]
-        answer = "The baseline monitoring and leakage checks are part of the verification workflow."
-
-        filtered = self.manager.filter_citations_by_answer(citations, answer)
-        assert len(filtered) == 1
-        assert filtered[0].source_name == "Focused Snippet"
-
-    def test_explicit_kb_marker_keeps_cited_source_when_snippet_prefix_does_not_overlap(self):
-        citations = [
-            Citation(
-                source_id="doc_1",
-                source_name="ACM0003 Methodology",
-                source_type="knowledge_base",
-                content_snippet="Table 2. Emission sources and greenhouse gases selected for accounting.",
-                relevance_score=0.9,
-            )
-        ]
-        answer = (
-            "Project participants may apply the combined additionality tool or an approved "
-            "standardized baseline [cite_kb: 1]."
+    @staticmethod
+    def _kb_citation(source_name: str, index: int, snippet: str = "Content") -> Citation:
+        return Citation(
+            source_id=f"doc_{index}",
+            source_name=source_name,
+            source_type="knowledge_base",
+            marker_type="knowledge_base",
+            content_snippet=snippet,
+            relevance_score=0.9,
+            index=index,
         )
 
-        filtered = self.manager.filter_citations_by_answer(citations, answer)
+    def test_select_cited_returns_only_cited_chunks(self):
+        """Only chunks the answer cites are selected — prompt index is canonical."""
+        citations = [self._kb_citation(f"Doc {i}", i) for i in (1, 2, 3)]
+        answer = "Doc one and three support this [cite_kb: 1, 3]."
 
-        assert filtered == citations
+        from src.citations.check import select_cited
+        cited = select_cited(citations, answer)
 
-    def test_explicit_marker_and_renumberer_agree_on_duplicate_source_names(self):
-        """Filter and renumberer must map citation index N to the same source.
+        assert [c.index for c in cited] == [1, 3]
 
-        When the citation list contains duplicate source names, the filter's
-        retain decision and the renumberer's marker rewriting must use the
-        same index→source mapping (unique names by first-seen order). If they
-        diverge, the filter can retain a citation the renumberer can't map,
-        leaving a dangling [cite_kb: N] reference in the final answer.
-        """
-        from src.query_processing.citation_verifier import renumber_citation_markers
+    def test_select_cited_first_cited_order(self):
+        """Citations come back in the order the answer first cites them."""
+        citations = [self._kb_citation(f"Doc {i}", i) for i in (1, 2, 3)]
+        answer = "Second [cite_kb: 2] then first [cite_kb: 1], twice [cite_kb: 2]."
 
+        from src.citations.check import select_cited
+        cited = select_cited(citations, answer)
+
+        assert [c.index for c in cited] == [2, 1]
+
+    def test_select_cited_interleaves_kb_and_web(self):
+        """KB and web markers interleave by textual appearance."""
         citations = [
+            self._kb_citation("KB One", 1),
             Citation(
-                source_id="doc_1",
-                source_name="ACM0003 Methodology",
-                source_type="knowledge_base",
-                content_snippet="Emission sources selected for accounting.",
-                relevance_score=0.9,
-            ),
-            Citation(
-                source_id="doc_2",
-                source_name="ACM0003 Methodology",  # duplicate name, different chunk
-                source_type="knowledge_base",
-                content_snippet="Baseline approach for A/R project activities.",
-                relevance_score=0.85,
-            ),
-            Citation(
-                source_id="doc_3",
-                source_name="VCS Standard",
-                source_type="knowledge_base",
-                content_snippet="VCS program-level requirements.",
+                source_id="web_1",
+                source_name="Web Article",
+                source_type="web",
+                marker_type="web",
+                content_snippet="Web snippet",
                 relevance_score=0.8,
-            ),
-            Citation(
-                source_id="doc_4",
-                source_name="Unrelated Doc",
-                source_type="knowledge_base",
-                content_snippet="Completely different content.",
-                relevance_score=0.5,
+                url="https://example.com",
+                index=1,
             ),
         ]
-        # Unique KB sources by first-seen order:
-        #   1 = "ACM0003 Methodology"  2 = "VCS Standard"  3 = "Unrelated Doc"
-        # LLM cites sources 1 and 2; source 3 should be dropped.
-        answer = (
-            "Project participants may apply the combined additionality tool "
-            "[cite_kb: 1] or an approved standardized baseline [cite_kb: 2]."
+        answer = "Web says [Web, cite: 1] and KB says [cite_kb: 1]."
+
+        from src.citations.check import select_cited
+        cited = select_cited(citations, answer)
+
+        assert [(c.marker_type, c.index) for c in cited] == [("web", 1), ("knowledge_base", 1)]
+
+    def test_select_cited_appends_index_none_citations(self):
+        """Structured-mode citations (index=None) are always shown."""
+        citations = [
+            self._kb_citation("KB One", 1),
+            Citation(
+                source_id="dataset_1",
+                source_name="Dataset",
+                source_type="structured",
+                marker_type="knowledge_base",
+                content_snippet="Structured data",
+                relevance_score=1.0,
+                index=None,
+            ),
+        ]
+
+        from src.citations.check import select_cited
+        cited = select_cited(citations, "No markers here.")
+
+        assert cited == [citations[1]]
+
+    def test_select_cited_ignores_markers_in_code(self):
+        """Markers inside code spans/blocks do not select citations."""
+        citations = [self._kb_citation("Doc 1", 1)]
+        answer = "Use `[cite_kb: 1]` in the prompt. Real text here."
+
+        from src.citations.check import select_cited
+        assert select_cited(citations, answer) == []
+
+    def test_finalize_selects_cited_and_sets_sources(self):
+        """finalize keeps only cited chunks and derives sources from them."""
+        citations = [self._kb_citation(f"Doc {i}", i) for i in (1, 2, 3)]
+        result = {"answer": "Two supports this [cite_kb: 2].", "citations": citations}
+
+        self.manager.finalize(result, "question")
+
+        assert [c.index for c in result["citations"]] == [2]
+        assert result["sources"] == ["Doc 2"]
+        assert result["_citations_finalized"] is True
+        assert result["answer"] == "Two supports this [cite_kb: 2]."
+
+    def test_finalize_drops_invalid_marker_ids(self):
+        """Marker numbers with no matching citation are removed from the answer."""
+        citations = [self._kb_citation("Doc 1", 1)]
+        result = {"answer": "One [cite_kb: 1] and nine [cite_kb: 9].", "citations": citations}
+
+        self.manager.finalize(result, "question")
+
+        assert "[cite_kb: 1]" in result["answer"]
+        assert "[cite_kb: 9]" not in result["answer"]
+        assert "[cite_kb:]" not in result["answer"]
+        assert [c.index for c in result["citations"]] == [1]
+
+    def test_finalize_no_cited_citations_clears_sources(self):
+        """An answer with no valid markers shows no citations or sources."""
+        citations = [self._kb_citation("Doc 1", 1)]
+        result = {"answer": "Plain answer text.", "citations": citations, "sources": ["Doc 1"]}
+
+        self.manager.finalize(result, "question")
+
+        assert result["citations"] == []
+        assert result["sources"] == []
+
+    def test_finalize_preserves_error_source_marker(self):
+        """Error fallback sources are kept when nothing is cited."""
+        result = {
+            "answer": NO_ANSWER_FOUND,
+            "citations": [],
+            "sources": ["error_fallback"],
+        }
+
+        self.manager.finalize(result, "question")
+
+        assert result["sources"] == ["error_fallback"]
+
+    def test_finalize_suppression_strips_all_markers(self):
+        """Conversational queries suppress all citations and markers."""
+        citations = [self._kb_citation("Doc 1", 1)]
+        result = {"answer": "Hello there [cite_kb: 1]!", "citations": citations}
+
+        self.manager.finalize(result, "hi")
+
+        assert result["citations"] == []
+        assert "[cite_kb: 1]" not in result["answer"]
+
+    def test_finalize_web_marker_matches_non_web_source_type(self):
+        """Web-extracted citations match [Web, cite: N] even if typed otherwise."""
+        web_citation = Citation(
+            source_id="web_1",
+            source_name="Report.pdf",
+            source_type="file_search",  # resolver may type a web hit as file-like
+            marker_type="web",
+            content_snippet="snippet",
+            relevance_score=0.8,
+            url="https://example.com/report.pdf",
+            index=1,
         )
+        result = {"answer": "See the report [Web, cite: 1].", "citations": [web_citation]}
 
-        filtered = self.manager.filter_citations_by_answer(citations, answer)
+        self.manager.finalize(result, "question")
 
-        retained_names = {c.source_name for c in filtered}
-        assert "ACM0003 Methodology" in retained_names
-        assert "VCS Standard" in retained_names
-        assert "Unrelated Doc" not in retained_names
-
-        # The renumberer must preserve valid markers — no dangling references.
-        # The renumberer rewrites numbers, not format, so [cite_kb: N] stays.
-        renumbered = renumber_citation_markers(answer, citations, filtered)
-        assert "[cite_kb: 1]" in renumbered
-        assert "[cite_kb: 2]" in renumbered
-        # No orphaned empty markers from unmapped references.
-        assert "[]" not in renumbered
-
-    def test_no_fallback_when_no_matches(self):
-        """Should return empty list when no citations match answer evidence."""
-        citations = [
-            Citation(
-                source_id="doc_1",
-                source_name="Document A",
-                source_type="knowledge_base",
-                content_snippet="Content about topic A.",
-                relevance_score=0.9
-            ),
-            Citation(
-                source_id="doc_2",
-                source_name="Document B",
-                source_type="knowledge_base",
-                content_snippet="Content about topic B.",
-                relevance_score=0.7
-            ),
-            Citation(
-                source_id="doc_3",
-                source_name="Document C",
-                source_type="knowledge_base",
-                content_snippet="Content about topic C.",
-                relevance_score=0.5
-            )
-        ]
-        answer = "This answer mentions nothing from any document."
-        
-        filtered = self.manager.filter_citations_by_answer(citations, answer)
-        
-        assert filtered == []
-    
-    def test_empty_citations_returns_empty(self):
-        """Empty citations list should return empty list."""
-        filtered = self.manager.filter_citations_by_answer([], "Some answer")
-        assert filtered == []
-    
-    def test_empty_answer_returns_empty(self):
-        """Empty answer should return empty list (no evidence to support citations)."""
-        citations = [
-            Citation(
-                source_id="doc_1",
-                source_name="Doc",
-                source_type="knowledge_base",
-                content_snippet="Content",
-                relevance_score=0.9
-            )
-        ]
-        filtered = self.manager.filter_citations_by_answer(citations, "")
-        assert filtered == []
-    
-    def test_multiple_matching_citations(self):
-        """All matching citations should be returned."""
-        citations = [
-            Citation(
-                source_id="doc_1",
-                source_name="Report A",
-                source_type="knowledge_base",
-                content_snippet="Carbon credits and offsets are important mechanisms.",
-                relevance_score=0.9
-            ),
-            Citation(
-                source_id="doc_2",
-                source_name="Report B",
-                source_type="knowledge_base",
-                content_snippet="Carbon credits trading has increased.",
-                relevance_score=0.8
-            ),
-            Citation(
-                source_id="doc_3",
-                source_name="Unrelated",
-                source_type="knowledge_base",
-                content_snippet="Cooking recipes and food.",
-                relevance_score=0.7
-            )
-        ]
-        answer = "According to Report A and Report B, carbon credits are essential."
-        
-        filtered = self.manager.filter_citations_by_answer(citations, answer)
-        
-        assert len(filtered) == 2
-        source_names = {c.source_name for c in filtered}
-        assert "Report A" in source_names
-        assert "Report B" in source_names
-        assert "Unrelated" not in source_names
+        assert result["citations"] == [web_citation]
+        assert "[Web, cite: 1]" in result["answer"]
 
 
 class TestCitationSuppression:
@@ -1098,7 +965,7 @@ class _DummyWebSearch:
     async def search(self, query, timeout_ms=None):
         return dict(self._search_result)
 
-    async def search_with_kb_context(self, query, kb_context, kb_sources, timeout_ms=None):
+    async def search_with_kb_context(self, query, kb, timeout_ms=None):
         return dict(self._hybrid_result)
 
 
@@ -1116,7 +983,8 @@ class TestWebSearchGroundingContract:
         assert result["answer"] == NO_ANSWER_FOUND
         assert result["sources"] == []
         assert result["grounded"] is False
-        llm.generate_text.assert_not_awaited()
+        # One call for the scope gate; no answer generation without sources.
+        assert llm.generate_text.await_count == 1
 
     @pytest.mark.asyncio
     async def test_hybrid_search_does_not_generate_without_web_sources(self):
@@ -1128,15 +996,15 @@ class TestWebSearchGroundingContract:
 
         result = await agent.search_with_kb_context(
             "current market status",
-            kb_context="KB context",
-            kb_sources=["KB Document"],
+            kb=KBContext(text="KB context", summaries=[], sources=["KB Document"], citations=[]),
         )
 
         assert result["answer"] == ""
         assert result["web_sources"] == []
         assert result["grounded"] is False
         assert result["hybrid"] is False
-        llm.generate_text.assert_not_awaited()
+        # One call for the scope gate; no answer generation without sources.
+        assert llm.generate_text.await_count == 1
 
 
 def _build_route_processor_config(**overrides):
@@ -1191,7 +1059,7 @@ class TestRouteProcessorCitationRegressions:
             retriever=_DummyRetriever(vector_results),
             answer_generator=_DummyAnswerGenerator(answer_result),
             web_search=_DummyWebSearch(search_result={"answer": "", "sources": []}, hybrid_result=hybrid_result),
-            citation_manager=CitationManager(min_relevance_score=0.0),
+            citation_manager=CitationManager(),
             config=_build_route_processor_config(
                 enable_web_search=True,
                 retrieval_k=5,
@@ -1226,7 +1094,7 @@ class TestRouteProcessorCitationRegressions:
             retriever=_DummyRetriever(vector_results),
             answer_generator=_DummyAnswerGenerator(answer_result),
             web_search=_DummyWebSearch(search_result={"answer": "", "sources": []}),
-            citation_manager=CitationManager(min_relevance_score=0.0),
+            citation_manager=CitationManager(),
             config=_build_route_processor_config(enable_web_search=False),
         )
 
@@ -1260,7 +1128,7 @@ class TestRouteProcessorCitationRegressions:
             retriever=_DummyRetriever({"documents": [], "metadatas": [], "distances": []}),
             answer_generator=_DummyAnswerGenerator({"answer": "", "sources": []}),
             web_search=_DummyWebSearch(search_result=web_result),
-            citation_manager=CitationManager(min_relevance_score=0.0),
+            citation_manager=CitationManager(),
             config=_build_route_processor_config(enable_web_search=True),
         )
 
@@ -1274,7 +1142,7 @@ class TestRouteProcessorCitationRegressions:
         assert result["sources"] == []
 
     @pytest.mark.asyncio
-    async def test_process_web_route_preserves_error_source_for_ungrounded_answer(self):
+    async def test_process_web_route_renders_deliberate_no_answer_without_error_source(self):
         processor = RouteProcessor(
             retriever=_DummyRetriever({"documents": [], "metadatas": [], "distances": []}),
             answer_generator=_DummyAnswerGenerator({"answer": "", "sources": []}),
@@ -1285,7 +1153,7 @@ class TestRouteProcessorCitationRegressions:
                     "grounded": False,
                 }
             ),
-            citation_manager=CitationManager(min_relevance_score=0.0),
+            citation_manager=CitationManager(),
             config=_build_route_processor_config(enable_web_search=True),
         )
 
@@ -1296,7 +1164,7 @@ class TestRouteProcessorCitationRegressions:
         )
 
         assert result["citations"] == []
-        assert result["sources"] == ["error_fallback"]
+        assert result["sources"] == []
 
     @pytest.mark.asyncio
     async def test_process_hybrid_route_aligns_sources_with_filtered_citations(self):
@@ -1319,7 +1187,7 @@ class TestRouteProcessorCitationRegressions:
             "grounded": True,
         }
         hybrid_synthesis_result = {
-            "answer": "The carbon credit verification methodology supports integrity.",
+            "answer": "The carbon credit verification methodology supports integrity [Web, cite: 1].",
             "sources": [
                 {
                     "title": "data/431_v1.2_methodology.pdf",
@@ -1350,7 +1218,7 @@ class TestRouteProcessorCitationRegressions:
             retriever=_DummyRetriever(vector_results),
             answer_generator=_DummyAnswerGenerator({"answer": "", "sources": []}),
             web_search=_DummyWebSearch(search_result=web_search_result, hybrid_result=hybrid_synthesis_result),
-            citation_manager=CitationManager(min_relevance_score=0.0),
+            citation_manager=CitationManager(),
             # Use parallel mode so both KB and web run — this test verifies
             # citation alignment when both sources contribute. This also makes
             # the test independent of the configured retrieval ordering.
@@ -1367,10 +1235,8 @@ class TestRouteProcessorCitationRegressions:
             steps=[],
         )
 
-        assert len(result["citations"]) >= 1
-        # Web citations with URLs now survive filter_by_answer (grounded search
-        # sources are inherently answer-referenced), so both appear in sources.
-        assert "Methodology" in result["sources"]
+        # Only the cited web source appears; marker index maps to web_sources.
+        assert len(result["citations"]) == 1
         assert "External Article" in result["sources"]
 
     @pytest.mark.asyncio
@@ -1385,7 +1251,7 @@ class TestRouteProcessorCitationRegressions:
                     "grounded": False,
                 }
             ),
-            citation_manager=CitationManager(min_relevance_score=0.0),
+            citation_manager=CitationManager(),
             config=_build_route_processor_config(
                 enable_web_search=True,
                 parallel_retrieval=True,
@@ -1406,7 +1272,7 @@ class TestRouteProcessorCitationRegressions:
     @pytest.mark.asyncio
     async def test_hybrid_synthesis_error_uses_grounded_first_pass_web_answer(self):
         web_search_result = {
-            "answer": "Grounded web answer.",
+            "answer": "Grounded web answer [Web, cite: 1].",
             "sources": [
                 {
                     "title": "External Article",
@@ -1431,7 +1297,7 @@ class TestRouteProcessorCitationRegressions:
             }),
             answer_generator=_DummyAnswerGenerator({"answer": "", "sources": []}),
             web_search=_DummyWebSearch(web_search_result, hybrid_result),
-            citation_manager=CitationManager(min_relevance_score=0.0),
+            citation_manager=CitationManager(),
             config=_build_route_processor_config(
                 enable_web_search=True,
                 parallel_retrieval=True,
@@ -1445,13 +1311,13 @@ class TestRouteProcessorCitationRegressions:
             steps=[],
         )
 
-        assert result["answer"] == "Grounded web answer."
+        assert result["answer"] == "Grounded web answer [Web, cite: 1]."
         assert result["sources"] == ["External Article"]
-        assert all(c.source_type == "web" for c in result["citations"])
+        assert all(c.marker_type == "web" for c in result["citations"])
 
 
 class TestCitationScoreNormalization:
-    """Test metric-aware score normalization in citation extraction."""
+    """Test metric-aware score normalization in the context builder."""
 
     def setup_method(self):
         from src.retrieval.score_utils import DistanceMetric
@@ -1459,15 +1325,6 @@ class TestCitationScoreNormalization:
 
     def test_citation_uses_normalized_score_not_naive(self):
         """Citation relevance_score should use normalize_score (1 - d/2) not naive (1 - d)."""
-        from src.citations.extractor import CitationExtractor
-        from src.citations.config import CitationConfig
-
-        config = CitationConfig(min_relevance_score=0.0)
-        extractor = CitationExtractor(
-            config=config,
-            safe_metadata_fields={"file_name"},
-        )
-
         # distance=0.4 should give score=0.8 with normalization (1 - 0.4/2)
         # not 0.6 with naive (1 - 0.4)
         vector_results = {
@@ -1476,57 +1333,36 @@ class TestCitationScoreNormalization:
             "distances": [0.4],
         }
 
-        citations = extractor.extract_from_vector_results(vector_results)
+        citations = build_kb_context(vector_results).citations
         assert len(citations) == 1
         # Normalized score: 1 - 0.4/2 = 0.8
         assert citations[0].relevance_score == 0.8
 
     def test_citation_score_clamps_low_distance_to_one(self):
         """Distance=0 (identical) should give score=1.0."""
-        from src.citations.extractor import CitationExtractor
-        from src.citations.config import CitationConfig
-
-        config = CitationConfig(min_relevance_score=0.0)
-        extractor = CitationExtractor(config=config, safe_metadata_fields={"file_name"})
-
         vector_results = {
             "documents": ["Perfect match content"],
             "metadatas": [{"file_name": "perfect.pdf"}],
             "distances": [0.0],
         }
 
-        citations = extractor.extract_from_vector_results(vector_results)
+        citations = build_kb_context(vector_results).citations
         assert citations[0].relevance_score == 1.0
 
     def test_citation_score_clamps_high_distance_to_zero(self):
         """Distance=2.0 (opposite for cosine) should give score≈0."""
-        from src.citations.extractor import CitationExtractor
-        from src.citations.config import CitationConfig
-
-        config = CitationConfig(min_relevance_score=0.0)
-        extractor = CitationExtractor(config=config, safe_metadata_fields={"file_name"})
-
         vector_results = {
             "documents": ["Opposite content"],
             "metadatas": [{"file_name": "opposite.pdf"}],
             "distances": [2.0],
         }
 
-        citations = extractor.extract_from_vector_results(vector_results)
+        citations = build_kb_context(vector_results).citations
         # Normalized: 1 - 2.0/2 = 0.0
         assert citations[0].relevance_score == 0.0
 
     def test_citation_format_includes_all_fields(self):
         """Citation should include all expected fields with correct types."""
-        from src.citations.extractor import CitationExtractor
-        from src.citations.config import CitationConfig
-
-        config = CitationConfig(min_relevance_score=0.0)
-        extractor = CitationExtractor(
-            config=config,
-            safe_metadata_fields={"file_name", "page_number", "document_id"},
-        )
-
         vector_results = {
             "documents": ["VM0007 REDD+ Methodology Framework content"],
             "metadatas": [{
@@ -1538,7 +1374,7 @@ class TestCitationScoreNormalization:
             "distances": [0.3],  # score = 0.85
         }
 
-        citations = extractor.extract_from_vector_results(vector_results)
+        citations = build_kb_context(vector_results).citations
         assert len(citations) == 1
         c = citations[0]
 
@@ -1554,23 +1390,14 @@ class TestCitationScoreNormalization:
 
     def test_citation_source_name_fallback_chain(self):
         """Source name should fallback through file_name -> parent_doc -> source -> default."""
-        from src.citations.extractor import CitationExtractor
-        from src.citations.config import CitationConfig
-
-        config = CitationConfig(min_relevance_score=0.0)
-        extractor = CitationExtractor(
-            config=config,
-            safe_metadata_fields={"file_name", "parent_doc", "source"},
-        )
-
         # Case 1: file_name present
         results1 = {
             "documents": ["Content"],
             "metadatas": [{"file_name": "explicit_name.pdf", "parent_doc": "ignored.pdf"}],
             "distances": [0.5],
         }
-        c1 = extractor.extract_from_vector_results(results1)[0]
-        assert "Explicit" in c1.source_name  # cleaned at extraction: extension stripped
+        c1 = build_kb_context(results1).citations[0]
+        assert "Explicit" in c1.source_name  # cleaned: extension stripped
 
         # Case 2: only parent_doc
         results2 = {
@@ -1578,8 +1405,8 @@ class TestCitationScoreNormalization:
             "metadatas": [{"parent_doc": "parent_name.pdf"}],
             "distances": [0.5],
         }
-        c2 = extractor.extract_from_vector_results(results2)[0]
-        assert "Parent" in c2.source_name  # cleaned at extraction: extension stripped
+        c2 = build_kb_context(results2).citations[0]
+        assert "Parent" in c2.source_name  # cleaned: extension stripped
 
         # Case 3: only source
         results3 = {
@@ -1587,8 +1414,8 @@ class TestCitationScoreNormalization:
             "metadatas": [{"source": "source_name.txt"}],
             "distances": [0.5],
         }
-        c3 = extractor.extract_from_vector_results(results3)[0]
-        assert "Source" in c3.source_name  # cleaned at extraction: extension stripped
+        c3 = build_kb_context(results3).citations[0]
+        assert "Source" in c3.source_name  # cleaned: extension stripped
 
         # Case 4: none present - default naming
         results4 = {
@@ -1596,5 +1423,5 @@ class TestCitationScoreNormalization:
             "metadatas": [{}],
             "distances": [0.5],
         }
-        c4 = extractor.extract_from_vector_results(results4)[0]
+        c4 = build_kb_context(results4).citations[0]
         assert "Document 1" in c4.source_name

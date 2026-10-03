@@ -227,7 +227,6 @@ function CaseStudyPage(): JSX.Element {
         {/* Project Statistics */}
         <ProjectStatistics
           carbonSequestered={caseStudyData.statistics.carbonSequestered}
-          permanenceRisk={caseStudyData.statistics.permanenceRisk}
           bufferPool={caseStudyData.statistics.bufferPool}
           creditsIssued={caseStudyData.statistics.creditsIssued}
           creditsRetired={caseStudyData.statistics.creditsRetired}

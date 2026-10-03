@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { sanitizeInput } from '@/lib/security';
 import { Chat, Message } from '@/store/chatStore.types';
 import { generateChatTitle, generateId } from '@/store/chatStore.utils';
+import { ChatsApiError, deleteChat as deleteChatOnServer } from '@/services/chatsApi';
 import { useBotResponse } from './useBotResponse';
 
 interface UseChatActionsParams {
@@ -53,8 +54,9 @@ export function useChatActions({
       id: newChatId,
       title: initialMessage ? generateChatTitle(initialMessage) : 'New Chat',
       messages: [],
-      createdAt: new Date(),
+      updatedAt: new Date(),
       shownRecommendations: [],
+      messagesLoaded: true,
     };
 
     addChat(newChat);
@@ -146,6 +148,12 @@ export function useChatActions({
       return next;
     });
     deleteChatFromStore(chatId);
+    // Persist the deletion on the server. A 404 means the chat is already
+    // gone (never persisted, or deleted on another device) — treat as success.
+    void deleteChatOnServer(chatId).catch((error) => {
+      if (error instanceof ChatsApiError && error.status === 404) return;
+      console.error('[ChatContext] Failed to delete chat on server:', error);
+    });
   }, [activeRequestControllers, pendingBotMessageIds, cancelPendingRequest, deleteChatFromStore, setTypingChatIds]);
 
   /**
@@ -171,8 +179,9 @@ export function useChatActions({
         id: targetChatId,
         title: generateChatTitle(sanitizedContent),
         messages: [],
-        createdAt: new Date(),
+        updatedAt: new Date(),
         shownRecommendations: [],
+        messagesLoaded: true,
       };
       addChat(targetChat);
       setActiveChatId(targetChatId);

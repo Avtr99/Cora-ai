@@ -82,10 +82,9 @@ const TermsOfServicePage: React.FC = () => {
 
       <LegalSection title="Data Handling" number={6}>
         <p>
-          Cora AI follows a local-first data model. Your chat history and conversations are stored
-          on the machine where the instance is deployed, not in any central cloud service. PII is
-          automatically redacted before storage. No user accounts are required, and no personal
-          identifiers such as IP addresses are collected by the application.
+          Cora AI stores chats on the machine where the instance is deployed, not in any central
+          cloud service. Each instance has one built-in owner account. There is no sign-up. The
+          application does not collect personal identifiers such as IP addresses.
         </p>
         <p>
           If the operator has configured external API providers (e.g. for AI inference or web

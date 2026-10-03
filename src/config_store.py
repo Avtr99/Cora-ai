@@ -60,8 +60,8 @@ def _apply_db_overlay(settings: Settings) -> Settings:
 
     Also auto-generates and persists a ``SECRET_KEY`` on first run if none is
     configured in ``.env`` or the DB. The generated key is stable across
-    restarts (stored in ``app_settings``) so conversation memory and history
-    signatures remain valid. An explicit ``SECRET_KEY`` in ``.env`` always
+    restarts (stored in ``app_settings``) so memory user-ID anonymization
+    stays consistent. An explicit ``SECRET_KEY`` in ``.env`` always
     takes precedence and is never overwritten.
 
     Silently skips if the DB or table is unavailable (e.g. on first run
@@ -180,7 +180,6 @@ class _CollectionRelevanceOverrides(BaseModel):
 
     kb_min_top_relevance_score: Optional[float] = Field(default=None, alias="KB_MIN_TOP_RELEVANCE_SCORE")
     rerank_score_threshold: Optional[float] = Field(default=None, alias="RERANK_SCORE_THRESHOLD")
-    citation_min_relevance_score: Optional[float] = Field(default=None, alias="CITATION_MIN_RELEVANCE_SCORE")
     similarity_threshold: Optional[float] = Field(default=None, alias="SIMILARITY_THRESHOLD")
 
     model_config = {"populate_by_name": True}

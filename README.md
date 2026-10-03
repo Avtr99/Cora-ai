@@ -251,7 +251,9 @@ This starts three services:
 > and `ENABLE_API_KEY_PROTECTION=true`, and serve the app over HTTPS through a
 > reverse proxy. If your tools used `http://localhost:6333` to reach Qdrant,
 > run `docker compose exec app curl http://qdrant:6333/collections` instead, or
-> add a `docker-compose.override.yml` that maps `"127.0.0.1:6333:6333"`.
+> add a `docker-compose.override.yml` that maps `"127.0.0.1:6333:6333"`. See
+> [Self-hosting Cora](docs/SELF_HOSTING.md) for remote access, reverse proxy,
+> and backups.
 
 The `app` and `ingest-worker` services share a `./data:/app/data` bind mount for uploaded
 documents and a named volume (`cora_db_data`) for the SQLite database. The DB is on a named
@@ -295,6 +297,16 @@ curl -X POST http://127.0.0.1:8000/v1/query \
   -d '{"text": "What is the VCM?"}'
 ```
 
+To continue a chat, send the `conversation_id` from the response. `message_id`
+is an optional client ID for the user message. The server reads the chat
+history. The request body has no `history` field.
+
+```bash
+curl -X POST http://127.0.0.1:8000/v1/query \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Who publishes it?", "conversation_id": "<from the first response>", "message_id": "<a new UUID>"}'
+```
+
 ---
 
 ## Manual development setup
@@ -326,7 +338,9 @@ python -m src.api.main
 ```
 
 The backend binds to `127.0.0.1` and runs on http://localhost:8000. To expose
-it to other machines, set `UVICORN_HOST=0.0.0.0` in `.env`.
+it to other machines, set `UVICORN_HOST=0.0.0.0` in `.env`. Exposing the app
+also requires `ENABLE_API_KEY_PROTECTION=true`, an `API_ACCESS_KEY`, and HTTPS
+through a reverse proxy. See [Self-hosting Cora](docs/SELF_HOSTING.md).
 
 ### Frontend
 
@@ -437,11 +451,17 @@ Qdrant for vectors and conversation memory.
 | POST | `/v1/query/stream` | Streaming SSE query |
 | POST | `/v1/query/async` | Async queued query (returns `job_id`) |
 | GET | `/v1/query/async/{job_id}` | Poll async job |
+| GET | `/v1/chats` | List your chats, most recently updated first |
+| GET | `/v1/chats/{id}` | Get one chat with all its turns |
+| DELETE | `/v1/chats/{id}` | Delete a chat and its turns |
 | POST | `/v1/summarize` | Document summarization |
 | POST | `/v1/documents` | Upload document |
 | GET | `/v1/documents` | List documents |
 | GET/POST | `/v1/memory/*` | Conversation memory CRUD |
 | GET/POST | `/api/v1/settings/*` | LLM / app settings + setup wizard |
+| GET | `/api/auth/session` | Login status for the SPA (`required`, `authenticated`) |
+| POST | `/api/auth/session` | Log in with the access key. Sets the `cora_session` cookie |
+| DELETE | `/api/auth/session` | Log out. Ends the session on the server and clears the `cora_session` cookie |
 | GET | `/docs` | OpenAPI Swagger UI |
 
 Full interactive docs are available at `/docs` once the server is running.
@@ -464,7 +484,7 @@ every option. The most important ones:
 | `DATABASE_URL` | SQLite database path. `sqlite:///data/cora.db` for local dev, `sqlite:////app/db/cora.db` in Docker (named volume). |
 | `SQLITE_JOURNAL_MODE` | `WAL` (default) for both local dev and Docker. The Docker named volume supports WAL's shared-memory requirement. |
 | `QDRANT_COLLECTION_NAME` | Name of the Qdrant collection. Default is `cora_dense_only`. |
-| `SECRET_KEY` | Signs conversation history and anonymizes memory user IDs. **Auto-generated on first run** and persisted to SQLite — no setup needed. Set it in `.env` only if you want your own key. |
+| `SECRET_KEY` | Anonymizes memory user IDs (fallback for `MEMORY_SECRET_KEY`). **Auto-generated on first run** and persisted to SQLite — no setup needed. Set it in `.env` only if you want your own key. |
 
 ### KB relevance thresholds (tunable, with per-collection overrides)
 

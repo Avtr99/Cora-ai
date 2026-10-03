@@ -21,7 +21,6 @@ from .protocols import (
 from .reasoning_formatter import AgentStep
 from .route_processor_utils import (
     check_answer_relevance,
-    clean_source_display_name,
     compute_merged_coverage_score,
     derive_web_timeout_ms,
     extract_source_chunks,
@@ -29,12 +28,14 @@ from .route_processor_utils import (
     kb_top_relevance,
     normalize_sources,
     remaining_budget_ms,
-    source_name_from_metadata,
 )
+from ..citations.check import marker_type
+from ..citations.context import build_kb_context, citations_from_result
 from ..query_processing.fallback_answers import (
     NO_ANSWER_FOUND,
     UNVERIFIED_ANSWER,
     is_non_answer,
+    is_refusal,
 )
 
 if TYPE_CHECKING:
@@ -150,23 +151,22 @@ class HybridRouteHandler:
                 "scores": [],
             }
 
-        # Synthesize answer
-        kb_context = "\n\n".join(vector_results.get("documents", []))
-        kb_sources = self._extract_sources(vector_results)
-        
+        # Build the canonical KB context — the same <source index="N">
+        # numbering the markers and citations reference downstream.
+        kb = build_kb_context(vector_results)
+
         gen_start = time.time()
         web_answer = web_results.get("answer", "")
         # The provider sets grounded only when the answer has web evidence.
         web_answer_usable = web_result_is_usable(web_results)
 
-        if kb_context and web_answer_usable:
+        if kb.text and web_answer_usable:
             # Combine KB context with web results
             remaining_budget = remaining_budget_ms(timeout_budget_ms, step_start)
             hybrid_web_timeout_ms = derive_web_timeout_ms(remaining_budget)
             result = await self.web_search.search_with_kb_context(
                 query=query,
-                kb_context=kb_context,
-                kb_sources=kb_sources,
+                kb=kb,
                 timeout_ms=hybrid_web_timeout_ms,
             )
             hybrid_succeeded = bool(result.get("hybrid")) and web_result_is_usable(result)
@@ -187,16 +187,17 @@ class HybridRouteHandler:
                     "suggested_prompts": web_results.get("suggested_prompts"),
                     "truncated": web_results.get("truncated", False),
                 }
-        elif kb_context:
+        elif kb.text:
             # KB only
             result = await self.answer_generator.search_and_process(
                 original_query, vector_results, resolved_query=query
             )
         else:
-            # Web only
+            # Web only. A scope refusal is terminal — surface it rather than
+            # downgrading to the generic non-answer.
             web_sources = web_results.get("sources", []) if web_answer_usable else []
             result = {
-                "answer": web_answer if web_answer_usable else NO_ANSWER_FOUND,
+                "answer": web_answer if (web_answer_usable or is_refusal(web_answer)) else NO_ANSWER_FOUND,
                 "sources": [(s.get("title") or s.get("url") or "web") for s in web_sources],
                 "web_sources": web_sources,
                 "hybrid": False,
@@ -267,58 +268,37 @@ class HybridRouteHandler:
                     },
                 ))
 
-        # Merge citations and keep only sources that are actually grounded in the final answer.
-        kb_citations = self.citation_manager.extract_citations_from_vector_results(
-            vector_results,
-            max_citations=5
-        )
-        # For hybrid answers, extract web citations from the synthesis call's own
-        # web_sources — [Web, cite: N] markers index into that list, not the
-        # first-pass web_results.
-        citation_web_results = (
-            {"sources": result.get("web_sources", [])}
-            if result.get("hybrid")
-            else web_results
-        )
-        web_citations = self.citation_manager.extract_citations_from_web_results(
-            citation_web_results,
-            max_citations=3
-        )
-        is_hybrid = bool(result.get("hybrid"))
-        is_web_only = not is_hybrid and bool(result.get("web_sources"))
+        # Citations are the exact source records the answer's markers point
+        # at — KB chunks numbered by the prompt's <source index="N"> tags and
+        # web results by their source numbers. No merge cap or renumbering.
         is_no_answer = is_non_answer(result.get("answer", ""))
-        if is_hybrid:
-            merged_citations = self.citation_manager.merge_citations(
-                kb_citations,
-                web_citations,
-                max_total=5
+        if result.get("hybrid"):
+            # For hybrid answers, extract web citations from the synthesis
+            # call's own web_sources — [Web, cite: N] markers index into that
+            # list, not the first-pass web_results.
+            web_citations = self.citation_manager.extract_citations_from_web_results(
+                {"sources": result.get("web_sources", [])}
             )
-        elif is_web_only:
-            merged_citations = web_citations
+            result["citations"] = kb.citations + web_citations
+        elif result.get("web_sources"):
+            result["citations"] = self.citation_manager.extract_citations_from_web_results(
+                {"sources": result.get("web_sources", [])}
+            )
         elif is_no_answer:
-            merged_citations = []
+            result["citations"] = []
         else:
-            merged_citations = kb_citations
-        # Defer filtering, suppression, and renumbering to the
-        # finalize_citations_callback (RouteProcessor._finalize_citations),
-        # which handles source-type alignment and marker renumbering in one
-        # pass.  Setting citations to the merged set gives the callback the
-        # full original list so renumber mapping is correct.
-        result["citations"] = merged_citations
+            # KB-only path: the context citations came back with the result.
+            result["citations"] = citations_from_result(result)
 
-        # Use coverage_score from result if available, otherwise compute from merged citations
+        # Use coverage_score from result if available, otherwise compute from citations
         coverage_score = result.get("coverage_score")
         if coverage_score is None:
             # Compute based on citation coverage using canonical helper
-            total_citations = len(merged_citations)
-            if is_hybrid:
-                kb_citation_count, web_citation_count = len(kb_citations), len(web_citations)
-            elif is_web_only:
-                kb_citation_count, web_citation_count = 0, len(web_citations)
-            elif is_no_answer:
-                kb_citation_count = web_citation_count = 0
-            else:
-                kb_citation_count, web_citation_count = len(kb_citations), 0
+            total_citations = len(result["citations"])
+            kb_citation_count = sum(
+                1 for c in result["citations"] if marker_type(c) == "knowledge_base"
+            )
+            web_citation_count = total_citations - kb_citation_count
             coverage_score = compute_merged_coverage_score(
                 total_citations, kb_citation_count, web_citation_count
             )
@@ -417,18 +397,3 @@ class HybridRouteHandler:
             web_results = {"answer": "", "sources": [], "grounded": False}
 
         return vector_results, web_results
-    
-    def _extract_sources(self, vector_results: Dict[str, Any]) -> List[str]:
-        """Extract source names from vector results."""
-        sources = []
-        metadatas = vector_results.get("metadatas", [])
-
-        for metadata in metadatas:
-            if metadata and isinstance(metadata, dict):
-                source = source_name_from_metadata(metadata)
-                if source:
-                    source = clean_source_display_name(source)
-                if source and source not in sources:
-                    sources.append(source)
-
-        return sources

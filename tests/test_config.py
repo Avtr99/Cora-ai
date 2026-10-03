@@ -221,3 +221,54 @@ class TestUvicornHost:
     def test_env_override(self, monkeypatch):
         monkeypatch.setenv("UVICORN_HOST", "0.0.0.0")
         assert Settings(_env_file=None).UVICORN_HOST == "0.0.0.0"
+
+
+class TestApiAccessKeyRequirement:
+    """P3-T1: ENABLE_API_KEY_PROTECTION requires a >=32-char API_ACCESS_KEY."""
+
+    def test_protection_off_without_key_is_valid(self, monkeypatch):
+        monkeypatch.delenv("ENABLE_API_KEY_PROTECTION", raising=False)
+        monkeypatch.delenv("API_ACCESS_KEY", raising=False)
+        settings = Settings(_env_file=None)
+        assert settings.ENABLE_API_KEY_PROTECTION is False
+        assert settings.API_ACCESS_KEY is None
+
+    def test_protection_on_without_key_raises(self, monkeypatch):
+        monkeypatch.delenv("API_ACCESS_KEY", raising=False)
+        with pytest.raises(ValidationError, match="API_ACCESS_KEY"):
+            Settings(_env_file=None, ENABLE_API_KEY_PROTECTION=True)
+
+    def test_protection_on_short_key_raises(self, monkeypatch):
+        monkeypatch.delenv("API_ACCESS_KEY", raising=False)
+        with pytest.raises(ValidationError, match="API_ACCESS_KEY"):
+            Settings(
+                _env_file=None,
+                ENABLE_API_KEY_PROTECTION=True,
+                API_ACCESS_KEY="k" * 31,
+            )
+
+    def test_protection_on_generated_key_is_valid(self, monkeypatch):
+        from src.api.middleware.security import generate_api_key
+
+        monkeypatch.delenv("API_ACCESS_KEY", raising=False)
+        key = generate_api_key()
+        settings = Settings(
+            _env_file=None,
+            ENABLE_API_KEY_PROTECTION=True,
+            API_ACCESS_KEY=key,
+        )
+        assert settings.API_ACCESS_KEY == key
+
+    def test_validation_error_hides_setting_values(self, monkeypatch):
+        """A failed startup validation must not echo secrets into logs."""
+        monkeypatch.setenv("GEMINI_API_KEY", "SECRET-MARKER-123")
+        with pytest.raises(ValidationError) as exc_info:
+            Settings(
+                _env_file=None,
+                ENABLE_API_KEY_PROTECTION=True,
+                API_ACCESS_KEY="short",
+            )
+        message = str(exc_info.value)
+        assert "input_value" not in message
+        assert "SECRET-MARKER-123" not in message
+        assert "at least 32 characters" in message

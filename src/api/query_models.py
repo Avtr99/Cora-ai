@@ -27,12 +27,12 @@ class Query(BaseModel):
         max_length=128,
         description="Reserved for future use. Session binding uses server-side state.",
     )
-    history: Optional[List[Message]] = Field(default=None, max_length=50)
-    history_signature: Optional[str] = Field(
+    message_id: Optional[str] = Field(
         default=None,
         max_length=64,
-        pattern=r"^(?:[0-9a-fA-F]+|unsigned)$",
-        description="HMAC-SHA256 hex signature for history integrity, or 'unsigned' for dev mode.",
+        pattern=r"^[a-zA-Z0-9\-]+$",
+        description="Client-generated user message ID (UUID format recommended). "
+        "The server generates one when absent; a retry reuses it to upsert the turn.",
     )
     include_debug: bool = False
     client_request_id: Optional[str] = Field(
@@ -48,6 +48,15 @@ class CitationDetail(BaseModel):
     source_name: str
     source_type: str
     relevance_score: float
+    # Prompt position — the N in [cite_kb: N] / [Web, cite: N] the answer
+    # cites. Absent for citations without prompt indices (structured mode).
+    index: Optional[int] = None
+    # Marker namespace `index` belongs to; a web result may carry a
+    # file-like source_type but still answers to [Web, cite: N].
+    marker_type: Optional[str] = None
+    # Identity of the underlying document (doc store ID for KB chunks, URL
+    # for web results); the frontend merges chunk badges that share it.
+    document_key: Optional[str] = None
     page_number: Optional[int] = None
     section: Optional[str] = None
     url: Optional[str] = None
@@ -120,8 +129,6 @@ class QueryMetadataResponse(BaseModel):
     timeout_exceeded: Optional[bool] = None
     timeout_reason: Optional[str] = None
     timing_breakdown: Optional[Dict[str, float]] = None
-    history_verification_failed: bool = False
-    history_items_dropped: int = 0
     config_version: Optional[int] = Field(
         None,
         description="Config generation at request start (observability stamp, not a consistency guarantee).",
@@ -135,14 +142,14 @@ class Response(BaseModel):
     confidence: float
     sources: List[str]
     conversation_id: str
+    message_id: str
+    answer_id: str
     timestamp: str
     citations: Optional[CitationResponse] = None
     reasoning_steps: Optional[List[AgentStepResponse]] = None
     metadata: Optional[QueryMetadataResponse] = None
     quiz: Optional[QuizResponse] = None
     suggested_prompts: Optional[List[str]] = None
-    history_signature: Optional[str] = None
-    history: Optional[List[Message]] = None
     truncated: bool = False
     config_version: int = Field(
         0,

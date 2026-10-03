@@ -147,21 +147,40 @@ class MetadataExtractor:
         # Combine filename and first 2000 chars of content for analysis
         analysis_text = f"{filename}\n{content[:2000]}"
 
-        # Detect registry/category — returns the matched RegistryPattern so we
-        # can distinguish real registries (Verra, Gold Standard, ...) from
-        # governance bodies and topic classifiers (ICVCM, Market Intelligence,
-        # ...). Real registries go into ``registry``; everything else goes into
-        # ``category`` so the ``registry`` field is never polluted with
-        # non-registry values.
-        matched_pattern = self._detect_registry_pattern(analysis_text)
-        if matched_pattern:
-            if matched_pattern.is_registry:
-                metadata["registry"] = matched_pattern.name
-            else:
-                metadata["category"] = matched_pattern.name
-        # Keep a plain-string registry name for downstream ID/version extraction
-        # and publisher fallback (those still work with category names too).
-        registry = matched_pattern.name if matched_pattern else None
+        # Publisher comes first — the "Publisher - Title" filename convention
+        # is a declared provenance signal and must outrank anything the
+        # content merely mentions.
+        publisher = self._extract_publisher_from_filename(filename)
+
+        # Detect the best-matching taxonomy pattern for TOPIC classification.
+        # Content markers legitimately say what a document is ABOUT — they can
+        # never say who published it, so they do not set ``registry``.
+        detected = self._detect_registry_pattern(analysis_text)
+        matched_pattern = detected[0] if detected else None
+        had_id_match = detected[1] if detected else False
+
+        # Registry = provenance, from declared signals only:
+        #   1. a recognised registry publisher in the filename convention,
+        #   2. a registry name declared in the filename itself,
+        #   3. an issuer-scoped document ID (VM0007, 115G) — IDs are assigned
+        #      by the issuing registry, so an ID match is authorship evidence.
+        # A document that merely mentions a registry gets it as ``category``
+        # instead — topically true, provenance-safe.
+        registry = self._filename_registry(publisher, filename)
+        if (
+            registry is None
+            and matched_pattern
+            and matched_pattern.is_registry
+            and had_id_match
+        ):
+            registry = matched_pattern.name
+        if registry:
+            metadata["registry"] = registry
+
+        # Category = topic: the best marker-matched pattern, including a
+        # registry name when the document is about it but not published by it.
+        if matched_pattern and matched_pattern.name != registry:
+            metadata["category"] = matched_pattern.name
 
         # Extract document ID
         doc_id = self._extract_document_id(analysis_text, registry)
@@ -183,9 +202,8 @@ class MetadataExtractor:
         # Keeping title extraction here would create a redundant, lower-quality
         # value that gets overwritten immediately.
 
-        # Extract publisher — filename prefix ("Publisher - Title") is the
-        # strongest signal; fall back to the detected registry/standard org.
-        publisher = self._extract_publisher_from_filename(filename)
+        # Publisher fallback — when the filename declares no publisher, use
+        # the provenance-derived registry/standard org.
         if not publisher and registry:
             publisher = PUBLISHER_ALIASES.get(registry.lower())
             if publisher is None and registry:
@@ -211,6 +229,10 @@ class MetadataExtractor:
         if not filename:
             return None
         stem = _strip_known_extensions(filename)
+        # Real-world filenames vary the separator: "Publisher - Title",
+        # "Publisher_-_Title" (download/upload-safe naming). Normalize
+        # underscores to spaces before applying the convention.
+        stem = re.sub(r"_+", " ", stem)
         if " - " not in stem:
             return None
         prefix = stem.split(" - ", 1)[0].strip()
@@ -232,17 +254,46 @@ class MetadataExtractor:
             return matches[-1]
         return None
     
-    def _detect_registry_pattern(self, text: str) -> Optional[RegistryPattern]:
+    def _filename_registry(self, publisher: Optional[str], filename: str) -> Optional[str]:
         """
-        Detect which registry/category pattern the document matches.
+        Registry declared by the filename itself.
+
+        The "Publisher - Title" prefix is the strongest form: when it resolves
+        to a known registry that wins, and the rest of the filename is treated
+        as topic, not provenance. Without a prefix, a registry name inside the
+        filename still counts — naming the file is a user declaration.
+        """
+        if publisher:
+            for pattern in self.patterns:
+                if pattern.is_registry and publisher.lower() == pattern.name.lower():
+                    return pattern.name
+            # A declared non-registry publisher takes precedence over name
+            # substrings elsewhere in the filename ("ICVCM - Review of Gold
+            # Standard" is an ICVCM document about Gold Standard).
+            return None
+        filename_text = re.sub(
+            r"[^a-z0-9]+", " ", _strip_known_extensions(filename).lower()
+        )
+        for pattern in self.patterns:
+            if not pattern.is_registry:
+                continue
+            name = pattern.name.lower()
+            if re.search(rf"(?<![a-z0-9]){re.escape(name)}(?![a-z0-9])", filename_text):
+                return pattern.name
+        return None
+
+    def _detect_registry_pattern(self, text: str) -> Optional[Tuple[RegistryPattern, bool]]:
+        """
+        Detect which registry/category pattern the document's content matches.
 
         Args:
             text: Text to analyze
 
         Returns:
-            The matched RegistryPattern, or None if no pattern matched.
-            Caller checks ``pattern.is_registry`` to decide whether to store
-            the name as ``registry`` or ``category``.
+            ``(pattern, had_id_match)`` for the best-matching pattern, or None.
+            The caller uses the pattern for ``category`` (topic) and only
+            promotes it to ``registry`` when ``had_id_match`` or filename
+            provenance supports it — content markers alone are topic evidence.
         """
         text_lower = text.lower()
 
@@ -268,8 +319,8 @@ class MetadataExtractor:
                 pattern_by_name[pattern.name] = pattern
 
         if scores:
-            best_name = max(scores.items(), key=lambda item: item[1])[0]
-            return pattern_by_name[best_name]
+            best_name, best = max(scores.items(), key=lambda item: item[1])
+            return pattern_by_name[best_name], bool(best[0])
 
         return None
     

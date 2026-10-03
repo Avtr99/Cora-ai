@@ -14,6 +14,7 @@ from fastapi import Request
 from loguru import logger
 
 from ..config import get_settings
+from ..db.chats import answer_id
 from ..db.revisions import get_revisions
 from ..agents.reasoning_formatter import create_timeout_response
 from .lifespan import (
@@ -22,8 +23,8 @@ from .lifespan import (
     get_retriever,
 )
 from .middleware import ThreatLevel, get_input_sanitizer, get_output_sanitizer, OutputSanitizer
-from .query_history import resolve_trusted_history, sanitize_history_messages
-from .query_models import Message, Query, Response
+from .query_history import TurnContext, close_turn
+from .query_models import Query, Response
 from .query_sanitization import (
     log_blocked_threat,
     log_output_redaction,
@@ -32,9 +33,6 @@ from .query_sanitization import (
     sanitize_suggested_prompts,
     sanitize_value,
 )
-from ..utils.security import sign_history
-
-HISTORY_CONTEXT_MAX_MESSAGES = 10  # The client cap should be >= this; the frontend uses FALLBACK_HISTORY_MAX.
 
 
 async def _drain_orchestrator_stream(
@@ -82,11 +80,11 @@ async def _drain_orchestrator_stream(
 async def process_query_core_stream(
     query: Query,
     request: Request,
+    ctx: TurnContext,
     *,
     include_reasoning: bool,
     include_metadata: bool,
     include_duration_ms: bool,
-    include_chat_history_in_orchestrator: bool,
     emit_tokens: bool = True,
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """Shared streaming query pipeline used by ``/query/stream``.
@@ -144,33 +142,18 @@ async def process_query_core_stream(
                "message": "Service initializing or LLM not configured. Visit /setup to configure."}
         return
 
-    history_scope_key = None
     settings = get_settings()
-    signing_secret = settings.SECRET_KEY
     timeout_ms = max(float(getattr(settings, "RAG_TIMEOUT_MS", 0) or 0), 0.0)
     timeout_seconds = timeout_ms / 1000.0
-
-    original_history_present = bool(query.history)
-    history_window, history_verified = resolve_trusted_history(
-        query.history,
-        conversation_id=query.conversation_id,
-        history_signature=query.history_signature,
-        signing_secret=signing_secret,
-        scope_key=history_scope_key or "",
-        max_messages=HISTORY_CONTEXT_MAX_MESSAGES,
-    )
-    cleaned_history = sanitize_history_messages(history_window)
-    scoped_history = cleaned_history
-
-    input_history_len = len(history_window) if history_window else 0
-    history_items_dropped = input_history_len - len(cleaned_history)
 
     orchestrator_kwargs: Dict[str, Any] = {
         "query": safe_query,
         "metadata_filters": None,
     }
-    if include_chat_history_in_orchestrator and scoped_history:
-        orchestrator_kwargs["chat_history"] = [{"role": m.role, "content": m.content} for m in scoped_history]
+    if ctx.history:
+        orchestrator_kwargs["chat_history"] = [
+            {"role": m.role, "content": m.content} for m in ctx.history
+        ]
 
     output_sanitizer = get_output_sanitizer()
     final_result: Optional[Dict[str, Any]] = None
@@ -216,7 +199,13 @@ async def process_query_core_stream(
         await stream_gen.aclose()
 
     if final_result is None:
-        final_result = {"answer": "", "sources": ["knowledge_base"], "citations": None}
+        # The stream ended without a final result — a failure, not an empty
+        # answer. Storing it would persist a blank turn as if it succeeded.
+        error_id = str(uuid.uuid4())[:8]
+        logger.warning(f"Streaming query ended with no result [error_id={error_id}]")
+        yield {"event": "error", "error_id": error_id,
+               "message": "Internal server error processing query"}
+        return
 
     answer = str(final_result.get("answer", "") or "")
     sanitized_answer, redacted_items = output_sanitizer.sanitize(answer)
@@ -226,38 +215,12 @@ async def process_query_core_stream(
     sanitized_sources = sanitize_value(sources, output_sanitizer)
     safe_sources = [str(s) for s in sanitized_sources if s] or ["knowledge_base"]
 
-    conversation_id = query.conversation_id or str(uuid.uuid4())
-    # Sign the exact request text the client sent, not the escaped/sanitized copy
-    # used for prompting. This makes the signature reproducible by the client.
-    new_history = []
-    if history_window:
-        new_history.extend([{"role": m.role, "content": m.content} for m in history_window])
-    new_history.append({"role": "user", "content": query.text})
-    new_history.append({"role": "assistant", "content": sanitized_answer})
-    new_history = new_history[-HISTORY_CONTEXT_MAX_MESSAGES:]
-
-    if signing_secret:
-        history_signature = sign_history(
-            new_history,
-            conversation_id,
-            signing_secret,
-            scope_key=history_scope_key or "",
-            allow_unsigned=False,
-        )
-    else:
-        history_signature = None
-
     sanitized_metadata = None
-    history_signals_triggered = history_items_dropped > 0 or (
-        history_verified is False and original_history_present
-    )
-    if include_metadata or history_signals_triggered:
+    if include_metadata:
         raw_metadata = final_result.get("metadata") or {}
         sanitized_metadata = sanitize_metadata(
             raw_metadata,
             output_sanitizer,
-            history_verification_failed=original_history_present and not history_verified,
-            history_items_dropped=history_items_dropped,
             config_version=config_version,
         )
 
@@ -278,7 +241,9 @@ async def process_query_core_stream(
         answer=sanitized_answer,
         confidence=final_result.get("confidence", 0.0),
         sources=safe_sources,
-        conversation_id=conversation_id,
+        conversation_id=ctx.conversation_id,
+        message_id=ctx.message_id,
+        answer_id=answer_id(ctx.message_id),
         timestamp=datetime.now(timezone.utc).isoformat(),
         citations=final_result.get("citations"),
         reasoning_steps=sanitized_reasoning_steps,
@@ -287,11 +252,13 @@ async def process_query_core_stream(
         suggested_prompts=sanitize_suggested_prompts(
             final_result.get("suggested_prompts"), output_sanitizer
         ),
-        history_signature=history_signature,
-        history=[Message(**m) for m in new_history] if new_history else None,
         truncated=final_result.get("truncated", False),
         config_version=config_version,
     )
+
+    # Store the turn just before the result event (B6): a client that leaves
+    # earlier stores nothing; one that leaves after still gets a stored turn.
+    await close_turn(ctx, query.text, response, final_result)
 
     payload = response.model_dump() if hasattr(response, "model_dump") else dict(response)
     yield {"event": "result", "payload": payload}

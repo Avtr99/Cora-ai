@@ -7,6 +7,14 @@ import re
 from typing import FrozenSet
 
 
+# Metadata keys that are safe to surface in citation payloads.
+SAFE_METADATA_FIELDS: FrozenSet[str] = frozenset({
+    "file_name", "original_filename", "parent_doc", "source", "page_number",
+    "section", "registry", "category", "document_id", "version_number", "title",
+    "publisher", "registry_document_id", "methodology_codes",
+})
+
+
 _ALL_KB_EXTENSIONS = {
     ".pdf", ".doc", ".docx", ".txt", ".md", ".csv", ".json", ".jsonl",
     ".xml", ".yaml", ".yml", ".xlsx", ".xls", ".ppt", ".pptx", ".parquet",
@@ -29,23 +37,10 @@ _TITLE_CASE_LOWER = frozenset({
     "at", "to", "of", "by", "as", "is", "if", "vs",
 })
 
-_STOP_WORDS = frozenset({
-    "the", "a", "an", "is", "are", "was", "were", "be", "been", "being", "have",
-    "has", "had", "do", "does", "did", "will", "would", "could", "should", "may",
-    "might", "must", "shall", "can", "need", "dare", "ought", "used", "to", "of",
-    "in", "for", "on", "with", "at", "by", "from", "as", "into", "through", "during",
-    "before", "after", "above", "below", "between", "under", "again", "further", "then",
-    "once", "here", "there", "when", "where", "why", "how", "all", "each", "few",
-    "more", "most", "other", "some", "such", "no", "nor", "not", "only", "own",
-    "same", "so", "than", "too", "very", "just", "and", "but", "if", "or", "because",
-    "until", "while",
-})
-
 _WINDOWS_PATH_RE = re.compile(r"[A-Za-z]:\\[^\n<>\"|?*]+")
 _UNIX_PATH_RE = re.compile(r"/(?:home|root|usr|var|etc|tmp|opt|srv|mnt|proc)/[^\n<>\"|?*]+")
 _ENV_PATH_RE = re.compile(r"\b[A-Z_]{3,}=(?:/[^\"]*\S|[A-Za-z]:\\[^\s]+)")
 
-_WORD_RE = re.compile(r"\b[a-zA-Z0-9][a-zA-Z0-9.-]*\b")
 _WORD_COUNT_RE = re.compile(r"\b\w+\b")
 _NON_ALNUM_SPACE_RE = re.compile(r"[^a-z0-9\s]")
 _MULTISPACE_RE = re.compile(r"\s+")
@@ -102,18 +97,7 @@ _EXACT_CONVERSATIONAL = frozenset({
 class CitationConfig:
     """Configurable thresholds and limits for citation logic."""
 
-    min_relevance_score: float = 0.3
-    max_kb_citations: int = 5
-    max_web_citations: int = 3
-    max_total_citations: int = 5
     snippet_max_length: int = 200
-    rank_decay_factor: float = 0.1
-    snippet_overlap_ratio_threshold: float = 0.15
-    snippet_overlap_absolute_threshold: int = 6
     short_answer_char_limit: int = 50
-    long_query_word_limit: int = 20
-    min_word_length: int = 3
-    name_match_bonus: int = 2
     coverage_suppression_threshold: float = 0.2
-    stop_words: FrozenSet[str] = field(default_factory=lambda: _STOP_WORDS)
     kb_extensions: FrozenSet[str] = field(default_factory=lambda: frozenset(_ALL_KB_EXTENSIONS))

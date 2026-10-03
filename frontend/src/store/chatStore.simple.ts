@@ -1,23 +1,23 @@
 /**
  * MINIMAL ZUSTAND CHAT STORE
- * 
- * Purpose: Handle ONLY state storage and persistence
+ *
+ * Purpose: Handle ONLY state storage
  * Actions: Remain in ChatContext.tsx (don't move complex logic)
- * 
- * Benefits of this hybrid approach:
- * 1. Automatic localStorage persistence (no manual useEffect)
- * 2. No useRef needed (Zustand's get() always returns fresh state)
- * 3. Keep actions in familiar Context pattern
- * 4. Gradual migration path
- * 
- * Lines: ~150 (vs 989 in old ChatContext)
+ *
+ * Chats are memory-only (Phase 7): the server owns persistence, the browser
+ * holds no chat data in localStorage. On sign-out (auth status 'required')
+ * the store is cleared, so nothing is left behind.
  */
 
 import { useMemo } from 'react';
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
 import { Chat } from './chatStore.types';
-import { validateAndSanitizeChatHistory } from './chatStore.utils';
+import { useAuthStore } from './authStore';
+
+/** localStorage key used by the pre-Phase-7 persisted chat store (D18). */
+const LEGACY_CHAT_HISTORY_KEY = 'chat-history';
+
+export type ChatListStatus = 'idle' | 'loading' | 'ready' | 'error';
 
 /**
  * State-only interface
@@ -26,6 +26,10 @@ import { validateAndSanitizeChatHistory } from './chatStore.utils';
 interface ChatStoreState {
   chats: Chat[];
   activeChatId: string | null;
+  /** Server chat-list load status: 'idle' until the first load attempt. */
+  listStatus: ChatListStatus;
+  /** Chat IDs whose messages are being fetched from the server right now. */
+  loadingChatIds: string[];
 }
 
 /**
@@ -38,117 +42,150 @@ interface ChatStoreActions {
   updateChat: (chatId: string, updates: Partial<Chat>) => void;
   deleteChat: (chatId: string) => void;
   setActiveChat: (chatId: string | null) => void;
-  
+
   // Bulk operations
   setChats: (chats: Chat[]) => void;
   clearAll: () => void;
+
+  // Server sync state
+  setListStatus: (status: ChatListStatus) => void;
+  markChatLoading: (chatId: string) => void;
+  unmarkChatLoading: (chatId: string) => void;
+  /** Apply updates, bump updatedAt to now, and move the chat to the top. */
+  touchChat: (chatId: string, updates?: Partial<Chat>) => void;
 }
 
 export type ChatStore = ChatStoreState & ChatStoreActions;
 
 /**
  * Simple Zustand store for chat state
- * 
+ *
  * What it does:
- * - Stores chats array and active chat ID
- * - Automatically persists to localStorage
- * - Validates data on load
- * 
+ * - Stores chats array and active chat ID (in memory only)
+ * - Tracks server list/detail loading state
+ *
  * What it doesn't do:
  * - Complex business logic (stays in ChatContext)
- * - API calls (stays in ChatContext)
+ * - API calls (stays in ChatContext / services)
  * - Message handling (stays in ChatContext)
  */
-export const useChatStore = create<ChatStore>()(
-  persist(
-    (set, get) => ({
-      // ==========================================
-      // STATE
-      // ==========================================
-      chats: [],
-      activeChatId: null,
+export const useChatStore = create<ChatStore>()((set, get) => ({
+  // ==========================================
+  // STATE
+  // ==========================================
+  chats: [],
+  activeChatId: null,
+  listStatus: 'idle',
+  loadingChatIds: [],
 
-      // ==========================================
-      // SIMPLE CRUD ACTIONS
-      // ==========================================
+  // ==========================================
+  // SIMPLE CRUD ACTIONS
+  // ==========================================
 
-      addChat: (chat: Chat) => {
-        set((state) => {
-          // Filter out any existing chat with the same ID to prevent duplicates
-          const filteredChats = state.chats.filter((c) => c.id !== chat.id);
-          return {
-            chats: [chat, ...filteredChats],
-          };
-        });
-      },
+  addChat: (chat: Chat) => {
+    set((state) => {
+      // Filter out any existing chat with the same ID to prevent duplicates
+      const filteredChats = state.chats.filter((c) => c.id !== chat.id);
+      return {
+        chats: [chat, ...filteredChats],
+      };
+    });
+  },
 
-      updateChat: (chatId: string, updates: Partial<Chat>) => {
-        set((state) => ({
-          chats: state.chats.map((chat) =>
-            chat.id === chatId ? { ...chat, ...updates } : chat
-          ),
-        }));
-      },
+  updateChat: (chatId: string, updates: Partial<Chat>) => {
+    set((state) => ({
+      chats: state.chats.map((chat) =>
+        chat.id === chatId ? { ...chat, ...updates } : chat
+      ),
+    }));
+  },
 
-      deleteChat: (chatId: string) => {
-        set((state) => ({
-          chats: state.chats.filter((chat) => chat.id !== chatId),
-          activeChatId: state.activeChatId === chatId ? null : state.activeChatId,
-        }));
-      },
+  deleteChat: (chatId: string) => {
+    set((state) => ({
+      chats: state.chats.filter((chat) => chat.id !== chatId),
+      activeChatId: state.activeChatId === chatId ? null : state.activeChatId,
+      loadingChatIds: state.loadingChatIds.filter((id) => id !== chatId),
+    }));
+  },
 
-      setActiveChat: (chatId: string | null) => {
-        // Allow clearing activeChatId with null
-        if (chatId === null) {
-          set({ activeChatId: null });
-          return;
-        }
-        
-        // Validate that the chatId exists in the store before setting
-        const { chats } = get();
-        const chatExists = chats.some((chat) => chat.id === chatId);
-        
-        if (chatExists) {
-          set({ activeChatId: chatId });
-        } else {
-          console.warn(`[ChatStore] Attempted to set active chat to non-existent ID: ${chatId}`);
-        }
-      },
-
-      setChats: (chats: Chat[]) => {
-        set({ chats });
-      },
-
-      clearAll: () => {
-        set({ chats: [], activeChatId: null });
-      },
-    }),
-    {
-      name: 'chat-history',
-      storage: createJSONStorage(() => localStorage),
-      
-      // Only persist chats
-      partialize: (state) => ({
-        chats: state.chats,
-      }),
-      
-      // Validate on load
-      onRehydrateStorage: () => (state) => {
-        if (state) {
-          try {
-            state.chats = validateAndSanitizeChatHistory(state.chats);
-            if (import.meta.env.DEV) {
-              console.log(`[ChatStore] Loaded ${state.chats.length} chats from localStorage`);
-            }
-          } catch (error) {
-            console.error('[ChatStore] Error validating chats:', error);
-            state.chats = [];
-          }
-        }
-      },
+  setActiveChat: (chatId: string | null) => {
+    // Allow clearing activeChatId with null
+    if (chatId === null) {
+      set({ activeChatId: null });
+      return;
     }
-  )
-);
+
+    // Validate that the chatId exists in the store before setting
+    const { chats } = get();
+    const chatExists = chats.some((chat) => chat.id === chatId);
+
+    if (chatExists) {
+      set({ activeChatId: chatId });
+    } else {
+      console.warn(`[ChatStore] Attempted to set active chat to non-existent ID: ${chatId}`);
+    }
+  },
+
+  setChats: (chats: Chat[]) => {
+    set({ chats });
+  },
+
+  clearAll: () => {
+    set({ chats: [], activeChatId: null, listStatus: 'idle', loadingChatIds: [] });
+  },
+
+  // ==========================================
+  // SERVER SYNC STATE
+  // ==========================================
+
+  setListStatus: (status: ChatListStatus) => {
+    set({ listStatus: status });
+  },
+
+  markChatLoading: (chatId: string) => {
+    set((state) =>
+      state.loadingChatIds.includes(chatId)
+        ? state
+        : { loadingChatIds: [...state.loadingChatIds, chatId] }
+    );
+  },
+
+  unmarkChatLoading: (chatId: string) => {
+    set((state) => ({
+      loadingChatIds: state.loadingChatIds.filter((id) => id !== chatId),
+    }));
+  },
+
+  touchChat: (chatId: string, updates?: Partial<Chat>) => {
+    set((state) => {
+      const chat = state.chats.find((c) => c.id === chatId);
+      if (!chat) return state;
+      const updated: Chat = { ...chat, ...updates, updatedAt: new Date() };
+      return { chats: [updated, ...state.chats.filter((c) => c.id !== chatId)] };
+    });
+  },
+}));
+
+// Clear all chat state when the session is lost (sign-out or a 401 marked the
+// session required). The browser must not keep chats from a previous session.
+useAuthStore.subscribe((state, prevState) => {
+  if (state.status === 'required' && prevState.status !== 'required') {
+    useChatStore.getState().clearAll();
+  }
+});
+
+/**
+ * Remove chat data persisted by the pre-Phase-7 localStorage store (D18).
+ * Called once from main.tsx before React renders so an upgrade leaves no
+ * chat content in the browser.
+ */
+export function removeLegacyChatHistory(): void {
+  try {
+    localStorage.removeItem(LEGACY_CHAT_HISTORY_KEY);
+  } catch {
+    // localStorage may be unavailable (private browsing) — non-fatal.
+  }
+}
 
 /**
  * Helper hooks for common patterns

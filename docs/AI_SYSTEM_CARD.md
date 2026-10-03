@@ -43,19 +43,21 @@ Cora does not use a training dataset and does not fine-tune models. The data flo
 1. **User-uploaded documents** (PDFs, CSVs, etc.) are parsed, chunked, and stored in a local Qdrant vector store.
 2. **Queries** are embedded and matched against the local vector store.
 3. **Retrieved chunks** are passed to the LLM to generate a cited answer.
-4. **Optional web search** fetches public snippets when local documents are insufficient.
+4. **Optional web search** fetches public snippets when local documents are insufficient. A lite-model scope gate refuses queries outside the sustainability/climate domain before any web call is made, so web search cannot answer off-topic questions (e.g. recipes or sports).
 
 There is no external data collection beyond user-provided documents and optional search snippets. By default, all persistent state lives locally (SQLite + Qdrant). No training data is collected or redistributed.
 
 ## Chunking and Retrieval Configuration
 
-- **Chunk size:** 1500 characters
-- **Chunk overlap:** 300 characters
+- **Chunker:** Docling `HybridChunker` — structure-aware, keeps tables and sections intact
+- **Chunk size:** 1500 characters (character budget, enforced by a char-counting tokenizer)
 - **Top-K after reranking:** 15
 - **Rerank score threshold:** 0.2
 - **KB minimum top relevance score:** 0.4
 
-The chunk size and overlap were selected through an internal A/B test. The test compared chunk sizes of 600, 800, 1000, 1200, 1500, and 2000 characters across 15 representative VCM queries. An OpenRouter Gemini judge scored each configuration for faithfulness and completeness. The 1500/300 configuration minimized hedging and performed best on the combined metric. This is documented in the `CHUNK_SIZE` / `CHUNK_OVERLAP` block in `src/config.py` and in `.env.example`.
+Stored markdown is re-parsed into a `DoclingDocument` at index time, so pipe tables and HTML tables become typed table items instead of flat text. Each chunk carries its heading ancestry (document title plus section path) via `contextualize()`. The 1500-character budget is enforced exactly by a tokenizer that counts characters (`_CharTokenizer` in `src/document_store/indexer.py`). There is no overlap setting — the chunker merges small adjacent items and repeats table headers instead.
+
+The chunk size was selected through an internal A/B test. The test compared chunk sizes of 600, 800, 1000, 1200, 1500, and 2000 characters across 15 representative VCM queries. An OpenRouter Gemini judge scored each configuration for faithfulness and completeness. The 1500 configuration minimized hedging and performed best on the combined metric. This is documented in the `CHUNK_SIZE` block in `src/config.py` and in `.env.example`.
 
 ## Performance Metrics and Evaluation
 
@@ -82,6 +84,7 @@ Test queries are provided in `scripts/evaluation/test_queries.json`. Evaluation 
 
 - **Hallucination:** The LLM can generate plausible but incorrect or unsupported statements. Users are instructed to verify responses against the cited sources.
 - **Coverage gaps:** The system can only answer from the documents in the knowledge base. If the topic is not covered, it falls back to web search or reports that the information is not found.
+- **Domain boundary:** The scope gate accepts sustainability, climate, and carbon-market questions, but refuses unrelated topics. Borderline classification depends on the configured lite model and can occasionally misjudge edge cases. When `COLLECTION_SYSTEM_INSTRUCTION` is set, that description defines the domain instead.
 - **Citation errors:** The model may cite a document that is topically adjacent but does not directly answer the question.
 - **Provider dependency:** Quality and availability depend on the configured LLM/embedding provider. Local providers may be slower or less capable than cloud providers.
 - **Document quality:** OCR and table extraction quality depend on the PDF conversion mode and the source document quality.

@@ -7,11 +7,6 @@ export interface Strength {
   text: string;
 }
 
-export interface PermanenceRisk {
-  percentage: number;
-  label: string;
-}
-
 export interface Benefit {
   number: number;
   title: string;
@@ -20,11 +15,11 @@ export interface Benefit {
 
 export interface Statistics {
   carbonSequestered: string;
-  bufferPool: string;
+  /** Optional: not all registries report a per-project buffer pool (Gold Standard uses a pooled compliance buffer). */
+  bufferPool?: string;
   creditsIssued: string;
   creditsRetired: string;
   source: string;
-  permanenceRisk: PermanenceRisk;
 }
 
 export interface BeforeAfterImage {

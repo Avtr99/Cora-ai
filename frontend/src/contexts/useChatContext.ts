@@ -5,6 +5,8 @@ export interface ChatContextType {
   chats: Chat[];
   activeChat: Chat | null;
   isTyping: boolean;
+  /** True while the active chat's messages are being fetched from the server. */
+  isLoadingMessages: boolean;
   /**
    * Creates a new chat with an optional initial message.
    * @param initialMessage - Optional first message to send in the new chat

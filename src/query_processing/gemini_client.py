@@ -475,7 +475,7 @@ class GeminiClient(BaseRAGClient):
 
         return fallback_text
 
-    # _prepare_context, _build_context_fingerprint, _should_cache_answer,
+    # _build_context_fingerprint, _should_cache_answer,
     # _calculate_coverage_score, and _sanitize_query are inherited from
     # BaseRAGClient (provider-agnostic implementations).
 
