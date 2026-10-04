@@ -1,34 +1,117 @@
 import React from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import { TONE_COLORS, type BarDatum } from '@/components/pricing/shared/barItems';
+import { TrendingDown, TrendingUp } from 'lucide-react';
+import { TONE_CLASSES, type BarDatum } from '@/components/pricing/shared/barItems';
 
+const GRID =
+  'grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-2 sm:grid-cols-[12.5rem_minmax(0,1fr)_8.25rem] sm:gap-x-6 3xl:grid-cols-[13rem_minmax(0,1fr)_9rem] 4xl:grid-cols-[15rem_minmax(0,1fr)_10rem]';
+
+/**
+ * Price comparison on a linear scale: name and examples, a proportional track,
+ * then the price with an optional ratio caption or year-on-year chip. The axis
+ * sits outside the group so the group holds exactly one styled node per bar.
+ */
 const BarComparison: React.FC<{
   items: BarDatum[];
   label: string;
-  valueClassName?: string;
-}> = ({
-  items,
-  label,
-  valueClassName = 'text-right font-inter text-lg sm:text-xl font-semibold tracking-tight text-text-primary tabular-nums',
-}) => {
+  hint?: string;
+  /** Caption family for the ratio under each price, e.g. `reduction`. */
+  ratioSuffix?: string;
+  axis?: { ticks: number[]; max: number };
+  legend?: React.ReactNode;
+}> = ({ items, label, hint, ratioSuffix, axis, legend }) => {
   const reduceMotion = useReducedMotion();
+  // The first datum is the ratio reference - its caption reads "Baseline".
+  const baseline = items[0];
+
   return (
-    <div role="group" aria-label={label} className="space-y-5 sm:space-y-6">
-      {items.map((item, index) => (
-        <div key={item.label} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-5 gap-y-3 py-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_6rem] sm:gap-4">
-          <span className="font-inter text-body-sm sm:text-body 3xl:text-lg 4xl:text-xl font-medium text-text-primary">{item.label}</span>
-          <div className="order-last col-span-2 h-2.5 3xl:h-3 4xl:h-3.5 rounded-full bg-surface-subtle sm:order-0 sm:col-span-1">
-            <motion.div
-              className="h-full min-w-2 rounded-full"
-              style={{ backgroundColor: TONE_COLORS[item.tone], width: `${Math.max(item.widthPct, 6)}%`, transformOrigin: 'left center' }}
-              initial={reduceMotion ? false : { scaleX: 0 }}
-              animate={{ scaleX: 1 }}
-              transition={{ duration: 0.45, ease: [0.4, 0, 0.2, 1], delay: 0.1 + index * 0.07 }}
-            />
+    <div>
+      {hint ? (
+        <p className="max-w-[56ch] text-pretty font-inter text-ui 3xl:text-sm 4xl:text-base leading-relaxed text-text-secondary">
+          {hint}
+        </p>
+      ) : null}
+      <div role="group" aria-label={label} className="mt-5 grid gap-4 3xl:gap-5">
+        {items.map((item, index) => {
+          const ChipIcon = item.chip?.direction === 'down' ? TrendingDown : TrendingUp;
+          return (
+            <div key={item.label} className={GRID}>
+              <div className="col-span-2 min-w-0 sm:col-span-1">
+                <b className="flex items-center gap-2 font-poppins text-body-sm 3xl:text-base 4xl:text-lg font-semibold leading-tight text-text-primary">
+                  <span aria-hidden="true" className={`h-2 w-2 shrink-0 rounded-full ${TONE_CLASSES[item.tone]}`} />
+                  {item.label}
+                </b>
+                {item.examples ? (
+                  <small className="mt-0.5 block pl-4 font-inter text-caption 3xl:text-ui leading-snug text-text-muted">
+                    {item.examples}
+                  </small>
+                ) : null}
+              </div>
+              <div className="h-[26px] min-w-0 rounded-md bg-surface-base 3xl:h-8 4xl:h-9">
+                <motion.div
+                  className={`h-full min-w-[6px] origin-left rounded-md ${TONE_CLASSES[item.tone]}`}
+                  style={{ width: `${item.widthPct}%` }}
+                  initial={reduceMotion ? false : { scaleX: 0 }}
+                  animate={{ scaleX: 1 }}
+                  transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.1 + index * 0.12 }}
+                />
+              </div>
+              <div className="col-span-2 text-right sm:col-span-1">
+                <b className="block font-poppins text-lg sm:text-xl 3xl:text-2xl 4xl:text-3xl font-semibold leading-none tracking-tight text-text-primary tabular-nums">
+                  {item.value}
+                </b>
+                {ratioSuffix ? (
+                  <small className="mt-1.5 block font-inter text-caption 3xl:text-ui leading-snug text-text-muted tabular-nums">
+                    {index === 0
+                      ? 'Baseline'
+                      : `${(item.rawValue / baseline.rawValue).toFixed(1)}\u00d7${item.open || item.chip ? '+' : ''} ${ratioSuffix}`}
+                  </small>
+                ) : null}
+                {item.chip ? (
+                  <span
+                    className={`mt-1.5 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 font-inter text-caption 3xl:text-ui font-semibold tabular-nums ${
+                      item.chip.direction === 'down'
+                        ? 'bg-kpi-reduction-bg text-kpi-reduction'
+                        : 'bg-semantic-success-bg text-semantic-success-text'
+                    }`}
+                  >
+                    <ChipIcon aria-hidden="true" strokeWidth={2.5} className="h-3.5 w-3.5" />
+                    {item.chip.text}
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {axis ? (
+        <div aria-hidden="true" className={`mt-2 ${GRID}`}>
+          <div className="hidden sm:block" />
+          <div className="relative h-4">
+            {axis.ticks.map((tick, tickIndex) => (
+              <span
+                key={tick}
+                className={`absolute top-0 font-inter text-overline text-text-muted tabular-nums ${
+                  tickIndex === 0
+                    ? 'translate-x-0'
+                    : tickIndex === axis.ticks.length - 1
+                      ? '-translate-x-full'
+                      : '-translate-x-1/2'
+                }`}
+                style={{ left: `${(tick / axis.max) * 100}%` }}
+              >
+                ${tick}
+              </span>
+            ))}
           </div>
-          <span className={valueClassName}>{item.value}</span>
+          <div className="hidden sm:block" />
         </div>
-      ))}
+      ) : null}
+      {legend ? (
+        <p className="mt-4 border-t border-border-ui pt-4 font-inter text-caption 3xl:text-ui leading-relaxed text-text-muted">
+          {legend}
+        </p>
+      ) : null}
     </div>
   );
 };

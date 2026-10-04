@@ -1,5 +1,5 @@
 import React from 'react';
-import { RELATED_FACTORS, type PricingSource } from '@/data/pricingFactorContent';
+import { PRICE_YEAR_NOTE, RELATED_FACTORS, type PricingSource } from '@/data/pricingFactorContent';
 import type { ForceId } from '@/data/pricingData';
 
 const RelatedFactor: React.FC<{
@@ -23,7 +23,7 @@ const RelatedFactor: React.FC<{
 
 const SourceLinks: React.FC<{ sources: PricingSource[] }> = ({ sources }) => (
   <p className="font-inter text-overline 3xl:text-xs 4xl:text-sm leading-relaxed text-text-muted">
-    Source:{' '}
+    {PRICE_YEAR_NOTE} Source:{' '}
     {sources.map((source, index) => (
       <React.Fragment key={source.href}>
         {index > 0 && <span aria-hidden="true">, </span>}

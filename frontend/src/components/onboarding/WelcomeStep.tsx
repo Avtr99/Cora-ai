@@ -1,6 +1,7 @@
 /**
  */
 
+import { Fragment } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { CheckCircle2 } from "lucide-react";
 
@@ -49,7 +50,7 @@ const WelcomeStep = ({
       />
 
       <motion.h1
-        className="font-poppins text-3xl 3xl:text-4xl 4xl:text-5xl leading-8 md:text-4xl md:leading-10 3xl:leading-10 4xl:leading-12 font-semibold text-text-primary tracking-tight mb-2 3xl:mb-3 4xl:mb-4"
+        className="font-poppins text-display md:text-3xl font-semibold text-text-primary tracking-tight mb-2 3xl:mb-3 4xl:mb-4"
         initial={shouldReduceMotion ? false : { opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1], delay: 0.06 }}
@@ -58,7 +59,7 @@ const WelcomeStep = ({
       </motion.h1>
 
       <motion.p
-        className="font-inter text-sm 3xl:text-base 4xl:text-lg text-text-muted max-w-sm 3xl:max-w-md 4xl:max-w-lg mb-8 3xl:mb-10 4xl:mb-12"
+        className="font-inter text-body-sm 3xl:text-base 4xl:text-lg text-text-muted max-w-sm 3xl:max-w-md 4xl:max-w-lg mb-8 3xl:mb-10 4xl:mb-12"
         initial={shouldReduceMotion ? false : { opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1], delay: 0.12 }}
@@ -78,25 +79,25 @@ const WelcomeStep = ({
             <div className="flex h-5 w-5 3xl:h-6 3xl:w-6 4xl:h-7 4xl:w-7 items-center justify-center rounded-full bg-semantic-success-bg">
               <CheckCircle2 className="h-3.5 w-3.5 3xl:h-4 3xl:w-4 4xl:h-5 4xl:w-5 text-semantic-success-icon" strokeWidth={2.5} />
             </div>
-            <span className="font-poppins text-sm 3xl:text-base 4xl:text-lg font-semibold text-text-primary">
+            <span className="font-poppins text-body-sm 3xl:text-base 4xl:text-lg font-semibold text-text-primary">
               {allConfigured ? "Your setup is ready" : "Existing config detected"}
             </span>
           </div>
           <div className="rounded-xl border border-border-ui bg-surface-card p-3 3xl:p-4 4xl:p-5 text-left">
-            <div className="grid grid-cols-[auto_1fr] gap-x-4 3xl:gap-x-5 gap-y-1.5 3xl:gap-y-2 text-xs 3xl:text-sm 4xl:text-base">
+            <div className="grid grid-cols-[auto_1fr] gap-x-4 3xl:gap-x-5 gap-y-1.5 3xl:gap-y-2 text-caption 3xl:text-sm 4xl:text-base">
               {detectedItems.map((item) => (
-                <>
-                  <span key={`${item.label}-label`} className="font-poppins font-medium text-text-secondary">
+                <Fragment key={item.label}>
+                  <span className="font-poppins font-medium text-text-secondary">
                     {item.label}
                   </span>
-                  <span key={`${item.label}-detail`} className="font-inter text-text-muted truncate text-xs 3xl:text-sm 4xl:text-base">
+                  <span className="font-inter text-text-muted truncate">
                     {item.detail}
                   </span>
-                </>
+                </Fragment>
               ))}
             </div>
           </div>
-          <p className="mt-2 3xl:mt-3 font-inter text-xs 3xl:text-sm 4xl:text-base text-text-muted">
+          <p className="mt-2 3xl:mt-3 font-inter text-caption 3xl:text-sm 4xl:text-base text-text-muted">
             {allConfigured
               ? "You can start chatting now or review your settings first."
               : "We'll skip the configured steps and only set up what's missing."}
@@ -113,14 +114,14 @@ const WelcomeStep = ({
         <button
           type="button"
           onClick={allConfigured ? onSkip : onContinue}
-          className="px-8 3xl:px-10 4xl:px-12 py-2.5 3xl:py-3 4xl:py-4 rounded-lg bg-brand-700 text-white font-poppins text-sm 3xl:text-base 4xl:text-lg font-semibold shadow-card-md transition-colors hover:bg-brand-hover focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-focus"
+          className="px-8 3xl:px-10 4xl:px-12 py-2.5 3xl:py-3 4xl:py-4 rounded-lg bg-brand-700 text-white font-poppins text-body-sm 3xl:text-base 4xl:text-lg font-semibold shadow-card-md transition-colors hover:bg-brand-hover focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-focus"
         >
           {allConfigured ? "Go to chat" : isConfigured ? "Complete setup" : "Get started"}
         </button>
         <button
           type="button"
           onClick={allConfigured ? onContinue : onSkip}
-          className="font-inter text-sm 3xl:text-base 4xl:text-lg text-text-muted hover:text-text-primary transition-colors"
+          className="font-inter text-body-sm 3xl:text-base 4xl:text-lg text-text-muted hover:text-text-primary transition-colors rounded-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2"
         >
           {allConfigured ? "Review settings" : "Skip setup for now"}
         </button>

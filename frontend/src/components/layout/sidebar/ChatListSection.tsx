@@ -56,7 +56,7 @@ export const ChatListSection: React.FC<ChatListSectionProps> = ({
 
   return (
     <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-      <p className="text-overline 3xl:text-sm 4xl:text-lg font-semibold text-text-muted uppercase tracking-wider px-5 3xl:px-6 pt-2 3xl:pt-3 pb-0.5 shrink-0">
+      <p className="text-overline font-semibold text-text-muted uppercase tracking-wider px-3 pt-3 pb-1 shrink-0">
         History
       </p>
       <ScrollArea.Root className="flex-1 min-h-0 overflow-hidden">

@@ -19,7 +19,7 @@ const LegalPageLayout: React.FC<LegalPageLayoutProps> = ({ title, lastUpdated, c
   return (
     <main className="bg-surface-base min-h-screen relative">
       <ScrollToTop />
-      <div className="container mx-auto px-4 md:px-12 lg:px-24 3xl:px-24 4xl:px-32 pt-16 3xl:pt-20 4xl:pt-24 pb-8 3xl:pb-12 4xl:pb-16 max-w-[1320px] 3xl:max-w-[1600px] 4xl:max-w-[1800px]">
+      <div className="container mx-auto px-4 md:px-12 lg:px-24 3xl:px-24 4xl:px-32 pt-16 3xl:pt-20 4xl:pt-24 pb-8 3xl:pb-12 4xl:pb-16 max-w-[1320px]">
         {/* Header with Back Navigation */}
         <nav aria-label="Page" className="mb-4 md:mb-8 3xl:mb-10 4xl:mb-12">
           <Link

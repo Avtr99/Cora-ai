@@ -14,9 +14,11 @@ Design system for the Cora VCM application. Single source of truth — one entry
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 ```
 
-```js
-// tailwind.config.ts
-fontFamily: { sans: ['Inter', ...], poppins: ['Poppins', 'sans-serif'], inter: ['Inter', 'sans-serif'] }
+```css
+/* src/index.css @theme */
+--font-sans: Inter, ui-sans-serif, system-ui, sans-serif;
+--font-poppins: Poppins, sans-serif;
+--font-inter: Inter, sans-serif;
 ```
 
 #### Type Scale
@@ -56,11 +58,10 @@ Several tokens intentionally share the same value in light mode but diverge in d
 | `BRAND` | Brand purple scale: `primary950` (#2E1065), `primary900` (#403D85), `primary700` (#4A2AA3), `primary500` (#6F4ECB), `primary300` (#C4B5FD), `primary200` (#E9D5FF), `primary100` (#F3E8FF), `primary50` (#FAF5FF) |
 | `NEUTRAL` | Neutral gray scale: 0 (#FFFFFF), 25 (#FAFAFA), 50 (#F8F9FA), 100 (#F3F4F6), 150 (#E5E7EB), 200 (#D6D6D6), 300 (#B8BEC8), 400 (#6B7280), 600 (#4B5563), 800 (#525252), 900 (#171717) |
 | `TEXT` | Semantic text: `primary` #171717, `body` #525252, `muted` #6B7280, `disabled` #B8BEC8, `inverse` #FFFFFF |
-| `INTERACTIVE` | States: `default` #6B7280, `hover/active` #6F4ECB, `focusRing` rgba(74,42,163,0.35) |
 | `ICON_STATE` | Icon states: `default` #6B7280, `active/selected` #6F4ECB |
 | `getProjectTypeColor(type)` | Returns `{ accent, bg, text }` for Forest/REDD+, Renewable, Agriculture, Cookstove/Household, Landfill/Industrial, default purple |
 | `getStatusStyle(status)` | Returns `{ bg, text, dot }` for registered/active (green), completed (blue), cancelled (red), under development (amber), crediting period ended (gray) |
-| `TREND_COLORS` | Trend badges / icon colors: rising (green), declining (orange), note (amber) |
+| `KPI` | Pricing-chart accents: `reduction` #C4627A (+ `reductionBg` #FDF0F3), `removal` #2D9D78 (+ `removalSoft`, `removalDeep` #065F46), `other` #6B7280. Trend tones live in CSS vars `--color-trend-rising*`, `--color-trend-declining*` |
 
 #### Semantic Quick Reference
 
@@ -95,7 +96,7 @@ CSS variable `--radius: 0.5rem` (8px). Derived:
 - `rounded-lg` → 8px, `rounded-md` → 6px, `rounded-sm` → 4px, `rounded-xs` → 2px
 - Custom: `rounded-[20px]` pills, `rounded-2xl` cards, `rounded-full` badges
 
-### App Type Scale (`tailwind.config.ts` `fontSize`)
+### App Type Scale (`src/index.css` `@theme` `--text-*`)
 
 Marketing H1–H6 above are for hero/page titles. In-app UI uses these utilities instead:
 
@@ -114,7 +115,7 @@ Marketing H1–H6 above are for hero/page titles. In-app UI uses these utilities
 
 ### Elevation (Shadows)
 
-Defined as CSS custom properties in `src/index.css` and Tailwind utilities in `tailwind.config.ts`.
+Defined as CSS custom properties and `@theme` tokens in `src/index.css` (Tailwind v4 — no `tailwind.config.ts`).
 
 | Class | Value | Use |
 |---|---|---|
@@ -291,14 +292,14 @@ Page shell: `src/pages/PricingPage.tsx` — hero + `PricingFactorTabs` + `Pricin
 
 #### FactorComparison
 - **File**: `src/components/pricing/FactorComparison.tsx`
-- One white `DataCard` per force, using open layout gaps instead of repeated internal divider rules:
-  - **Type** — linear animated bar comparison plus a dark neutral context panel.
-  - **Integrity** — balanced landfill-gas metrics, co-benefit premium, and CCP methodology status list.
-  - **Claims** — SBTi V2.0 milestone timeline + open demand lanes without flow chips.
-  - **Compliance** — CORSIA timeline + open authorized and unauthorized buyer pools without large tinted cards.
-  - **Vintage** — linear animated bar comparison plus a dark neutral context panel.
+- Thin dispatcher: maps `ForceId` to the per-factor panel in `factors/`. Each panel composes labelled `Band` sections inside one `DataCard` surface, then renders `OutlookCards` and `PanelFooter` on the page background. Open layout gaps replace repeated internal divider rules.
+  - **Type** (`TypeComparison`) — animated `BarComparison` of 2024 average prices + "why the gap exists" band (`Waffle` supply share, `VerticalBars` demand, `MiniBars` durability).
+  - **Integrity** (`IntegrityComparison`) — landfill-gas `VerticalBars` (price + volume after CCP approval), methodology examples, co-benefit `MiniBars`.
+  - **Claims** (`ClaimsComparison`) — `NetZeroChart` equation, SBTi V2.0 `MilestoneTimeline`, `ClaimFlow` eligibility ribbons.
+  - **Compliance** (`ComplianceComparison`) — `BuyerStaircase` (buyer pools × authorization levels) + CORSIA `MilestoneTimeline`.
+  - **Vintage** (`VintageComparison`) — `BarComparison` + `VintageStrip` year strip.
 - Statuses render as semantic text labels rather than capsules. Large values use tabular numerals.
-- Shared primitives: `BandLabel`, `DataCard`, `SplitBand`, `BarComparison`, `StatusPill`.
+- Shared primitives in `shared/`: `Band`, `BandLabel`, `DataCard`, `BarComparison`, `MiniBars`, `VerticalBars` (+ `VisualCaption`), `Waffle`, `BuyerStaircase`, `ClaimFlow`, `NetZeroChart`, `VintageStrip`, `MilestoneTimeline`, `OutlookCards`, `ContextSection`, `FactorHeader`, `PanelFooter`, `barItems`, `today`.
 
 ---
 
@@ -454,7 +455,7 @@ import ChatIcon from '@/assets/icons/chat.svg?react';
 - Motion: all transitions respect `@media (prefers-reduced-motion: reduce)`
 
 ### Responsive Design
-- Container centered with `2rem` padding; custom `2xl` breakpoint at `1400px`; ultra-wide `3xl` at `1920px`, `4xl` at `2400px` (`tailwind.config.ts` `screens`)
+- Container centered with `2rem` padding; ultra-wide `3xl` at `1920px`, `4xl` at `2400px` (`--breakpoint-3xl` / `--breakpoint-4xl` in `src/index.css` `@theme`)
 - Split view right panel hidden below `lg`; mobile gets sheet-style drawer
 - Sidebar collapses to icon-only on mobile (hamburger toggle)
 

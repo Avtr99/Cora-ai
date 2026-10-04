@@ -44,7 +44,20 @@ interface ChatStoreActions {
   setActiveChat: (chatId: string | null) => void;
 
   // Bulk operations
-  setChats: (chats: Chat[]) => void;
+  /**
+   * Apply the server chat list. Summaries carry no messages, so locally
+   * loaded or in-flight state is preserved on top of the remote summary,
+   * and local chats that haven't reached the server yet are kept.
+   * This is the only write path for server list data — a raw replace would
+   * silently drop in-flight turns.
+   */
+  mergeServerChats: (remoteChats: Chat[]) => void;
+  /**
+   * Apply a fetched chat's history. Fetched turns are prepended to whatever
+   * arrived locally during the fetch (e.g. a pending message/placeholder),
+   * so a slow fetch cannot erase in-flight state.
+   */
+  mergeChatHistory: (chatId: string, history: Pick<Chat, 'title' | 'messages' | 'shownRecommendations' | 'updatedAt'>) => void;
   clearAll: () => void;
 
   // Server sync state
@@ -126,8 +139,43 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
     }
   },
 
-  setChats: (chats: Chat[]) => {
-    set({ chats });
+  mergeServerChats: (remoteChats: Chat[]) => {
+    set((state) => {
+      const localById = new Map(state.chats.map((c) => [c.id, c]));
+      const remoteIds = new Set(remoteChats.map((c) => c.id));
+
+      const merged = remoteChats.map((remote) => {
+        const local = localById.get(remote.id);
+        return local && (local.messagesLoaded || local.messages.length > 0)
+          ? {
+              ...remote,
+              messages: local.messages,
+              shownRecommendations: local.shownRecommendations,
+              messagesLoaded: local.messagesLoaded,
+            }
+          : remote;
+      });
+
+      const pending = state.chats.filter((c) => !remoteIds.has(c.id));
+      return { chats: [...pending, ...merged] };
+    });
+  },
+
+  mergeChatHistory: (chatId, history) => {
+    set((state) => ({
+      chats: state.chats.map((chat) =>
+        chat.id === chatId
+          ? {
+              ...chat,
+              title: history.title,
+              messages: [...history.messages, ...chat.messages],
+              shownRecommendations: [...new Set([...history.shownRecommendations, ...chat.shownRecommendations])],
+              updatedAt: history.updatedAt,
+              messagesLoaded: true,
+            }
+          : chat
+      ),
+    }));
   },
 
   clearAll: () => {

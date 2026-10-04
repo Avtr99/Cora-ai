@@ -11,7 +11,6 @@
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { IconWrapper } from "@/components/icons/IconWrapper";
-import { BRAND } from "@/lib/colors";
 import ChatIcon from "@/assets/icons/chat.svg?react";
 import BookIcon from "@/assets/icons/book.svg?react";
 import PricingIcon from "@/assets/icons/pricing.svg?react";
@@ -66,10 +65,10 @@ const TourStep = ({ onFinish }: TourStepProps): JSX.Element => {
   return (
     <div>
       <div className="mb-4 3xl:mb-5 4xl:mb-6">
-        <h2 className="font-poppins text-lg md:text-xl 3xl:text-2xl 4xl:text-3xl font-semibold text-text-primary mb-1 3xl:mb-2 4xl:mb-3">
+        <h2 className="font-poppins text-heading-1 3xl:text-display font-semibold text-text-primary mb-1 3xl:mb-2 4xl:mb-3">
           What you can do with Cora
         </h2>
-        <p className="font-inter text-sm 3xl:text-base 4xl:text-lg text-text-muted">
+        <p className="font-inter text-body-sm 3xl:text-base 4xl:text-lg text-text-muted">
           You&apos;re all set. Click any card to jump straight in.
         </p>
       </div>
@@ -92,16 +91,16 @@ const TourStep = ({ onFinish }: TourStepProps): JSX.Element => {
           >
             <Link
               to={to}
-              className="flex items-start gap-3 3xl:gap-4 h-full p-3 3xl:p-4 4xl:p-5 rounded-xl bg-surface-card border border-border-ui shadow-card-sm transition-all hover:border-brand-300 hover:shadow-card group"
+              className="flex items-start gap-3 3xl:gap-4 h-full p-3 3xl:p-4 4xl:p-5 rounded-xl bg-surface-card border border-border-ui shadow-card-sm transition-all hover:border-brand-300 hover:shadow-card group focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2"
             >
               <div className="flex items-center justify-center w-9 h-9 3xl:w-10 3xl:h-10 4xl:w-12 4xl:h-12 rounded-lg bg-brand-100 shrink-0">
-                <IconWrapper Icon={icon} size={18} color={BRAND.primary700} aria-hidden={true} className="3xl:w-5! 3xl:h-5! 4xl:w-6! 4xl:h-6!" />
+                <IconWrapper Icon={icon} size={18} color="var(--color-brand-700)" aria-hidden={true} className="3xl:w-5! 3xl:h-5! 4xl:w-6! 4xl:h-6!" />
               </div>
               <div className="min-w-0">
-                <h3 className="font-poppins text-sm 3xl:text-base 4xl:text-lg font-semibold text-text-primary group-hover:text-brand-700 transition-colors">
+                <h3 className="font-poppins text-body-sm 3xl:text-base 4xl:text-lg font-semibold text-text-primary group-hover:text-brand-700 transition-colors">
                   {title}
                 </h3>
-                <p className="mt-1 3xl:mt-2 font-inter text-xs 3xl:text-sm 4xl:text-base text-text-muted leading-relaxed">
+                <p className="mt-1 3xl:mt-2 font-inter text-caption 3xl:text-sm 4xl:text-base text-text-muted leading-relaxed">
                   {description}
                 </p>
               </div>
@@ -114,13 +113,13 @@ const TourStep = ({ onFinish }: TourStepProps): JSX.Element => {
         <button
           type="button"
           onClick={onFinish}
-          className="px-7 3xl:px-9 4xl:px-11 py-2.5 3xl:py-3 4xl:py-4 rounded-lg bg-brand-700 text-white font-poppins text-sm 3xl:text-base 4xl:text-lg font-semibold shadow-card-md transition-colors hover:bg-brand-hover focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-focus"
+          className="px-7 3xl:px-9 4xl:px-11 py-2.5 3xl:py-3 4xl:py-4 rounded-lg bg-brand-700 text-white font-poppins text-body-sm 3xl:text-base 4xl:text-lg font-semibold shadow-card-md transition-colors hover:bg-brand-hover focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-focus"
         >
           Start chatting
         </button>
         <Link
           to="/about/"
-          className="font-inter text-sm 3xl:text-base 4xl:text-lg text-text-muted hover:text-text-primary transition-colors"
+          className="font-inter text-body-sm 3xl:text-base 4xl:text-lg text-text-muted hover:text-text-primary transition-colors rounded-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2"
         >
           Learn more about Cora
         </Link>

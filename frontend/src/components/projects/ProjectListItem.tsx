@@ -119,7 +119,7 @@ export const ProjectListItem: React.FC<ProjectListItemProps> = ({
             ? 'border-brand-500 bg-brand-500 opacity-100'
             : compareDisabled
               ? 'border-border-ui bg-surface-subtle cursor-not-allowed opacity-0'
-              : 'border-border-ui bg-surface-card hover:border-brand-500 opacity-0 group-hover:opacity-100'
+              : 'border-border-ui bg-surface-card hover:border-text-muted opacity-0 group-hover:opacity-100'
           }`}
       >
         {isSelected && (

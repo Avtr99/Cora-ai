@@ -163,16 +163,60 @@ describe('useChatStore', () => {
     });
   });
 
-  describe('setChats', () => {
-    it('replaces all chats', () => {
-      const chat = createMockChat('chat-1');
-      useChatStore.getState().addChat(chat);
-
+  describe('mergeServerChats', () => {
+    it('applies the server list when the store is empty', () => {
       const newChats = [createMockChat('chat-3'), createMockChat('chat-4')];
-      useChatStore.getState().setChats(newChats);
+      useChatStore.getState().mergeServerChats(newChats);
 
       expect(useChatStore.getState().chats).toHaveLength(2);
       expect(useChatStore.getState().chats.map(c => c.id)).toEqual(['chat-3', 'chat-4']);
+    });
+
+    it('keeps local chats that are not in the server list yet', () => {
+      const local = createMockChat('local-new');
+      useChatStore.getState().addChat(local);
+
+      useChatStore.getState().mergeServerChats([createMockChat('chat-3')]);
+
+      const chats = useChatStore.getState().chats;
+      expect(chats.map(c => c.id)).toEqual(['local-new', 'chat-3']);
+    });
+
+    it('preserves loaded local messages on chats present in the server list', () => {
+      const local = {
+        ...createMockChat('chat-1'),
+        messages: [{ id: 'm1', content: 'hi', sender: 'user' as const, timestamp: new Date() }],
+      };
+      useChatStore.getState().addChat(local);
+      const remote = { ...createMockChat('chat-1'), messages: [], messagesLoaded: false };
+
+      useChatStore.getState().mergeServerChats([remote]);
+
+      const chat = useChatStore.getState().chats[0];
+      expect(chat.messages).toEqual(local.messages);
+      expect(chat.messagesLoaded).toBe(true);
+    });
+  });
+
+  describe('mergeChatHistory', () => {
+    it('prepends fetched history to messages added during the fetch', () => {
+      const chat = { ...createMockChat('chat-1'), messagesLoaded: false };
+      useChatStore.getState().addChat(chat);
+      useChatStore.getState().updateChat('chat-1', {
+        messages: [{ id: 'm2', content: 'sent during load', sender: 'user' as const, timestamp: new Date() }],
+      });
+
+      useChatStore.getState().mergeChatHistory('chat-1', {
+        title: 'Chat 1',
+        messages: [{ id: 'm1', content: 'old', sender: 'user' as const, timestamp: new Date() }],
+        shownRecommendations: ['rec-1'],
+        updatedAt: new Date(),
+      });
+
+      const updated = useChatStore.getState().chats[0];
+      expect(updated.messages.map(m => m.id)).toEqual(['m1', 'm2']);
+      expect(updated.messagesLoaded).toBe(true);
+      expect(updated.shownRecommendations).toEqual(['rec-1']);
     });
   });
 

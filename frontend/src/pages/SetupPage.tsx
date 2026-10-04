@@ -161,8 +161,8 @@ const SetupPage = (): JSX.Element => {
  onClick={() => setPreset(key)}
  className={`px-4 3xl:px-5 py-3 3xl:py-4 4xl:py-5 rounded-lg border-2 text-sm font-poppins font-medium transition-all ${
  preset === key
- ? "border-brand-700 bg-brand-50 text-brand-700"
- : "border-border-ui bg-surface-card text-text-secondary hover:border-brand-300"
+  ? "border-text-primary bg-surface-subtle text-text-primary shadow-xs"
+  : "border-border-ui bg-surface-card text-text-secondary hover:border-border-strong"
  }`}
  >
  {PRESETS[key].label}
@@ -188,7 +188,7 @@ const SetupPage = (): JSX.Element => {
  value={apiKey}
  onChange={(e) => setApiKey(e.target.value)}
  placeholder={settings?.has_api_key ? "••••••••••••" : "Enter your API key"}
- className="w-full px-4 3xl:px-5 py-3 3xl:py-4 4xl:py-5 rounded-lg border border-border-ui bg-surface-card text-text-primary font-inter text-sm 3xl:text-base 4xl:text-lg focus:border-brand-700 focus:outline-hidden focus:ring-2 focus:ring-focus"
+ className="w-full px-4 3xl:px-5 py-3 3xl:py-4 4xl:py-5 rounded-lg border border-border-ui bg-surface-card text-text-primary font-inter text-sm 3xl:text-base 4xl:text-lg focus:border-border-strong focus:outline-hidden focus:ring-2 focus:ring-focus"
  />
  </div>
  )}
@@ -204,7 +204,7 @@ const SetupPage = (): JSX.Element => {
  value={baseUrl}
  onChange={(e) => setBaseUrl(e.target.value)}
  placeholder="https://api.example.com/v1"
- className="w-full px-4 3xl:px-5 py-3 3xl:py-4 4xl:py-5 rounded-lg border border-border-ui bg-surface-card text-text-primary font-inter text-sm 3xl:text-base 4xl:text-lg focus:border-brand-700 focus:outline-hidden focus:ring-2 focus:ring-focus"
+ className="w-full px-4 3xl:px-5 py-3 3xl:py-4 4xl:py-5 rounded-lg border border-border-ui bg-surface-card text-text-primary font-inter text-sm 3xl:text-base 4xl:text-lg focus:border-border-strong focus:outline-hidden focus:ring-2 focus:ring-focus"
  />
  </div>
  )}
@@ -218,7 +218,7 @@ const SetupPage = (): JSX.Element => {
  <select
  value={modelMain}
  onChange={(e) => setModelMain(e.target.value)}
- className="w-full px-4 3xl:px-5 py-3 3xl:py-4 4xl:py-5 rounded-lg border border-border-ui bg-surface-card text-text-primary font-inter text-sm 3xl:text-base 4xl:text-lg focus:border-brand-700 focus:outline-hidden focus:ring-2 focus:ring-focus"
+ className="w-full px-4 3xl:px-5 py-3 3xl:py-4 4xl:py-5 rounded-lg border border-border-ui bg-surface-card text-text-primary font-inter text-sm 3xl:text-base 4xl:text-lg focus:border-border-strong focus:outline-hidden focus:ring-2 focus:ring-focus"
  >
  <option value="">Select a model...</option>
  {ollamaModels.map((m) => (
@@ -237,7 +237,7 @@ const SetupPage = (): JSX.Element => {
  value={modelMain}
  onChange={(e) => setModelMain(e.target.value)}
  placeholder={config.modelPlaceholder}
- className="w-full px-4 3xl:px-5 py-3 3xl:py-4 4xl:py-5 rounded-lg border border-border-ui bg-surface-card text-text-primary font-inter text-sm 3xl:text-base 4xl:text-lg focus:border-brand-700 focus:outline-hidden focus:ring-2 focus:ring-focus"
+ className="w-full px-4 3xl:px-5 py-3 3xl:py-4 4xl:py-5 rounded-lg border border-border-ui bg-surface-card text-text-primary font-inter text-sm 3xl:text-base 4xl:text-lg focus:border-border-strong focus:outline-hidden focus:ring-2 focus:ring-focus"
  />
  )}
  {preset === "ollama" && ollamaModels.length === 0 && !loadingModels && (
@@ -345,12 +345,13 @@ const SetupPage = (): JSX.Element => {
 function ProviderStatusCard({ label, status }: { label: string; status: { provider: string; has_api_key: boolean; model: string | null; is_configured: boolean; warning: string | null } }): JSX.Element {
  const ok = status.is_configured;
  return (
- <div className={`p-3 3xl:p-4 4xl:p-5 rounded-lg border ${ok ? "border-semantic-success-border bg-semantic-success-bg" : "border-semantic-warning-border bg-semantic-warning-bg"}`}>
- <div className="flex items-center justify-between mb-1">
- <span className="text-sm font-poppins font-medium text-text-primary">{label}</span>
- <span className={`text-xs 3xl:text-sm 4xl:text-base font-inter ${ok ? "text-semantic-success-text" : "text-semantic-warning-text"}`}>
- {ok ? "\u2713 Ready" : "\u26A0 Incomplete"}
- </span>
+  <div className="p-3 3xl:p-4 4xl:p-5 rounded-lg border border-border-ui bg-surface-card">
+  <div className="flex items-center justify-between mb-1">
+  <span className="text-sm font-poppins font-medium text-text-primary">{label}</span>
+  <span className="inline-flex items-center gap-1.5 text-xs 3xl:text-sm 4xl:text-base font-inter font-medium text-text-secondary">
+  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${ok ? "bg-semantic-success-icon" : "bg-semantic-warning-icon"}`} />
+  {ok ? "Ready" : "Incomplete"}
+  </span>
  </div>
  <div className="text-xs 3xl:text-sm 4xl:text-base text-text-muted font-inter">
  {status.provider === "none" ? "Disabled" : status.provider}

@@ -279,7 +279,7 @@ const DocumentStorePage: React.FC = () => {
 
   return (
     <main className="min-h-screen bg-surface-page">
-      <div className="container mx-auto px-4 md:px-12 lg:px-24 3xl:px-24 4xl:px-32 pt-16 3xl:pt-20 4xl:pt-24 pb-8 3xl:pb-12 4xl:pb-16 max-w-7xl 3xl:max-w-[1600px] 4xl:max-w-[1800px]">
+      <div className="container mx-auto px-4 md:px-12 lg:px-24 3xl:px-24 4xl:px-32 pt-16 3xl:pt-20 4xl:pt-24 pb-8 3xl:pb-12 4xl:pb-16 max-w-7xl">
         <nav aria-label="Back navigation" className="mb-4 md:mb-6 3xl:mb-8 4xl:mb-10">
           <Link
             to="/"
@@ -334,7 +334,7 @@ const DocumentStorePage: React.FC = () => {
           </div>
         )}
 
-        <div className="grid gap-5 3xl:gap-8 4xl:gap-10 lg:grid-cols-[1fr_360px] 3xl:grid-cols-[1fr_440px] 4xl:grid-cols-[1fr_520px] items-start">
+        <div className="grid gap-5 3xl:gap-8 4xl:gap-10 lg:grid-cols-[minmax(0,1fr)_360px] items-start">
           {/* Knowledge base */}
           <section className="bg-surface-card rounded-xl 3xl:rounded-2xl border border-border-ui shadow-xs overflow-hidden">
             <div className="px-5 3xl:px-8 4xl:px-10 py-4 3xl:py-6 4xl:py-8 border-b border-border-ui">
@@ -402,7 +402,7 @@ const DocumentStorePage: React.FC = () => {
 
             <div role="list">
               {documents.length > 0 && !documentsQuery.isLoading && (
-                <div className="hidden sm:grid grid-cols-[1fr_100px_90px_64px] 3xl:grid-cols-[1fr_140px_130px_96px] 4xl:grid-cols-[1fr_160px_150px_112px] gap-3 3xl:gap-4 px-4 3xl:px-6 4xl:px-8 py-2 3xl:py-3 border-b border-border-ui bg-surface-base font-inter text-overline 3xl:text-xs 4xl:text-sm uppercase tracking-wider font-semibold text-text-muted">
+                <div className="hidden sm:grid grid-cols-[1fr_100px_90px_64px] gap-3 3xl:gap-4 px-4 3xl:px-6 4xl:px-8 py-2 3xl:py-3 border-b border-border-ui bg-surface-base font-inter text-overline 3xl:text-xs 4xl:text-sm uppercase tracking-wider font-semibold text-text-muted">
                   <span>Name</span>
                   <span className="text-right">Date</span>
                   <span className="text-right">Status</span>

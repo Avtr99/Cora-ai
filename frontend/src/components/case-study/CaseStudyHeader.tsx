@@ -44,12 +44,12 @@ export const CaseStudyHeader = ({
       </div>
 
       <div className="flex flex-col gap-2 md:gap-2.5 3xl:gap-3 mb-8 3xl:mb-10 4xl:mb-12">
-        <h1 className="font-inter text-base md:text-base 3xl:text-[28px] 4xl:text-[32px] leading-tight md:leading-[22px] 3xl:leading-[36px] 4xl:leading-[42px] font-semibold text-neutral-900 w-full">
+        <h1 className="font-inter text-base md:text-base 3xl:text-2xl 4xl:text-[28px] leading-tight md:leading-[22px] 3xl:leading-8 4xl:leading-9 font-semibold text-neutral-900 w-full">
           {title}
         </h1>
         
         <div className="flex flex-wrap items-center gap-2 3xl:gap-3">
-          <a href={registryUrl} target="_blank" rel="noopener noreferrer" className="text-text-secondary font-inter text-xs md:text-sm 3xl:text-[17px] 4xl:text-xl underline whitespace-normal wrap-break-word min-w-0">
+          <a href={registryUrl} target="_blank" rel="noopener noreferrer" className="text-text-secondary font-inter text-xs md:text-sm 3xl:text-[15px] 4xl:text-base underline whitespace-normal wrap-break-word min-w-0">
             {organization} · {organizationId}
           </a>
           

@@ -135,7 +135,7 @@ const CaseStudiesPage: React.FC = () => {
     <main className="bg-surface-page min-h-screen">
       <ScrollToTop />
 
-      <div className="container mx-auto px-4 md:px-12 lg:px-24 3xl:px-24 4xl:px-32 pt-16 3xl:pt-20 4xl:pt-24 pb-24 md:pb-16 3xl:pb-20 4xl:pb-24 max-w-7xl 3xl:max-w-[1600px] 4xl:max-w-[1800px]">
+      <div className="container mx-auto px-4 md:px-12 lg:px-24 3xl:px-24 4xl:px-32 pt-16 3xl:pt-20 4xl:pt-24 pb-24 md:pb-16 3xl:pb-20 4xl:pb-24 max-w-7xl">
         {/* Page Header */}
         <header className="mb-8 md:mb-12 3xl:mb-14 4xl:mb-16">
           <nav aria-label="Back navigation" className="mb-4 md:mb-8 3xl:mb-10 4xl:mb-12">

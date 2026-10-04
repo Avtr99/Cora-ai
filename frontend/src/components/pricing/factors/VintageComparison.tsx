@@ -1,61 +1,53 @@
 import React from 'react';
-import BookIcon from '@/assets/icons/book.svg?react';
-import CalendarIcon from '@/assets/icons/calender.svg?react';
-import InfoIcon from '@/assets/icons/info.svg?react';
 import {
   MARKET_SOURCES,
   VINTAGE_INSIGHTS,
+  VINTAGE_PRICE_ARIA_LABEL,
   VINTAGE_PRICE_COMPARISON,
-  VINTAGE_SDG_PREMIUM,
-  type VintageInsightId,
+  VINTAGE_PRICE_LEGEND,
 } from '@/data/pricingFactorContent';
 import type { ForceId } from '@/data/pricingData';
-import BandLabel from '@/components/pricing/shared/BandLabel';
+import Band from '@/components/pricing/shared/Band';
 import BarComparison from '@/components/pricing/shared/BarComparison';
 import { toBarItems } from '@/components/pricing/shared/barItems';
-import ChartPanel from '@/components/pricing/shared/ChartPanel';
-import InsightRow from '@/components/pricing/shared/InsightRow';
+import DataCard from '@/components/pricing/shared/DataCard';
 import PanelFooter from '@/components/pricing/shared/PanelFooter';
-import StatPanel from '@/components/pricing/shared/StatPanel';
-
-const INSIGHT_ICONS: Record<VintageInsightId, React.FC<React.SVGProps<SVGSVGElement>>> = {
-  reporting: CalendarIcon,
-  methodology: BookIcon,
-  quality: InfoIcon,
-};
+import VintageStrip from '@/components/pricing/shared/VintageStrip';
 
 const VintageComparison: React.FC<{ onForceChange: (force: ForceId) => void }> = ({ onForceChange }) => {
-  const items = toBarItems(VINTAGE_PRICE_COMPARISON);
-  const chartLabel = `2024 average transaction prices: ${VINTAGE_PRICE_COMPARISON.map(
-    (datum) => `${datum.label} averaged ${datum.displayValue}`,
-  ).join(', ')}`;
+  const [reporting, methodology, quality] = VINTAGE_INSIGHTS;
 
   return (
-    <>
-      <ChartPanel
-        activeForce="vintage"
-        chart={
-          <div>
-            <BandLabel>2024 average transaction price</BandLabel>
-            <div className="mt-4">
-              <BarComparison items={items} label={chartLabel} />
-            </div>
-            <StatPanel stat={VINTAGE_SDG_PREMIUM} />
-          </div>
-        }
-        asideLabel="Why buyers prefer recent vintages"
-        aside={
-          <div className="space-y-4">
-            {VINTAGE_INSIGHTS.map((insight) => (
-              <InsightRow key={insight.id} Icon={INSIGHT_ICONS[insight.id]} title={insight.title}>
-                {insight.body}
-              </InsightRow>
-            ))}
-          </div>
-        }
-      />
-      <PanelFooter activeForce="vintage" onSelect={onForceChange} sources={MARKET_SOURCES} />
-    </>
+  <>
+    <DataCard activeForce="vintage">
+      <Band first label="2024 average transaction price">
+        <BarComparison
+          items={toBarItems(VINTAGE_PRICE_COMPARISON)}
+          label={VINTAGE_PRICE_ARIA_LABEL}
+          legend={
+            <>
+              <b className="font-semibold text-text-primary tabular-nums">{VINTAGE_PRICE_LEGEND.value}</b>{' '}
+              {VINTAGE_PRICE_LEGEND.text}
+            </>
+          }
+        />
+      </Band>
+      <Band label="Why buyers prefer recent vintages">
+        <VintageStrip />
+        <ul className="mt-6 grid gap-x-8 gap-y-3 border-t border-border-ui pt-5 md:grid-cols-2">
+          {[reporting, methodology].map((insight) => (
+            <li key={insight.id} className="text-pretty font-inter text-caption 3xl:text-ui leading-relaxed text-text-secondary">
+              <b className="font-semibold text-text-primary">{insight.title}.</b> {insight.body}
+            </li>
+          ))}
+        </ul>
+        <p className="mt-4 rounded-lg bg-surface-base px-3.5 py-3 text-pretty font-inter text-caption 3xl:text-ui leading-relaxed text-text-secondary">
+          <b className="font-semibold text-text-primary">{quality.title}.</b> {quality.body}
+        </p>
+      </Band>
+    </DataCard>
+    <PanelFooter activeForce="vintage" onSelect={onForceChange} sources={MARKET_SOURCES} />
+  </>
   );
 };
 

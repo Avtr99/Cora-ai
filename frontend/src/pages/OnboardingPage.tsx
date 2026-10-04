@@ -186,7 +186,7 @@ const OnboardingPage = (): JSX.Element => {
   if (loading) {
     return (
       <div className="min-h-screen bg-surface-base flex items-center justify-center">
-        <div className="animate-pulse text-text-muted font-inter text-sm 3xl:text-base 4xl:text-lg">Loading...</div>
+        <div className="animate-pulse text-text-muted font-inter text-body-sm 3xl:text-base 4xl:text-lg">Loading...</div>
       </div>
     );
   }
@@ -201,34 +201,34 @@ const OnboardingPage = (): JSX.Element => {
           <div className="inline-flex items-center justify-center w-12 h-12 3xl:w-14 3xl:h-14 4xl:w-16 4xl:h-16 rounded-full bg-surface-subtle border border-border-ui mb-4 3xl:mb-5 4xl:mb-6">
             <ServerOff className="h-5 w-5 3xl:h-6 3xl:w-6 4xl:h-7 4xl:w-7 text-text-muted" strokeWidth={1.75} />
           </div>
-          <h1 className="font-poppins text-xl 3xl:text-2xl 4xl:text-3xl font-semibold text-text-primary mb-2 3xl:mb-3 4xl:mb-4">
+          <h1 className="font-poppins text-heading-1 font-semibold text-text-primary mb-2 3xl:mb-3 4xl:mb-4">
             Backend not reachable
           </h1>
-          <p className="font-inter text-sm 3xl:text-base 4xl:text-lg text-text-muted mb-6 3xl:mb-8 4xl:mb-10">
+          <p className="font-inter text-body-sm 3xl:text-base 4xl:text-lg text-text-muted mb-6 3xl:mb-8 4xl:mb-10">
             Cora&apos;s backend server isn&apos;t running. If you&apos;ve already configured your API keys
-            in the backend <code className="px-1 3xl:px-1.5 py-0.5 3xl:py-1 rounded bg-surface-subtle text-text-primary text-sm 3xl:text-base 4xl:text-lg">.env</code>{" "}
+            in the backend <code className="px-1 3xl:px-1.5 py-0.5 3xl:py-1 rounded bg-surface-subtle text-text-primary font-mono text-sm 3xl:text-base 4xl:text-lg">.env</code>{" "}
             file, start the backend and refresh — onboarding will skip the steps you&apos;ve already set up.
           </p>
           <div className="flex flex-col items-center gap-3 3xl:gap-4 4xl:gap-5">
             <button
               type="button"
               onClick={() => window.location.reload()}
-              className="px-6 3xl:px-8 py-2.5 3xl:py-3 4xl:py-4 rounded-lg bg-brand-700 text-white font-poppins text-sm 3xl:text-base 4xl:text-lg font-semibold shadow-card-md transition-colors hover:bg-brand-hover focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-focus"
+              className="px-6 3xl:px-8 py-2.5 3xl:py-3 4xl:py-4 rounded-lg bg-brand-700 text-white font-poppins text-body-sm 3xl:text-base 4xl:text-lg font-semibold shadow-card-md transition-colors hover:bg-brand-hover focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-focus"
             >
               Retry connection
             </button>
             <button
               type="button"
               onClick={skip}
-              className="font-inter text-sm 3xl:text-base 4xl:text-lg text-text-muted hover:text-text-primary transition-colors"
+              className="font-inter text-body-sm 3xl:text-base 4xl:text-lg text-text-muted hover:text-text-primary transition-colors rounded-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2"
             >
               Skip to chat anyway
             </button>
           </div>
           <div className="mt-6 3xl:mt-8 4xl:mt-10 p-3 3xl:p-4 4xl:p-5 rounded-xl bg-surface-card border border-border-ui text-left">
-            <p className="font-inter text-xs 3xl:text-sm 4xl:text-base text-text-muted">
-              <span className="font-medium text-text-primary text-xs 3xl:text-sm 4xl:text-base">To start the backend:</span>{" "}
-              <code className="text-text-primary text-xs 3xl:text-sm 4xl:text-base">python -m src.api.main</code>
+            <p className="font-inter text-caption 3xl:text-sm 4xl:text-base text-text-muted">
+              <span className="font-medium text-text-primary">To start the backend:</span>{" "}
+              <code className="text-text-primary font-mono">python -m src.api.main</code>
             </p>
           </div>
         </div>
@@ -271,7 +271,7 @@ const OnboardingPage = (): JSX.Element => {
             <button
               type="button"
               onClick={skip}
-              className="font-inter text-xs 3xl:text-sm 4xl:text-base text-text-muted hover:text-text-primary transition-colors"
+              className="font-inter text-caption 3xl:text-sm 4xl:text-base text-text-muted hover:text-text-primary transition-colors rounded-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2"
             >
               Skip setup &rarr;
             </button>
@@ -373,7 +373,8 @@ function StepProgress({
         return (
           <div key={stepId} className="flex items-center gap-2">
             <span
-              className={`font-inter text-xs transition-colors ${
+              aria-current={state === "current" ? "step" : undefined}
+              className={`font-inter text-caption transition-colors ${
                 state === "current"
                   ? "text-text-primary font-semibold"
                   : state === "done"
@@ -385,7 +386,7 @@ function StepProgress({
             </span>
             {i < labels.length - 1 && (
               <span
-                className={`w-4 h-px ${state === "done" ? "bg-brand-700" : "bg-border-ui"}`}
+                className={`w-4 h-px ${state === "done" ? "bg-brand-700" : "bg-surface-muted"}`}
                 aria-hidden="true"
               />
             )}

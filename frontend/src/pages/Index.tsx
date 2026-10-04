@@ -139,7 +139,7 @@ const Index: React.FC = () => {
     // document body becomes scrollable and the sidebar (inside main) scrolls
     // off-screen alongside the chat content. h-dvh eliminates that whole-page
     // scroll bug. Desktop is unaffected because dvh === vh without UA chrome.
-    <main className="bg-surface-base h-dvh flex flex-col overflow-hidden [--sidebar-width:240px] [--sidebar-collapsed-width:68px] [--composer-bottom:1rem] 3xl:[--sidebar-width:300px] 3xl:[--sidebar-collapsed-width:80px] 3xl:[--composer-bottom:1.5rem] 4xl:[--sidebar-width:400px] 4xl:[--sidebar-collapsed-width:96px] 4xl:[--composer-bottom:2rem]">
+    <main className="bg-surface-base h-dvh flex flex-col overflow-hidden [--sidebar-width:208px] [--sidebar-collapsed-width:60px] [--composer-bottom:1rem] 3xl:[--sidebar-width:264px] 3xl:[--sidebar-collapsed-width:68px] 3xl:[--composer-bottom:1.5rem] 4xl:[--sidebar-width:336px] 4xl:[--sidebar-collapsed-width:80px] 4xl:[--composer-bottom:2rem]">
       {/* Main Page Heading - Visually Hidden but accessible to screen readers */}
       <h1 className="sr-only">Cora - Voluntary Carbon Market AI Assistant</h1>
 
@@ -163,7 +163,7 @@ const Index: React.FC = () => {
           style={{ height: isMobile ? 'calc(100dvh - 60px)' : '100%' }}
         >
           <div className="grow min-h-full min-w-0 pt-10 max-md:pt-14 px-6 md:px-8 3xl:pt-12 3xl:px-12 max-md:max-w-full flex flex-col">
-            <div className={`w-full min-w-0 flex-1 flex flex-col ${activeChat && activeChat.messages.length > 0 ? 'max-w-2xl 3xl:max-w-[850px] 4xl:max-w-[960px]' : 'max-w-5xl 3xl:max-w-7xl 4xl:max-w-[1536px]'} max-md:max-w-full mx-auto`}>
+            <div className="w-full min-w-0 flex-1 flex flex-col max-w-5xl 3xl:max-w-7xl 4xl:max-w-[1536px] max-md:max-w-full mx-auto">
               <AnimatePresence>
                 {!isTyping && !activeChat?.messages.length && !isUserTyping && (
                   <motion.header

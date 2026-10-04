@@ -50,8 +50,8 @@ const PricingFactorTabs: React.FC<PricingFactorTabsProps> = ({ activeForce, onCh
   };
 
   return (
-    <div ref={scrollRef} className="relative overflow-x-auto border-b border-surface-subtle md:rounded-xl md:border md:border-border-ui md:bg-surface-base">
-      <div className="flex items-center md:grid md:min-w-232 md:grid-cols-5 3xl:min-w-6xl 4xl:min-w-336" role="tablist" aria-label="Price factors">
+    <div ref={scrollRef} className="relative overflow-x-auto border-b border-border-ui md:rounded-xl md:border md:border-border-ui md:bg-surface-base">
+      <div className="flex items-center md:grid md:min-w-232 md:grid-cols-5" role="tablist" aria-label="Price factors">
         {FORCE_ORDER.map((id, index) => {
           const force = FORCES[id];
           const isActive = id === activeForce;
@@ -80,7 +80,7 @@ const PricingFactorTabs: React.FC<PricingFactorTabsProps> = ({ activeForce, onCh
                 {force.subtitle}
               </span>
               {isActive && (
-                <span aria-hidden="true" className="absolute bottom-0 left-3 right-3 h-[2px] rounded-t bg-brand-900 md:hidden" />
+                <span aria-hidden="true" className="absolute bottom-0 left-3 right-3 h-[2px] rounded-t bg-text-primary md:hidden" />
               )}
             </button>
           );

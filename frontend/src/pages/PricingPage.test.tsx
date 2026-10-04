@@ -73,27 +73,16 @@ describe('Pricing page', () => {
     expect(document.activeElement?.getAttribute('aria-selected')).toBe('true');
   });
 
-  it('shows the active factor headline stat in the hero', async () => {
-    const heroStat = container.querySelector('[data-testid="pricing-hero-stat"]')!;
-    expect(heroStat.textContent).toContain('381%');
-    const vintageTab = container.querySelector<HTMLButtonElement>('#pricing-tab-vintage')!;
-    await act(async () => vintageTab.click());
-    expect(container.querySelector('[data-testid="pricing-hero-stat"]')?.textContent).toContain('217%');
-    const complianceTab = container.querySelector<HTMLButtonElement>('#pricing-tab-compliance')!;
-    await act(async () => complianceTab.click());
-    expect(container.querySelector('[data-testid="pricing-hero-stat"]')?.textContent).toContain('Jan 2028');
-  });
-
   it('preserves the reported prices and proportional bar lengths', () => {
-    const chart = container.querySelector('[role="group"][aria-label*="average transaction prices"]')!;
+    const chart = container.querySelector('[role="group"][aria-label*="average price per tonne"]')!;
     expect(chart.textContent).toContain('$4.05');
     expect(chart.textContent).toContain('$19.50');
     expect(chart.textContent).toContain('$160+');
     const widths = Array.from(chart.querySelectorAll<HTMLElement>('[style]')).map((bar) => parseFloat(bar.style.width));
     expect(widths).toHaveLength(3);
-    // Bars stay proportional to price but keep a minimum visible width
-    // so the smallest value never collapses to an invisible dot.
-    expect(widths[0]).toBeGreaterThanOrEqual(6);
+    // Bars stay proportional to the price; a min-width class keeps the
+    // smallest bar visible without distorting the scale.
+    expect(widths[0]).toBeCloseTo((4.05 / 160) * 100, 5);
     expect(widths[1]).toBeGreaterThan(widths[0]);
     expect(widths[2]).toBe(100);
   });

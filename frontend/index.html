@@ -50,7 +50,9 @@
         --brand-link: 256 59% 40%;
         --brand-hover: 255 60% 32%;
       }
-      * { border-color: hsl(var(--border)); }
+      /* No `* { border-color }` here: an unlayered rule outranks every Tailwind
+         v4 @layer utility, which silently disabled all border-* color classes.
+         index.css @layer base already sets the same default via border-border. */
       body { background: hsl(var(--background)); color: hsl(var(--foreground)); margin: 0; font-family: Inter, sans-serif; }
       /* 100dvh (dynamic viewport height) tracks the visible area on mobile/tablet
          browsers so the app doesn't overflow below the address bar and create a

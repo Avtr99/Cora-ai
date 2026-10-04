@@ -49,18 +49,6 @@ export const TEXT = {
 } as const;
 
 // ---------------------------------------------------------------------------
-// Interactive state colors
-// ---------------------------------------------------------------------------
-export const INTERACTIVE = {
-  default: '#6B7280',
-  hover: BRAND.primary500,
-  active: BRAND.primary500,
-  disabled: '#B8BEC8',
-  focusRing: 'rgba(74,42,163,0.35)',
-  focusRingLight: 'rgba(74,42,163,0.25)',
-} as const;
-
-// ---------------------------------------------------------------------------
 // Icon state colors (used by IconWrapper component)
 // ---------------------------------------------------------------------------
 export const ICON_STATE = {
@@ -217,29 +205,6 @@ export const CHOROPLETH_COLORS: ReadonlyArray<{ min: number; color: string }> = 
 ];
 
 // ---------------------------------------------------------------------------
-// Trend colors (FactorComparison claims demand lanes)
-// Consistent nested structure: each trend has badge and icon sub-objects
-// ---------------------------------------------------------------------------
-export type TrendBadgeColorSet = { bg: string; text: string; border?: string };
-export type TrendIconColorSet = { bg: string; color: string };
-export type TrendColorSet = { badge: TrendBadgeColorSet; icon: TrendIconColorSet };
-
-export const TREND_COLORS = {
-  rising: {
-    badge: { bg: '#E3F6D6', text: '#2F4F2F' },
-    icon: { bg: '#E8F5E0', color: '#57924E' },
-  },
-  declining: {
-    badge: { bg: '#FDE6C9', text: '#7C2D00' },
-    icon: { bg: '#FFE8CC', color: '#A65B00' },
-  },
-  note: {
-    badge: { bg: '#FFFBF0', border: '#F5E6C3', text: '#92400E' },
-    icon: { bg: '#FEF3C7', color: '#D97706' },
-  },
-} as const satisfies Record<'rising' | 'declining' | 'note', TrendColorSet>;
-
-// ---------------------------------------------------------------------------
 // Semantic status colors (success / error / warning / info)
 // Used for alerts, banners, badges, validation states, and icon containers.
 // ---------------------------------------------------------------------------
@@ -297,7 +262,10 @@ export const SEMANTIC: Record<'success' | 'error' | 'warning' | 'info', Semantic
 // ---------------------------------------------------------------------------
 export const KPI = {
   reduction: '#C4627A',
+  reductionBg: '#FDF0F3',
   removal: '#2D9D78',
+  removalSoft: 'rgb(45 157 120 / 0.16)',
+  removalDeep: '#065F46',
   other: '#6B7280',
 } as const;
 

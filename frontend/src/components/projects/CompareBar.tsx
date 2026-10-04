@@ -21,7 +21,7 @@ export const CompareBar: React.FC<CompareBarProps> = ({
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-40 bg-surface-card/95 backdrop-blur-xs border-t border-border-ui shadow-bottom-bar">
-      <div className="container mx-auto max-w-7xl 3xl:max-w-[1600px] 4xl:max-w-[1800px] px-4 md:px-10 3xl:px-12 py-3 3xl:py-4 flex items-center gap-3">
+      <div className="container mx-auto max-w-7xl px-4 md:px-10 3xl:px-12 py-3 3xl:py-4 flex items-center gap-3">
         {/* Icon */}
         <ArrowLeftRight className="w-4 h-4 text-text-muted shrink-0 hidden sm:block" />
 

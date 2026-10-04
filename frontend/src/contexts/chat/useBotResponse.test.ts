@@ -69,7 +69,7 @@ describe('requestBotResponse', () => {
   });
 
   it('sends chat.id as conversation_id and the user message id as message_id', async () => {
-    useChatStore.getState().setChats([seedChat()]);
+    useChatStore.setState({ chats: [seedChat()] });
     mockStream.mockResolvedValueOnce(coraResult());
 
     await runRequest();
@@ -84,7 +84,7 @@ describe('requestBotResponse', () => {
   });
 
   it('replaces the placeholder with a bot message whose id is the server answerId', async () => {
-    useChatStore.getState().setChats([seedChat()]);
+    useChatStore.setState({ chats: [seedChat()] });
     mockStream.mockResolvedValueOnce(coraResult());
 
     await runRequest();
@@ -99,7 +99,7 @@ describe('requestBotResponse', () => {
   });
 
   it('resends the same user message id on retry', async () => {
-    useChatStore.getState().setChats([seedChat()]);
+    useChatStore.setState({ chats: [seedChat()] });
     mockStream.mockResolvedValue(coraResult());
 
     // First attempt fails server-side, retry reuses the same user message ID (A9)
@@ -125,7 +125,7 @@ describe('requestBotResponse', () => {
   });
 
   it('marks the placeholder as an error message on error_fallback', async () => {
-    useChatStore.getState().setChats([seedChat()]);
+    useChatStore.setState({ chats: [seedChat()] });
     mockStream.mockResolvedValueOnce(coraResult({ sources: ['error_fallback'], text: 'Could not answer' }));
 
     await runRequest();

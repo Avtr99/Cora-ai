@@ -1,39 +1,39 @@
 import React from 'react';
 import {
-  COMPLIANCE_BUYER_POOLS,
   COMPLIANCE_PRICE_OUTLOOK,
   COMPLIANCE_SOURCES,
-  type BuyerPool,
+  COMPLIANCE_STAIR_SUB,
+  COMPLIANCE_STAIRCASE,
+  CORSIA_DEADLINE_PHRASES,
 } from '@/data/pricingFactorContent';
 import type { ForceId } from '@/data/pricingData';
-import {
-  BulletList,
-  DemandText,
-  type Lane,
-} from '@/components/pricing/shared/LaneComparison';
-import TimelineFactorPanel from '@/components/pricing/shared/TimelineFactorPanel';
+import Band from '@/components/pricing/shared/Band';
+import BuyerStaircase from '@/components/pricing/shared/BuyerStaircase';
+import DataCard from '@/components/pricing/shared/DataCard';
+import MilestoneTimeline from '@/components/pricing/shared/MilestoneTimeline';
+import OutlookCards from '@/components/pricing/shared/OutlookCards';
+import PanelFooter from '@/components/pricing/shared/PanelFooter';
+import { monthsUntil } from '@/components/pricing/shared/today';
 
-const complianceLanes = (pools: BuyerPool[]): Lane[] =>
-  pools.map((pool) => ({
-    title: pool.title,
-    tone: pool.tone,
-    status: pool.status,
-    sections: [
-      { label: 'Demand', content: <DemandText>{pool.body}</DemandText> },
-      { label: 'Buyer pools', content: <BulletList items={pool.buyers} /> },
-    ],
-  }));
-
-const ComplianceComparison: React.FC<{ onForceChange: (force: ForceId) => void }> = ({ onForceChange }) => (
-  <TimelineFactorPanel
-    activeForce="compliance"
-    timelineLabel="CORSIA demand deadline"
-    lanesLabel="Who can buy the credit"
-    lanes={complianceLanes(COMPLIANCE_BUYER_POOLS)}
-    outlooks={COMPLIANCE_PRICE_OUTLOOK}
-    sources={COMPLIANCE_SOURCES}
-    onForceChange={onForceChange}
-  />
-);
+const ComplianceComparison: React.FC<{ onForceChange: (force: ForceId) => void }> = ({ onForceChange }) => {
+  const months = monthsUntil(2028);
+  return (
+    <>
+      <DataCard activeForce="compliance">
+        <Band first label="Who can buy the credit" sub={COMPLIANCE_STAIR_SUB}>
+          <BuyerStaircase />
+        </Band>
+        <Band label="CORSIA demand deadline">
+          <MilestoneTimeline forceId="compliance" />
+        </Band>
+        <p className="mt-4 max-w-[78ch] text-pretty font-inter text-caption 3xl:text-ui leading-relaxed text-text-secondary">
+          {months > 0 ? CORSIA_DEADLINE_PHRASES.remaining(months) : CORSIA_DEADLINE_PHRASES.passed}
+        </p>
+      </DataCard>
+      <OutlookCards outlooks={COMPLIANCE_PRICE_OUTLOOK} />
+      <PanelFooter activeForce="compliance" onSelect={onForceChange} sources={COMPLIANCE_SOURCES} />
+    </>
+  );
+};
 
 export default ComplianceComparison;

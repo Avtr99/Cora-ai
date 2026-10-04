@@ -470,7 +470,7 @@ import ChatIcon from '@/assets/icons/chat.svg?react';
 ### Layout Components
 
 #### Sidebar
-- Width: 250px (expanded), 60px (collapsed)
+- Width: 208px (expanded), 60px (collapsed) at the base tier (264px/68px at 3xl, 336px/80px at 4xl)
 - Background: `bg-surface-base` (#FAFAFA)
 - Animation: 200ms easeOut
 - Search input with filter functionality
@@ -508,7 +508,7 @@ import ChatIcon from '@/assets/icons/chat.svg?react';
 ### Color Usage Rules
 1. **Semantic tokens preferred**: Use `bg-card`, `text-foreground`, `border-border` instead of hex colors
 2. **Contrast requirements**: Minimum 4.5:1 for body text (WCAG AA)
-3. **Focus rings**: 2px purple ring `rgba(74,42,163,0.35)` with white offset
+3. **Focus rings**: 2px neutral grey ring `hsl(215.4 16.3% 46.9%)` (`--color-focus`) with white offset
 
 ### Typography Best Practices
 1. Use Poppins for headings, buttons, UI elements needing emphasis

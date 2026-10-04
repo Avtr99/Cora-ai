@@ -84,6 +84,31 @@ describe('loadChatList', () => {
 
     expect(mockListChats).not.toHaveBeenCalled();
   });
+
+  it('keeps locally created chats that are not in the server list yet', async () => {
+    const local = loadedChat('local-new');
+    useChatStore.setState({ chats: [local] });
+    mockListChats.mockResolvedValueOnce([serverSummaryChat('c1')]);
+
+    await loadChatList();
+
+    const chats = useChatStore.getState().chats;
+    expect(chats.map((c) => c.id)).toEqual(['local-new', 'c1']);
+    expect(chats[0].messages).toEqual(local.messages);
+  });
+
+  it('preserves loaded messages on chats present in the server list', async () => {
+    const local = loadedChat('c1');
+    useChatStore.setState({ chats: [local] });
+    mockListChats.mockResolvedValueOnce([serverSummaryChat('c1'), serverSummaryChat('c2')]);
+
+    await loadChatList();
+
+    const chat = useChatStore.getState().chats.find((c) => c.id === 'c1');
+    expect(chat?.messages).toEqual(local.messages);
+    expect(chat?.shownRecommendations).toEqual(['project-1']);
+    expect(chat?.messagesLoaded).toBe(true);
+  });
 });
 
 describe('loadChatMessages', () => {
@@ -94,7 +119,7 @@ describe('loadChatMessages', () => {
   });
 
   it('fills the chat messages and marks it loaded', async () => {
-    useChatStore.getState().setChats([serverSummaryChat('c1')]);
+    useChatStore.setState({ chats: [serverSummaryChat('c1')] });
     mockGetChat.mockResolvedValueOnce(loadedChat('c1'));
 
     await loadChatMessages('c1');
@@ -108,7 +133,7 @@ describe('loadChatMessages', () => {
   });
 
   it('removes the chat and clears activeChatId on 404', async () => {
-    useChatStore.getState().setChats([serverSummaryChat('c1'), serverSummaryChat('c2')]);
+    useChatStore.setState({ chats: [serverSummaryChat('c1'), serverSummaryChat('c2')] });
     useChatStore.setState({ activeChatId: 'c1' });
     mockGetChat.mockRejectedValueOnce(new ChatsApiError(404));
 
@@ -122,7 +147,7 @@ describe('loadChatMessages', () => {
 
   it('keeps the chat with empty messages on other errors', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    useChatStore.getState().setChats([serverSummaryChat('c1')]);
+    useChatStore.setState({ chats: [serverSummaryChat('c1')] });
     mockGetChat.mockRejectedValueOnce(new Error('network down'));
 
     await loadChatMessages('c1');
@@ -135,8 +160,33 @@ describe('loadChatMessages', () => {
     consoleSpy.mockRestore();
   });
 
+  it('does not drop messages sent while the fetch is in flight', async () => {
+    useChatStore.setState({ chats: [serverSummaryChat('c1')] });
+    let resolveDetail: (chat: Chat) => void = () => {};
+    mockGetChat.mockImplementationOnce(
+      () => new Promise<Chat>((resolve) => { resolveDetail = resolve; })
+    );
+
+    const promise = loadChatMessages('c1');
+
+    const sent: Message = {
+      id: 'm2',
+      content: 'sent during load',
+      sender: 'user',
+      timestamp: new Date(),
+    };
+    useChatStore.getState().updateChat('c1', { messages: [sent] });
+
+    resolveDetail(loadedChat('c1'));
+    await promise;
+
+    const chat = useChatStore.getState().chats[0];
+    expect(chat.messages.map((m) => m.id)).toEqual(['m1', 'm1-answer', 'm2']);
+    expect(chat.messagesLoaded).toBe(true);
+  });
+
   it('skips chats that are already loaded or already loading', async () => {
-    useChatStore.getState().setChats([serverSummaryChat('c1')]);
+    useChatStore.setState({ chats: [serverSummaryChat('c1')] });
     useChatStore.getState().updateChat('c1', { messagesLoaded: true });
 
     await loadChatMessages('c1');

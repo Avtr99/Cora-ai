@@ -16,7 +16,7 @@ import {
   EMBEDDING_PRESETS,
   type EmbeddingProvider,
 } from "@/components/onboarding/embeddingPresets";
-import { Field, ErrorBox, inputClass } from "@/components/settings/settingsPrimitives";
+import { Field, ErrorBox, ProviderGrid, inputClass } from "@/components/settings/settingsPrimitives";
 
 interface EmbeddingsStepProps {
   onBack: () => void;
@@ -69,7 +69,7 @@ const EmbeddingsStep = ({ onBack, onContinue }: EmbeddingsStepProps): JSX.Elemen
 
   if (loading) {
     return (
-      <div className="py-8 3xl:py-10 4xl:py-12 text-center text-text-muted font-inter text-sm 3xl:text-base 4xl:text-lg animate-pulse">
+      <div className="py-8 3xl:py-10 4xl:py-12 text-center text-text-muted font-inter text-body-sm 3xl:text-base 4xl:text-lg animate-pulse">
         Loading embedding settings...
       </div>
     );
@@ -83,27 +83,17 @@ const EmbeddingsStep = ({ onBack, onContinue }: EmbeddingsStepProps): JSX.Elemen
       />
 
       {/* Provider selection */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 3xl:gap-3 4xl:gap-4 mb-4 3xl:mb-5 4xl:mb-6">
-        {(Object.keys(EMBEDDING_PRESETS) as EmbeddingProvider[]).map((key) => {
-          const isActive = provider === key;
-          return (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setProvider(key)}
-              className={`px-3 3xl:px-4 py-2.5 3xl:py-3 4xl:py-4 rounded-lg border-2 text-xs 3xl:text-sm 4xl:text-base font-poppins font-medium transition-all ${
-                isActive
-                  ? "border-brand-700 bg-brand-100 text-brand-700"
-                  : "border-border-ui bg-surface-card text-text-secondary hover:border-brand-200"
-              }`}
-            >
-              {EMBEDDING_PRESETS[key].label}
-            </button>
-          );
-        })}
+      <div className="mb-4 3xl:mb-5 4xl:mb-6">
+        <ProviderGrid
+          presets={EMBEDDING_PRESETS}
+          selected={provider}
+          onSelect={setProvider}
+          columns={4}
+          size="roomy"
+        />
       </div>
 
-      <p className="text-xs 3xl:text-sm 4xl:text-base text-text-muted font-inter mb-5 3xl:mb-6 4xl:mb-7">{config.description}</p>
+      <p className="text-caption 3xl:text-sm 4xl:text-base text-text-muted font-inter mb-5 3xl:mb-6 4xl:mb-7">{config.description}</p>
 
       {/* API key (if needed) */}
       {config.needsApiKey && (
@@ -123,7 +113,7 @@ const EmbeddingsStep = ({ onBack, onContinue }: EmbeddingsStepProps): JSX.Elemen
               href={config.signupUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-block mt-1.5 3xl:mt-2 text-xs 3xl:text-sm 4xl:text-base text-brand-700 hover:text-brand-hover font-inter"
+              className="inline-block mt-1.5 3xl:mt-2 text-caption 3xl:text-sm 4xl:text-base text-brand-700 hover:text-brand-hover font-inter rounded-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2"
             >
               Get a key &rarr;
             </a>
@@ -142,8 +132,8 @@ const EmbeddingsStep = ({ onBack, onContinue }: EmbeddingsStepProps): JSX.Elemen
               placeholder="http://localhost:11434"
               className={inputClass}
             />
-            <p className="mt-1.5 3xl:mt-2 text-xs 3xl:text-sm 4xl:text-base text-text-muted font-inter">
-              Pull the model first: <code>ollama pull bge-large-en-v1.5</code>
+            <p className="mt-1.5 3xl:mt-2 text-caption 3xl:text-sm 4xl:text-base text-text-muted font-inter">
+              Pull the model first: <code className="font-mono">ollama pull bge-large-en-v1.5</code>
             </p>
           </Field>
         </div>
@@ -151,11 +141,11 @@ const EmbeddingsStep = ({ onBack, onContinue }: EmbeddingsStepProps): JSX.Elemen
 
       {/* Dimension note */}
       <div className="mb-5 3xl:mb-6 4xl:mb-7 p-3 3xl:p-4 4xl:p-5 rounded-lg bg-surface-subtle border border-border-ui">
-        <p className="text-xs 3xl:text-sm 4xl:text-base text-text-muted font-inter">
+        <p className="text-caption 3xl:text-sm 4xl:text-base text-text-muted font-inter">
           <strong className="text-text-primary">Dimension:</strong> {config.defaultDim}d
           {existing && existing.dim !== config.defaultDim && (
-            <span className="ml-1 text-semantic-warning-icon">
-              {"\u26A0"} Your Qdrant collection uses {existing.dim}d. Switching to a model with a
+            <span className="ml-1 font-medium text-semantic-warning-text">
+              Your Qdrant collection uses {existing.dim}d. Switching to a model with a
               different dimension requires re-ingesting documents.
             </span>
           )}

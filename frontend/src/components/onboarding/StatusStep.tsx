@@ -68,7 +68,7 @@ const StatusStep = ({ onBack, onContinue }: StatusStepProps): JSX.Element => {
     return (
       <div>
         <StepHeading title="Review your setup" subtitle="Could not load configuration status." />
-        <div className="mb-6 3xl:mb-8 p-3.5 3xl:p-4 4xl:p-5 rounded-lg bg-semantic-error-bg border border-semantic-error-border text-semantic-error-text font-inter text-sm 3xl:text-base 4xl:text-lg">
+        <div className="mb-6 3xl:mb-8 p-3.5 3xl:p-4 4xl:p-5 rounded-lg bg-semantic-error-bg border border-semantic-error-border text-semantic-error-text font-inter text-body-sm 3xl:text-base 4xl:text-lg">
           {error ?? "Unknown error"}
         </div>
         <StepActions onBack={onBack} onContinue={onContinue} continueLabel="Continue anyway" />
@@ -92,7 +92,7 @@ const StatusStep = ({ onBack, onContinue }: StatusStepProps): JSX.Element => {
 
       {/* Overall readiness banner */}
       <motion.div
-        className={`flex items-center gap-2.5 3xl:gap-3 p-3.5 3xl:p-4 4xl:p-5 rounded-lg mb-5 3xl:mb-6 4xl:mb-7 text-sm 3xl:text-base 4xl:text-lg font-inter border ${
+        className={`flex items-center gap-2.5 3xl:gap-3 p-3.5 3xl:p-4 4xl:p-5 rounded-lg mb-5 3xl:mb-6 4xl:mb-7 text-body-sm 3xl:text-base 4xl:text-lg font-inter border ${
           status.ready
             ? "bg-surface-card border-border-ui text-text-primary"
             : "bg-surface-card border-border-ui text-text-primary"
@@ -124,13 +124,13 @@ const StatusStep = ({ onBack, onContinue }: StatusStepProps): JSX.Element => {
       {/* Qdrant info */}
       {status.qdrant && (
         <div className="p-3.5 3xl:p-4 4xl:p-5 rounded-lg bg-surface-card border border-border-ui mb-5 3xl:mb-6 4xl:mb-7">
-          <div className="text-sm 3xl:text-base 4xl:text-lg font-poppins font-medium text-text-primary mb-1 3xl:mb-2 4xl:mb-3">Qdrant</div>
+          <div className="text-body-sm 3xl:text-base 4xl:text-lg font-poppins font-medium text-text-primary mb-1 3xl:mb-2 4xl:mb-3">Qdrant</div>
           {status.qdrant.error ? (
-            <div className="text-xs 3xl:text-sm 4xl:text-base text-semantic-error-icon font-inter">
+            <div className="text-caption 3xl:text-sm 4xl:text-base text-semantic-error-text font-inter">
               Connection error: {status.qdrant.error}
             </div>
           ) : (
-            <div className="text-xs 3xl:text-sm 4xl:text-base text-text-muted font-inter">
+            <div className="text-caption 3xl:text-sm 4xl:text-base text-text-muted font-inter">
               Collection: {status.qdrant.collection} &middot; Vectors: {status.qdrant.vector_dim}d
               &middot; Points: {status.qdrant.points_count?.toLocaleString() ?? "unknown"}
             </div>
@@ -144,7 +144,7 @@ const StatusStep = ({ onBack, onContinue }: StatusStepProps): JSX.Element => {
           {status.warnings.map((w, i) => (
             <div
               key={i}
-              className="p-3 3xl:p-4 4xl:p-5 rounded-lg bg-semantic-warning-bg border border-semantic-warning-border text-semantic-warning-text font-inter text-xs 3xl:text-sm 4xl:text-base"
+              className="p-3 3xl:p-4 4xl:p-5 rounded-lg bg-semantic-warning-bg border border-semantic-warning-border text-semantic-warning-text font-inter text-caption 3xl:text-sm 4xl:text-base"
             >
               {w}
             </div>
@@ -170,27 +170,21 @@ function ProviderCard({
   return (
     <div className="p-3.5 3xl:p-4 4xl:p-5 rounded-lg border border-border-ui bg-surface-card">
       <div className="flex items-center justify-between mb-1 3xl:mb-2 4xl:mb-3">
-        <span className="text-sm 3xl:text-base 4xl:text-lg font-poppins font-medium text-text-primary">{label}</span>
-        <span
-          className={`inline-flex items-center gap-1.5 3xl:gap-2 px-2 3xl:px-2.5 py-0.5 3xl:py-1 4xl:py-1.5 rounded-full text-xs 3xl:text-sm 4xl:text-base font-inter font-medium ${
-            ok
-              ? "bg-semantic-success-bg text-semantic-success-text"
-              : "bg-semantic-warning-bg text-semantic-warning-text"
-          }`}
-        >
-          <span className={`w-1.5 h-1.5 3xl:w-2 3xl:h-2 4xl:w-2.5 4xl:h-2.5 rounded-full ${ok ? "bg-semantic-success-icon" : "bg-semantic-warning-icon"}`} />
+        <span className="text-body-sm 3xl:text-base 4xl:text-lg font-poppins font-medium text-text-primary">{label}</span>
+        <span className="inline-flex items-center gap-1.5 3xl:gap-2 text-caption 3xl:text-sm 4xl:text-base font-inter font-medium text-text-secondary">
+          <span className={`w-1.5 h-1.5 3xl:w-2 3xl:h-2 rounded-full shrink-0 ${ok ? "bg-semantic-success-icon" : "bg-semantic-warning-icon"}`} />
           {ok ? "Ready" : "Incomplete"}
         </span>
       </div>
-      <div className="text-xs 3xl:text-sm 4xl:text-base text-text-muted font-inter">
+      <div className="text-caption 3xl:text-sm 4xl:text-base text-text-muted font-inter">
         {status.provider === "none" ? "Disabled" : status.provider}
         {status.model && status.provider !== "none" ? ` \u00B7 ${status.model}` : ""}
       </div>
       {status.warning && (
-        <div className="mt-1.5 3xl:mt-2 text-xs 3xl:text-sm 4xl:text-base text-semantic-warning-text font-inter">{status.warning}</div>
+        <div className="mt-1.5 3xl:mt-2 text-caption 3xl:text-sm 4xl:text-base text-semantic-warning-text font-inter">{status.warning}</div>
       )}
       {!ok && envHint && !status.warning && (
-        <div className="mt-1.5 3xl:mt-2 text-xs 3xl:text-sm 4xl:text-base text-text-muted font-inter">{envHint}</div>
+        <div className="mt-1.5 3xl:mt-2 text-caption 3xl:text-sm 4xl:text-base text-text-muted font-inter">{envHint}</div>
       )}
     </div>
   );

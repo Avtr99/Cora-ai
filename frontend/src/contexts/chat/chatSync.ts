@@ -16,12 +16,13 @@ export async function loadChatList(): Promise<void> {
 
   store.setListStatus('loading');
   try {
-    const chats = await listChats();
-    useChatStore.getState().setChats(chats);
-    useChatStore.getState().setListStatus('ready');
+    const remoteChats = await listChats();
+    const state = useChatStore.getState();
+    state.mergeServerChats(remoteChats);
+    state.setListStatus('ready');
   } catch (error) {
     console.error('[ChatContext] Failed to load chats from server:', error);
-    useChatStore.getState().setChats([]);
+    // Local chats are kept: a failed list fetch must not drop in-flight turns.
     useChatStore.getState().setListStatus('error');
   }
 }
@@ -45,13 +46,7 @@ export async function loadChatMessages(chatId: string): Promise<void> {
   store.markChatLoading(chatId);
   try {
     const detail = await getChat(chatId);
-    useChatStore.getState().updateChat(chatId, {
-      title: detail.title,
-      messages: detail.messages,
-      shownRecommendations: detail.shownRecommendations,
-      updatedAt: detail.updatedAt,
-      messagesLoaded: true,
-    });
+    useChatStore.getState().mergeChatHistory(chatId, detail);
   } catch (error) {
     if (error instanceof ChatsApiError && error.status === 404) {
       useChatStore.getState().deleteChat(chatId);
