@@ -210,7 +210,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAgentReas
                     setCopied(true);
                     setTimeout(() => setCopied(false), 2000);
                   }}
-                  className={`flex items-center text-xs 3xl:text-sm 4xl:text-base font-medium flex-shrink-0 px-2.5 3xl:px-3.5 4xl:px-4 py-1 3xl:py-1.5 4xl:py-2 rounded-md border transition-all duration-150 active:scale-[0.97] min-w-[72px] justify-center ${
+                  className={`flex items-center text-xs 3xl:text-sm 4xl:text-base font-medium shrink-0 px-2.5 3xl:px-3.5 4xl:px-4 py-1 3xl:py-1.5 4xl:py-2 rounded-md border transition-all duration-150 active:scale-[0.97] min-w-[72px] justify-center ${
                     copied 
                       ? 'text-text-primary bg-surface-subtle border-border-ui' 
                       : 'text-text-muted bg-transparent border-transparent hover:text-text-secondary hover:bg-surface-subtle hover:border-border-ui/50'
@@ -240,7 +240,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAgentReas
                         exit={{ opacity: 0, scale: 0.95 }}
                         transition={{ duration: 0.1 }}
                       >
-                        <Copy className="h-3 w-3 3xl:h-4 3xl:w-4 4xl:h-5 4xl:w-5 stroke-[2]" />
+                        <Copy className="h-3 w-3 3xl:h-4 3xl:w-4 4xl:h-5 4xl:w-5 stroke-2" />
                         <span>Copy</span>
                       </motion.span>
                     )}

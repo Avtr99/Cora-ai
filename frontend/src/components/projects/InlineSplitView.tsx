@@ -75,7 +75,7 @@ const InlineSplitView: React.FC<InlineSplitViewProps> = ({
     <div
       ref={listRef}
       onScroll={onListScroll}
-      className="w-full lg:w-[380px] 3xl:w-[440px] 4xl:w-[500px] lg:flex-shrink-0 border-r border-border-ui overflow-y-auto divide-y divide-surface-subtle"
+      className="w-full lg:w-[380px] 3xl:w-[440px] 4xl:w-[500px] lg:shrink-0 border-r border-border-ui overflow-y-auto divide-y divide-surface-subtle"
       data-project-list
       role="list"
       aria-label="Project list"
@@ -107,7 +107,7 @@ const InlineSplitView: React.FC<InlineSplitViewProps> = ({
     {/* Right: Map ↔ Detail tabbed panel */}
     <div className="hidden lg:flex flex-1 min-w-0 flex-col bg-surface-card">
       {/* Tab header */}
-      <div className="flex items-center justify-between px-4 3xl:px-6 h-11 3xl:h-12 4xl:h-14 border-b border-border-ui bg-surface-base flex-shrink-0">
+      <div className="flex items-center justify-between px-4 3xl:px-6 h-11 3xl:h-12 4xl:h-14 border-b border-border-ui bg-surface-base shrink-0">
         <div
           className="inline-flex items-center bg-surface-card border border-border-ui rounded-full p-0.5"
           role="tablist"
@@ -141,7 +141,7 @@ const InlineSplitView: React.FC<InlineSplitViewProps> = ({
             >
               <span className="w-1 h-1 rounded-full bg-text-muted" />
               {filters.country}
-              <IconWrapper Icon={XIcon} size={9} color={TEXT.muted} aria-hidden={true} className="3xl:!w-3 3xl:!h-3 4xl:!w-3.5 4xl:!h-3.5" />
+              <IconWrapper Icon={XIcon} size={9} color={TEXT.muted} aria-hidden={true} className="3xl:w-3! 3xl:h-3! 4xl:w-3.5! 4xl:h-3.5!" />
             </button>
           )}
           <span className="font-inter text-[10.5px] 3xl:text-xs 4xl:text-sm text-text-muted tabular-nums">
@@ -152,7 +152,7 @@ const InlineSplitView: React.FC<InlineSplitViewProps> = ({
               type="button"
               ref={expandTriggerRef}
               onClick={() => onSetMapFullscreen(true)}
-              className="inline-flex items-center gap-1.5 h-6 3xl:h-7 4xl:h-8 px-2 3xl:px-3 4xl:px-4 rounded-full border border-border-ui bg-surface-card text-text-secondary font-inter text-[10.5px] 3xl:text-xs 4xl:text-sm font-medium hover:border-brand-500 hover:text-brand-700 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2"
+              className="inline-flex items-center gap-1.5 h-6 3xl:h-7 4xl:h-8 px-2 3xl:px-3 4xl:px-4 rounded-full border border-border-ui bg-surface-card text-text-secondary font-inter text-[10.5px] 3xl:text-xs 4xl:text-sm font-medium hover:border-brand-500 hover:text-brand-700 transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2"
               aria-label="Expand map to fullscreen"
             >
               <Maximize2 className="w-3 h-3" aria-hidden="true" />

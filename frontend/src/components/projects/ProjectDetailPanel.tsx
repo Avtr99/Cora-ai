@@ -32,8 +32,8 @@ const Field: React.FC<FieldProps> = ({ label, value }) => {
   if (!displayValue) return null;
   return (
     <div className="flex justify-between py-2.5 gap-4 border-b border-surface-subtle last:border-0">
-      <span className="font-inter text-2xs 3xl:text-xs 4xl:text-xs text-text-muted flex-shrink-0">{label}</span>
-      <span className="font-inter text-xs 3xl:text-sm 4xl:text-sm text-text-primary text-right max-w-[60%] break-words font-medium">
+      <span className="font-inter text-2xs 3xl:text-xs 4xl:text-xs text-text-muted shrink-0">{label}</span>
+      <span className="font-inter text-xs 3xl:text-sm 4xl:text-sm text-text-primary text-right max-w-[60%] wrap-break-word font-medium">
         {displayValue}
       </span>
     </div>
@@ -216,7 +216,7 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({ project,
   return (
     <div className="h-full flex flex-col bg-surface-card">
       {/* Header — clean, no accent bar */}
-      <div className="flex-shrink-0 border-b border-border-ui px-5 3xl:px-7 4xl:px-8 pt-5 3xl:pt-6 4xl:pt-7 pb-4 3xl:pb-5">
+      <div className="shrink-0 border-b border-border-ui px-5 3xl:px-7 4xl:px-8 pt-5 3xl:pt-6 4xl:pt-7 pb-4 3xl:pb-5">
         <div className="flex items-start justify-between gap-2 mb-2">
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="font-inter text-2xs 3xl:text-xs 4xl:text-xs font-medium px-2 py-0.5 rounded bg-surface-subtle text-text-secondary">
@@ -235,7 +235,7 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({ project,
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 hover:bg-surface-subtle rounded-lg transition-colors lg:hidden flex-shrink-0"
+              className="p-1.5 hover:bg-surface-subtle rounded-lg transition-colors lg:hidden shrink-0"
               aria-label="Close project details"
             >
               <svg className="w-4 h-4 text-text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -288,14 +288,14 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({ project,
 
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-sm bg-chart-retired" />
+              <span className="w-2 h-2 rounded-xs bg-chart-retired" />
               <span className="font-inter text-2xs 3xl:text-xs 4xl:text-xs text-text-secondary">
                 Retired <span className="font-semibold">{formatCredits(project.creditsRetired)}</span>
                 <span className="text-text-muted ml-0.5">({retiredLabel})</span>
               </span>
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-sm bg-border-ui" />
+              <span className="w-2 h-2 rounded-xs bg-border-ui" />
               <span
                 className="font-inter text-2xs 3xl:text-xs 4xl:text-xs text-text-secondary"
                 title={isOverRetired

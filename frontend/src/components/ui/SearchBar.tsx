@@ -137,11 +137,11 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onTypingStateChange, varia
     : `relative flex w-full items-center gap-2 md:gap-3 3xl:gap-4 4xl:gap-5 rounded-xl md:rounded-3xl border bg-surface-card px-3 md:px-5 3xl:px-7 4xl:px-9 py-2 md:py-3 3xl:py-4 4xl:py-5 min-h-touch 3xl:min-h-touch-lg 4xl:min-h-[88px] shadow-card-sm transition-colors ${inputDisabled ? 'border-border-ui bg-surface-subtle/60 opacity-80' : 'border-border-ui'}`;
 
   const textareaClasses = isLarge
-    ? "resize-none font-inter font-normal text-sm md:text-base 3xl:text-xl 4xl:text-[22px] leading-relaxed text-text-secondary bg-transparent border-none outline-none w-full placeholder:text-text-muted disabled:opacity-60"
-    : "resize-none font-inter font-normal text-sm 3xl:text-[17px] 4xl:text-xl leading-5 3xl:leading-7 4xl:leading-8 text-text-primary bg-transparent border-none outline-none w-full placeholder:text-text-muted disabled:opacity-60";
+    ? "resize-none font-inter font-normal text-sm md:text-base 3xl:text-xl 4xl:text-[22px] leading-relaxed text-text-secondary bg-transparent border-none outline-hidden w-full placeholder:text-text-muted disabled:opacity-60"
+    : "resize-none font-inter font-normal text-sm 3xl:text-[17px] 4xl:text-xl leading-5 3xl:leading-7 4xl:leading-8 text-text-primary bg-transparent border-none outline-hidden w-full placeholder:text-text-muted disabled:opacity-60";
 
   const getButtonStyles = (largeVariant: boolean, typingState: boolean, isEmpty: boolean, isMobile: boolean) => {
-    const baseClasses = "relative flex items-center justify-center rounded-xl transition-all duration-200 focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed shrink-0";
+    const baseClasses = "relative flex items-center justify-center rounded-xl transition-all duration-200 focus:outline-hidden disabled:opacity-60 disabled:cursor-not-allowed shrink-0";
     const sizeClasses = largeVariant 
       ? (isMobile ? "w-11 h-11" : "w-11 h-11 md:w-12 md:h-12 3xl:w-16 3xl:h-16 4xl:w-20 4xl:h-20")
       : (isMobile ? "w-11 h-11" : "w-11 h-11 3xl:w-14 3xl:h-14 4xl:w-16 4xl:h-16");
@@ -150,7 +150,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onTypingStateChange, varia
     // Stop state (Active typing)
     if (typingState) {
       return {
-        className: `${baseClasses} ${sizeClasses} ${focusClasses} border border-border-ui bg-surface-card hover:bg-surface-base hover:border-border-ui shadow-sm transition-all duration-200`,
+        className: `${baseClasses} ${sizeClasses} ${focusClasses} border border-border-ui bg-surface-card hover:bg-surface-base hover:border-border-ui shadow-xs transition-all duration-200`,
         iconColor: TEXT.muted,
         showStop: true
       };
@@ -235,7 +235,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onTypingStateChange, varia
                     transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.15 }}
                     className="flex items-center justify-center"
                   >
-                    <Square className="w-3 h-3 3xl:w-4 3xl:h-4 4xl:w-5 4xl:h-5 fill-text-muted text-text-muted rounded-sm" />
+                    <Square className="w-3 h-3 3xl:w-4 3xl:h-4 4xl:w-5 4xl:h-5 fill-text-muted text-text-muted rounded-xs" />
                   </motion.span>
                 ) : (
                   <motion.span

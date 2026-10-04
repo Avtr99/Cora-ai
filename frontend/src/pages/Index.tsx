@@ -146,7 +146,7 @@ const Index: React.FC = () => {
       <div className="flex flex-1 max-md:flex-col overflow-hidden">
         {/* Sidebar - Fixed width, scrollable internally */}
         <motion.div
-          className="flex-shrink-0 max-md:w-full max-md:h-auto h-full overflow-hidden"
+          className="shrink-0 max-md:w-full max-md:h-auto h-full overflow-hidden"
           animate={{ width: isCollapsed ? 'var(--sidebar-collapsed-width)' : 'var(--sidebar-width)' }}
           transition={{ duration: 0.2, ease: "easeOut" }}
           style={{ height: isMobile ? 'auto' : '100%' }}
@@ -206,8 +206,8 @@ const Index: React.FC = () => {
                 )}
               </AnimatePresence>
 
-              <div className="flex-grow flex flex-col relative">
-                <div className="flex-grow min-h-0">
+              <div className="grow flex flex-col relative">
+                <div className="grow min-h-0">
                   <AnimatePresence mode="wait">
                     {activeChat && (activeChat.messages.length > 0 || isLoadingMessages) ? (
                       <motion.div

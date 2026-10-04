@@ -50,7 +50,7 @@ export const RecommendationCard: React.FC<RecommendationCardProps> = ({ recommen
 
   return (
     <Link to={recommendation.ctaLink} className="block group">
-      <div className="flex flex-col items-start gap-4 3xl:gap-5 p-4 3xl:p-5 4xl:p-6 bg-surface-card border border-border-ui rounded-xl hover:shadow-sm hover:border-border-ui transition-all duration-200 cursor-pointer">
+      <div className="flex flex-col items-start gap-4 3xl:gap-5 p-4 3xl:p-5 4xl:p-6 bg-surface-card border border-border-ui rounded-xl hover:shadow-xs hover:border-border-ui transition-all duration-200 cursor-pointer">
         {/* Text content */}
         <div className="flex flex-col items-start w-full">
           {/* Project title - with ellipsis for overflow */}

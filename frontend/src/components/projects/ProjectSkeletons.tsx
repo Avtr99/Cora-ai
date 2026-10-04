@@ -94,7 +94,7 @@ export const KPISkeleton: React.FC = () => (
 /** Split-view loading skeleton */
 export const SplitViewSkeleton: React.FC = () => (
   <div className="flex border border-border-ui rounded-2xl overflow-hidden bg-surface" style={{ height: `calc(100vh - ${HEADER_OFFSET_PX}px)`, minHeight: `${MIN_SKELETON_HEIGHT_PX}px` }}>
-    <div className="w-[400px] border-r border-border-ui overflow-hidden flex-shrink-0">
+    <div className="w-[400px] border-r border-border-ui overflow-hidden shrink-0">
       {Array.from({ length: 6 }).map((_, i) => (
         <ListItemSkeleton key={i} />
       ))}

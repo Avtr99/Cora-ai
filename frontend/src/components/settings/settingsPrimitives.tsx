@@ -12,7 +12,7 @@ export type TestState = "idle" | "testing" | "success" | "failed";
 
 /** Shared input class string — matches the design system. */
 export const inputClass =
-  "w-full px-4 3xl:px-5 py-2.5 3xl:py-3 4xl:py-4 rounded-lg border border-border-ui bg-surface-card text-text-primary font-inter text-sm 3xl:text-base 4xl:text-lg focus:border-brand-700 focus:outline-none focus:ring-2 focus:ring-focus";
+  "w-full px-4 3xl:px-5 py-2.5 3xl:py-3 4xl:py-4 rounded-lg border border-border-ui bg-surface-card text-text-primary font-inter text-sm 3xl:text-base 4xl:text-lg focus:border-brand-700 focus:outline-hidden focus:ring-2 focus:ring-focus";
 
 /** Labeled form field with optional hint badge and wrapper className. */
 export function Field({
@@ -90,14 +90,14 @@ export function TestConnection({
 
       {state === "success" && result && (
         <div className="mt-3 3xl:mt-4 p-3 3xl:p-4 4xl:p-5 rounded-lg bg-semantic-success-bg border border-semantic-success-border text-semantic-success-text font-inter text-sm 3xl:text-base 4xl:text-lg flex items-start gap-2 3xl:gap-3">
-          <span className="text-semantic-success-icon font-bold flex-shrink-0">{"\u2713"}</span>
+          <span className="text-semantic-success-icon font-bold shrink-0">{"\u2713"}</span>
           <div className="font-medium">{result.message}</div>
         </div>
       )}
 
       {state === "failed" && result && (
         <div className="mt-3 3xl:mt-4 p-3 3xl:p-4 4xl:p-5 rounded-lg bg-semantic-error-bg border border-semantic-error-border text-semantic-error-text font-inter text-sm 3xl:text-base 4xl:text-lg flex items-start gap-2 3xl:gap-3">
-          <span className="text-semantic-error-icon font-bold flex-shrink-0">{"\u2717"}</span>
+          <span className="text-semantic-error-icon font-bold shrink-0">{"\u2717"}</span>
           <div>
             <div className="font-medium">{result.message}</div>
             {result.detail && (

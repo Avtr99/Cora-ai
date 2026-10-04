@@ -180,7 +180,7 @@ export const FilterDropdown: React.FC<FilterDropdownProps> = ({
         aria-expanded={open}
         aria-controls={open ? `${listId}-list` : undefined}
         className={`inline-flex items-center justify-between w-full h-8 3xl:h-10 4xl:h-11 px-3 3xl:px-4 rounded-lg 3xl:rounded-xl font-inter text-xs 3xl:text-[13px] 4xl:text-sm font-medium transition-all
-          border focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2
+          border focus:outline-hidden focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2
           ${value
             ? 'bg-brand-900 text-white border-brand-900'
             : 'bg-surface-card text-text-secondary border-border-ui hover:border-border-ui'
@@ -204,7 +204,7 @@ export const FilterDropdown: React.FC<FilterDropdownProps> = ({
             aria-activedescendant={focusedIndex >= 0 ? `${listId}-option-${focusedIndex}` : undefined}
             tabIndex={-1}
             style={menuStyle}
-            className="fixed inset-x-0 bottom-0 sm:inset-x-auto sm:top-[var(--menu-top)] sm:left-[var(--menu-left)] sm:right-[var(--menu-right)] sm:bottom-auto z-40 bg-surface-card border-t sm:border border-border-ui rounded-t-2xl sm:rounded-xl shadow-2xl sm:shadow-lg max-h-[70vh] sm:max-h-[280px] overflow-hidden sm:min-w-[200px] sm:max-w-[320px] flex flex-col"
+            className="fixed inset-x-0 bottom-0 sm:inset-x-auto sm:top-(--menu-top) sm:left-(--menu-left) sm:right-(--menu-right) sm:bottom-auto z-40 bg-surface-card border-t sm:border border-border-ui rounded-t-2xl sm:rounded-xl shadow-2xl sm:shadow-lg max-h-[70vh] sm:max-h-[280px] overflow-hidden sm:min-w-[200px] sm:max-w-[320px] flex flex-col"
           >
             {/* Mobile header — makes the bottom sheet look like a modal,
                 mirroring the Filters popup for UX consistency. */}
@@ -263,9 +263,9 @@ export const FilterDropdown: React.FC<FilterDropdownProps> = ({
                           : 'text-text-secondary hover:bg-surface-base'
                       }`}
                     >
-                      <span className="break-words max-w-[260px] overflow-hidden">{opt.label}</span>
+                      <span className="wrap-break-word max-w-[260px] overflow-hidden">{opt.label}</span>
                       {opt.count !== undefined && (
-                        <span className="text-text-muted text-xs sm:text-2xs 3xl:text-xs 4xl:text-[13px] flex-shrink-0">{opt.count.toLocaleString()}</span>
+                        <span className="text-text-muted text-xs sm:text-2xs 3xl:text-xs 4xl:text-[13px] shrink-0">{opt.count.toLocaleString()}</span>
                       )}
                     </button>
                   );

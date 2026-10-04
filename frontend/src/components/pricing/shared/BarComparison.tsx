@@ -17,7 +17,7 @@ const BarComparison: React.FC<{
       {items.map((item, index) => (
         <div key={item.label} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-5 gap-y-3 py-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_6rem] sm:gap-4">
           <span className="font-inter text-body-sm sm:text-body 3xl:text-lg 4xl:text-xl font-medium text-text-primary">{item.label}</span>
-          <div className="order-last col-span-2 h-2.5 3xl:h-3 4xl:h-3.5 rounded-full bg-surface-subtle sm:order-none sm:col-span-1">
+          <div className="order-last col-span-2 h-2.5 3xl:h-3 4xl:h-3.5 rounded-full bg-surface-subtle sm:order-0 sm:col-span-1">
             <motion.div
               className="h-full min-w-2 rounded-full"
               style={{ backgroundColor: TONE_COLORS[item.tone], width: `${Math.max(item.widthPct, 6)}%`, transformOrigin: 'left center' }}

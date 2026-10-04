@@ -91,7 +91,7 @@ export const FilterDrawer: React.FC<FilterDrawerProps> = ({
       {/* Panel */}
       <div className="fixed z-40 flex flex-col bg-surface-card shadow-2xl inset-x-0 bottom-0 rounded-t-2xl max-h-[80vh] lg:fixed lg:inset-y-0 lg:right-0 lg:left-auto lg:top-0 lg:w-[400px] lg:max-h-none lg:rounded-none lg:border-l lg:border-border-ui">
         {/* Drawer header */}
-        <div className="flex items-center justify-between p-3 border-b border-surface-subtle flex-shrink-0">
+        <div className="flex items-center justify-between p-3 border-b border-surface-subtle shrink-0">
           <span className="font-poppins font-semibold text-sm 3xl:text-base 4xl:text-lg text-text-primary">
             {ariaLabel}
           </span>
@@ -117,7 +117,7 @@ export const FilterDrawer: React.FC<FilterDrawerProps> = ({
         </div>
 
         {/* Global search */}
-        <div className="p-3 border-b border-surface-subtle flex-shrink-0">
+        <div className="p-3 border-b border-surface-subtle shrink-0">
           <FilterSearchInput
             value={search}
             onChange={setSearch}

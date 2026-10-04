@@ -142,7 +142,7 @@ export const ProjectStatistics = ({
   
   return (
     <div className="mb-6 md:mb-16 3xl:mb-20 4xl:mb-24">
-      <div className="bg-surface-card rounded-2xl p-4 md:p-7 3xl:p-9 4xl:p-12 shadow-sm border border-border-ui mb-6 md:mb-12 3xl:mb-14 4xl:mb-16">
+      <div className="bg-surface-card rounded-2xl p-4 md:p-7 3xl:p-9 4xl:p-12 shadow-xs border border-border-ui mb-6 md:mb-12 3xl:mb-14 4xl:mb-16">
         <div className="flex flex-col md:flex-row justify-between items-start gap-3 md:gap-8 3xl:gap-10 4xl:gap-12">
           {/* Left side - Stats */}
           <div className="w-full md:w-auto flex flex-col gap-5 md:gap-8 3xl:gap-10 4xl:gap-12">

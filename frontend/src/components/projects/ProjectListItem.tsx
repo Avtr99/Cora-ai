@@ -113,8 +113,8 @@ export const ProjectListItem: React.FC<ProjectListItemProps> = ({
         aria-label={isSelected ? `Remove ${project.name} from comparison` : `Add ${project.name} to comparison`}
         disabled={compareDisabled && !isSelected}
         className={`absolute top-3 right-3 z-10 w-6 h-6 rounded flex items-center justify-center
-          border transition-all flex-shrink-0
-          focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2
+          border transition-all shrink-0
+          focus:outline-hidden focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2
           ${isSelected
             ? 'border-brand-500 bg-brand-500 opacity-100'
             : compareDisabled
@@ -133,14 +133,14 @@ export const ProjectListItem: React.FC<ProjectListItemProps> = ({
       {/* Main clickable area */}
       <button
         type="button"
-        className="w-full text-left px-4 3xl:px-6 py-3 3xl:py-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
+        className="w-full text-left px-4 3xl:px-6 py-3 3xl:py-4 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
         onClick={() => onSelect(project)}
         aria-label={`View details for ${project.name}`}
       >
         {/* Row 1: Status badge + ID + Registry */}
         <div className="flex items-center gap-1.5 mb-1">
           <span
-            className="inline-flex items-center gap-1 px-1 py-0.5 rounded text-2xs 3xl:text-xs 4xl:text-sm font-semibold font-inter uppercase tracking-wide flex-shrink-0"
+            className="inline-flex items-center gap-1 px-1 py-0.5 rounded text-2xs 3xl:text-xs 4xl:text-sm font-semibold font-inter uppercase tracking-wide shrink-0"
             style={{ backgroundColor: statusStyle.bg, color: statusStyle.text }}
           >
             <span className="w-1 h-1 3xl:w-1.5 3xl:h-1.5 rounded-full" style={{ backgroundColor: statusStyle.dot }} />
@@ -171,7 +171,7 @@ export const ProjectListItem: React.FC<ProjectListItemProps> = ({
 
         {/* Row 4: Credits with micro progress bar */}
         <div className="flex items-center gap-2">
-          <span className="font-poppins font-semibold text-xs 3xl:text-sm 4xl:text-base text-text-primary tabular-nums flex-shrink-0">
+          <span className="font-poppins font-semibold text-xs 3xl:text-sm 4xl:text-base text-text-primary tabular-nums shrink-0">
             {formatCredits(project.creditsIssued)}
           </span>
           <div className="flex-1 rounded-full bg-surface-subtle overflow-hidden" style={{ height: '4px' }}>
@@ -185,7 +185,7 @@ export const ProjectListItem: React.FC<ProjectListItemProps> = ({
               }}
             />
           </div>
-          <span className="font-inter text-xs 3xl:text-sm 4xl:text-base text-text-muted flex-shrink-0 tabular-nums">
+          <span className="font-inter text-xs 3xl:text-sm 4xl:text-base text-text-muted shrink-0 tabular-nums">
             {retiredLabel} retired
           </span>
         </div>

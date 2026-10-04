@@ -47,7 +47,7 @@ const StaticImg = ({ src = '', alt = '', ...imgProps }: MarkdownImgRendererProps
       loading="lazy"
       decoding="async"
       referrerPolicy="no-referrer"
-      className="max-w-full h-auto max-h-80 3xl:max-h-96 4xl:max-h-[28rem] object-contain rounded-md border border-surface-subtle"
+      className="max-w-full h-auto max-h-80 3xl:max-h-96 4xl:max-h-112 object-contain rounded-md border border-surface-subtle"
       {...safeProps}
     />
   );
@@ -70,7 +70,7 @@ const StaticTh = (props: React.ThHTMLAttributes<HTMLTableCellElement>) => (
   <th className="px-4 3xl:px-5 py-2.5 3xl:py-3 text-left font-poppins font-semibold text-xs 3xl:text-sm 4xl:text-base uppercase tracking-[0.08em] text-text-muted" {...props} />
 );
 const StaticTd = (props: React.TdHTMLAttributes<HTMLTableCellElement>) => (
-  <td className="px-4 3xl:px-5 py-2.5 3xl:py-3 font-inter text-sm 3xl:text-base 4xl:text-lg text-text-secondary leading-[1.5]" {...props} />
+  <td className="px-4 3xl:px-5 py-2.5 3xl:py-3 font-inter text-sm 3xl:text-base 4xl:text-lg text-text-secondary leading-normal" {...props} />
 );
 const StaticBlockquote = ({ children }: React.BlockquoteHTMLAttributes<HTMLQuoteElement>) => (
   <blockquote className="my-6 3xl:my-8 rounded-lg border border-border-ui bg-surface-card/50 px-5 3xl:px-6 py-4 3xl:py-5 text-text-secondary shadow-card-sm text-sm 3xl:text-base 4xl:text-lg italic leading-relaxed [&>p]:mb-0 [&>p:last-child]:mb-0">
@@ -133,7 +133,7 @@ export const ChatMarkdownContent: React.FC<ChatMarkdownContentProps> = ({
           <button
             type="button"
             onClick={() => copyText(text)}
-            className="absolute top-2 3xl:top-3 right-2 3xl:right-3 p-1.5 3xl:p-2 rounded bg-surface-card/80 hover:bg-surface-card text-text-muted shadow-sm"
+            className="absolute top-2 3xl:top-3 right-2 3xl:right-3 p-1.5 3xl:p-2 rounded bg-surface-card/80 hover:bg-surface-card text-text-muted shadow-xs"
             aria-label="Copy code"
             title="Copy code"
           >
@@ -206,7 +206,7 @@ export const ChatMarkdownContent: React.FC<ChatMarkdownContentProps> = ({
           href={safeHref}
           target={isExternal ? '_blank' : undefined}
           rel={isExternal ? 'noopener noreferrer' : undefined}
-          className="text-brand-700 underline break-words inline-flex items-center gap-1 3xl:gap-1.5"
+          className="text-brand-700 underline wrap-break-word inline-flex items-center gap-1 3xl:gap-1.5"
           {...safeProps}
         >
           {children}

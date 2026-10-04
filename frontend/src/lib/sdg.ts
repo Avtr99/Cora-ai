@@ -1,6 +1,6 @@
 /**
  * Tailwind background-color classes for SDG badge colors.
- * Colors are defined as `sdg` tokens in tailwind.config.ts.
+ * Colors are defined as `--color-sdg-*` tokens in src/index.css (@theme).
  */
 export const SDG_BG_CLASS: Record<number, string> = {
   1: 'bg-sdg-1',

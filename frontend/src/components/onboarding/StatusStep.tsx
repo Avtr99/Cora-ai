@@ -103,12 +103,12 @@ const StatusStep = ({ onBack, onContinue }: StatusStepProps): JSX.Element => {
       >
         {status.ready ? (
           <>
-            <CheckCircle2 className="w-4 h-4 3xl:w-5 3xl:h-5 4xl:w-6 4xl:h-6 text-semantic-success-text flex-shrink-0" strokeWidth={2} />
+            <CheckCircle2 className="w-4 h-4 3xl:w-5 3xl:h-5 4xl:w-6 4xl:h-6 text-semantic-success-text shrink-0" strokeWidth={2} />
             <span>All providers configured. Cora is ready to go.</span>
           </>
         ) : (
           <>
-            <AlertCircle className="w-4 h-4 3xl:w-5 3xl:h-5 4xl:w-6 4xl:h-6 text-semantic-warning-text flex-shrink-0" strokeWidth={2} />
+            <AlertCircle className="w-4 h-4 3xl:w-5 3xl:h-5 4xl:w-6 4xl:h-6 text-semantic-warning-text shrink-0" strokeWidth={2} />
             <span>Some providers aren't configured yet — you can still continue and finish setup in .env.</span>
           </>
         )}

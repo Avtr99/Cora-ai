@@ -48,7 +48,7 @@ const LoginPage = (): JSX.Element => {
               onChange={(e) => setKey(e.target.value)}
               autoComplete="current-password"
               autoFocus
-              className="w-full px-4 3xl:px-5 py-3 3xl:py-4 rounded-lg border border-border-ui bg-surface-card text-text-primary font-inter text-sm 3xl:text-base focus:border-brand-700 focus:outline-none focus:ring-2 focus:ring-focus"
+              className="w-full px-4 3xl:px-5 py-3 3xl:py-4 rounded-lg border border-border-ui bg-surface-card text-text-primary font-inter text-sm 3xl:text-base focus:border-brand-700 focus:outline-hidden focus:ring-2 focus:ring-focus"
             />
             {error && (
               <div
@@ -61,7 +61,7 @@ const LoginPage = (): JSX.Element => {
             <button
               type="submit"
               disabled={pending || key.length === 0}
-              className="mt-6 h-10 3xl:h-12 w-full rounded-lg bg-brand-700 px-4 font-inter text-sm 3xl:text-base font-semibold text-white transition-colors hover:bg-brand-hover disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-focus"
+              className="mt-6 h-10 3xl:h-12 w-full rounded-lg bg-brand-700 px-4 font-inter text-sm 3xl:text-base font-semibold text-white transition-colors hover:bg-brand-hover disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-focus"
             >
               {pending ? 'Signing in...' : 'Sign in'}
             </button>

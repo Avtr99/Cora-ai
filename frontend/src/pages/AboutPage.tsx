@@ -77,7 +77,7 @@ const AboutPage: React.FC = () => {
             to="/"
             className="inline-flex items-center gap-2 3xl:gap-2.5 text-brand-700 transition-colors duration-200 hover:text-brand-hover font-poppins text-sm md:text-base 3xl:text-lg 4xl:text-xl font-semibold"
           >
-            <IconWrapper Icon={ChevronLeftIcon} size={16} color="currentColor" aria-hidden={true} className="md:!w-4.5 md:!h-4.5 3xl:!w-5 3xl:!h-5 4xl:!w-6 4xl:!h-6" />
+            <IconWrapper Icon={ChevronLeftIcon} size={16} color="currentColor" aria-hidden={true} className="md:w-4.5! md:h-4.5! 3xl:w-5! 3xl:h-5! 4xl:w-6! 4xl:h-6!" />
             <span>About Cora</span>
           </Link>
         </nav>
@@ -102,8 +102,8 @@ const AboutPage: React.FC = () => {
             <div className="flex-1 space-y-4 md:space-y-7 3xl:space-y-8">
               {featureHighlights.map(({ icon, title, description }) => (
                 <div key={title} className="flex items-start gap-3 md:gap-4 3xl:gap-5">
-                  <div className="flex h-10 w-10 md:h-12 md:w-12 3xl:h-14 3xl:w-14 4xl:h-16 4xl:w-16 flex-shrink-0 items-center justify-center rounded-md 3xl:rounded-lg bg-brand-100 text-brand-500">
-                    <IconWrapper Icon={iconMap[icon]} size={18} color="currentColor" className="md:!w-[22px] md:!h-[22px] 3xl:!w-6 3xl:!h-6" />
+                  <div className="flex h-10 w-10 md:h-12 md:w-12 3xl:h-14 3xl:w-14 4xl:h-16 4xl:w-16 shrink-0 items-center justify-center rounded-md 3xl:rounded-lg bg-brand-100 text-brand-500">
+                    <IconWrapper Icon={iconMap[icon]} size={18} color="currentColor" className="md:w-[22px]! md:h-[22px]! 3xl:w-6! 3xl:h-6!" />
                   </div>
                   <div className="space-y-1 3xl:space-y-1.5">
                     <h3 className="font-poppins text-sm md:text-base 3xl:text-lg 4xl:text-xl font-semibold leading-5 md:leading-6 3xl:leading-7 text-brand-900">
@@ -125,8 +125,8 @@ const AboutPage: React.FC = () => {
                 <ul className="space-y-3 md:space-y-4 3xl:space-y-5">
                   {helpTopics.map(({ icon, label }) => (
                     <li key={label} className="flex items-start gap-3 md:gap-4 3xl:gap-5">
-                      <span className="flex h-5 w-5 3xl:h-6 3xl:w-6 flex-shrink-0 items-center justify-center mt-0.5">
-                        <IconWrapper Icon={iconMap[icon]} size={18} className="md:!w-[20px] md:!h-[20px] 3xl:!w-[22px] 3xl:!h-[22px]" />
+                      <span className="flex h-5 w-5 3xl:h-6 3xl:w-6 shrink-0 items-center justify-center mt-0.5">
+                        <IconWrapper Icon={iconMap[icon]} size={18} className="md:w-[20px]! md:h-[20px]! 3xl:w-[22px]! 3xl:h-[22px]!" />
                       </span>
                       <span className="font-inter text-sm md:text-base 3xl:text-lg 4xl:text-xl leading-5 md:leading-6 3xl:leading-7 text-brand-900">
                         {label}

@@ -37,7 +37,7 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder="Search documents or tags"
           aria-label="Search documents or tags"
-          className="w-full h-8 3xl:h-10 4xl:h-11 pl-8 3xl:pl-10 pr-8 rounded-lg 3xl:rounded-xl border border-border-ui bg-surface-card font-inter text-xs 3xl:text-sm 4xl:text-[15px] text-text-primary placeholder:text-text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 transition-shadow"
+          className="w-full h-8 3xl:h-10 4xl:h-11 pl-8 3xl:pl-10 pr-8 rounded-lg 3xl:rounded-xl border border-border-ui bg-surface-card font-inter text-xs 3xl:text-sm 4xl:text-[15px] text-text-primary placeholder:text-text-muted focus:outline-hidden focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 transition-shadow"
         />
         {search && (
           <button

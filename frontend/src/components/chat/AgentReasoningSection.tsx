@@ -45,8 +45,8 @@ export const AgentReasoningSection: React.FC<AgentReasoningSectionProps> = ({ st
 
   return (
     <details className="-mt-1 mb-3 3xl:mb-4 text-xs 3xl:text-sm 4xl:text-base cursor-pointer group">
-      <summary className="font-inter font-normal text-xs 3xl:text-sm 4xl:text-base leading-[1.4] text-text-secondary outline-none flex items-center gap-1.5 3xl:gap-2 hover:text-brand-500 transition-colors list-none select-none rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2">
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" className="flex-shrink-0">
+      <summary className="font-inter font-normal text-xs 3xl:text-sm 4xl:text-base leading-[1.4] text-text-secondary outline-hidden flex items-center gap-1.5 3xl:gap-2 hover:text-brand-500 transition-colors list-none select-none rounded-xs focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
           <path d="M6.5 2L3 6.5L6.5 6.5L6.5 10L10 5.5L6.5 5.5L6.5 2Z" fill={BRAND.primary500} stroke={BRAND.primary500} strokeWidth="0.5" />
         </svg>
         <span>How this answer was formed</span>
@@ -83,7 +83,7 @@ export const AgentReasoningSection: React.FC<AgentReasoningSectionProps> = ({ st
                     <ul className="space-y-1 3xl:space-y-1.5 4xl:space-y-2">
                       {detailMsgs.map((msg: string, i: number) => (
                         <li key={i} className="flex items-start gap-2">
-                          <span className="w-1 h-1 3xl:w-1.5 3xl:h-1.5 rounded-full bg-brand-500 mt-1.5 3xl:mt-2 flex-shrink-0"></span>
+                          <span className="w-1 h-1 3xl:w-1.5 3xl:h-1.5 rounded-full bg-brand-500 mt-1.5 3xl:mt-2 shrink-0"></span>
                           <span className="font-inter font-normal text-xs 3xl:text-sm leading-[1.45] text-text-secondary">
                             {friendlyMessage(msg)}
                           </span>

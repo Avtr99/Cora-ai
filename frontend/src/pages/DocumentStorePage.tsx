@@ -285,7 +285,7 @@ const DocumentStorePage: React.FC = () => {
             to="/"
             className="inline-flex items-center gap-2 3xl:gap-2.5 text-brand-700 transition-colors duration-200 hover:text-brand-hover font-poppins text-sm md:text-base 3xl:text-lg 4xl:text-xl font-semibold"
           >
-            <IconWrapper Icon={ChevronLeftIcon} size={16} color="currentColor" aria-hidden={true} className="md:!w-4.5 md:!h-4.5 3xl:!w-5 3xl:!h-5 4xl:!w-6 4xl:!h-6" />
+            <IconWrapper Icon={ChevronLeftIcon} size={16} color="currentColor" aria-hidden={true} className="md:w-4.5! md:h-4.5! 3xl:w-5! 3xl:h-5! 4xl:w-6! 4xl:h-6!" />
             <span>Document store</span>
           </Link>
         </nav>
@@ -304,7 +304,7 @@ const DocumentStorePage: React.FC = () => {
             <button
               type="button"
               onClick={() => configQuery.refetch()}
-              className="inline-flex h-8 3xl:h-10 4xl:h-11 shrink-0 items-center gap-1.5 3xl:gap-2 rounded-lg 3xl:rounded-xl border border-border-ui bg-surface-card px-3 3xl:px-4 font-inter text-xs 3xl:text-[13px] 4xl:text-sm font-medium text-text-primary transition-all hover:border-text-muted hover:bg-surface-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex h-8 3xl:h-10 4xl:h-11 shrink-0 items-center gap-1.5 3xl:gap-2 rounded-lg 3xl:rounded-xl border border-border-ui bg-surface-card px-3 3xl:px-4 font-inter text-xs 3xl:text-[13px] 4xl:text-sm font-medium text-text-primary transition-all hover:border-text-muted hover:bg-surface-subtle focus:outline-hidden focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={configQuery.isFetching}
             >
               <RefreshCw className={`h-3.5 w-3.5 3xl:h-4 3xl:w-4 4xl:h-5 4xl:w-5 ${configQuery.isFetching ? 'animate-spin' : ''}`} />
@@ -326,7 +326,7 @@ const DocumentStorePage: React.FC = () => {
             </div>
             <Link
               to="/settings"
-              className="inline-flex h-8 3xl:h-10 4xl:h-11 shrink-0 items-center gap-1.5 3xl:gap-2 rounded-lg 3xl:rounded-xl border border-border-ui bg-surface-card px-3 3xl:px-4 font-inter text-xs 3xl:text-[13px] 4xl:text-sm font-medium text-text-primary transition-all hover:border-text-muted hover:bg-surface-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2"
+              className="inline-flex h-8 3xl:h-10 4xl:h-11 shrink-0 items-center gap-1.5 3xl:gap-2 rounded-lg 3xl:rounded-xl border border-border-ui bg-surface-card px-3 3xl:px-4 font-inter text-xs 3xl:text-[13px] 4xl:text-sm font-medium text-text-primary transition-all hover:border-text-muted hover:bg-surface-subtle focus:outline-hidden focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2"
             >
               <SettingsIcon className="h-3.5 w-3.5 3xl:h-4 3xl:w-4 4xl:h-5 4xl:w-5" />
               Open Settings
@@ -353,7 +353,7 @@ const DocumentStorePage: React.FC = () => {
                       type="button"
                       onClick={handleReindexAll}
                       disabled={anyBusy}
-                      className="inline-flex h-8 3xl:h-10 4xl:h-11 items-center gap-1.5 3xl:gap-2 rounded-lg 3xl:rounded-xl border border-border-ui bg-surface-card px-3 3xl:px-4 font-inter text-xs 3xl:text-[13px] 4xl:text-sm font-medium text-text-secondary transition-all hover:border-text-muted hover:bg-surface-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="inline-flex h-8 3xl:h-10 4xl:h-11 items-center gap-1.5 3xl:gap-2 rounded-lg 3xl:rounded-xl border border-border-ui bg-surface-card px-3 3xl:px-4 font-inter text-xs 3xl:text-[13px] 4xl:text-sm font-medium text-text-secondary transition-all hover:border-text-muted hover:bg-surface-subtle focus:outline-hidden focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                       title="Re-chunk and re-embed all documents from their converted text"
                     >
                       <RefreshCw className={`h-3.5 w-3.5 3xl:h-4 3xl:w-4 4xl:h-5 4xl:w-5 ${reindexAllMutation.isPending ? 'animate-spin' : ''}`} />
@@ -363,7 +363,7 @@ const DocumentStorePage: React.FC = () => {
                       type="button"
                       onClick={handleClearAll}
                       disabled={anyBusy}
-                      className="inline-flex h-8 3xl:h-10 4xl:h-11 items-center gap-1.5 3xl:gap-2 rounded-lg 3xl:rounded-xl border border-semantic-error-border bg-surface-card px-3 3xl:px-4 font-inter text-xs 3xl:text-[13px] 4xl:text-sm font-medium text-semantic-error-text transition-all hover:bg-semantic-error-bg focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="inline-flex h-8 3xl:h-10 4xl:h-11 items-center gap-1.5 3xl:gap-2 rounded-lg 3xl:rounded-xl border border-semantic-error-border bg-surface-card px-3 3xl:px-4 font-inter text-xs 3xl:text-[13px] 4xl:text-sm font-medium text-semantic-error-text transition-all hover:bg-semantic-error-bg focus:outline-hidden focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                       title="Delete all documents and remove them from the knowledge base"
                     >
                       <Trash2 className="h-3.5 w-3.5 3xl:h-4 3xl:w-4 4xl:h-5 4xl:w-5" />
@@ -465,7 +465,7 @@ const DocumentStorePage: React.FC = () => {
                     reindexAllMutation.reset();
                     clearAllMutation.reset();
                   }}
-                  className="mt-0.5 shrink-0 rounded-md p-0.5 text-semantic-error-text transition-colors hover:bg-semantic-error-bg hover:text-semantic-error-text focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2"
+                  className="mt-0.5 shrink-0 rounded-md p-0.5 text-semantic-error-text transition-colors hover:bg-semantic-error-bg hover:text-semantic-error-text focus:outline-hidden focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2"
                   aria-label="Dismiss error"
                 >
                   <X className="h-4 w-4" />
@@ -538,7 +538,7 @@ export default function DocumentStorePageWrapper(): JSX.Element {
             </p>
             {error && (
               <div className="mt-4 rounded-lg border border-semantic-error-border bg-semantic-error-bg p-3 text-left">
-                <p className="font-inter text-caption text-semantic-error-text break-words">
+                <p className="font-inter text-caption text-semantic-error-text wrap-break-word">
                   {error.message}
                 </p>
               </div>
@@ -546,7 +546,7 @@ export default function DocumentStorePageWrapper(): JSX.Element {
             <button
               type="button"
               onClick={() => window.location.reload()}
-              className="mt-6 inline-flex h-9 items-center gap-2 rounded-lg bg-brand-700 px-5 font-poppins text-sm font-semibold text-white transition-colors hover:bg-brand-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2"
+              className="mt-6 inline-flex h-9 items-center gap-2 rounded-lg bg-brand-700 px-5 font-poppins text-sm font-semibold text-white transition-colors hover:bg-brand-hover focus:outline-hidden focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2"
             >
               <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
               Reload

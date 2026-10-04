@@ -174,7 +174,7 @@ const CitationBadge: React.FC<{ number: number; source: CitationSource }> = ({ n
         {number}
       </span>
       {/* Icon */}
-      <span className="flex-shrink-0">
+      <span className="shrink-0">
         <SourceIcon type={source.type} label={source.label} />
       </span>
       {/* Source name */}
