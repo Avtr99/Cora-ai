@@ -131,11 +131,13 @@ class TestSessionRows:
         finally:
             conn.close()
         assert len(rows) == 1
-        assert rows[0]["token_hash"] == hashlib.sha256(token.encode()).hexdigest()
+        # codeql[py/weak-sensitive-data-hashing] -- high-entropy tokens, not passwords
+        expected_token_hash = hashlib.sha256(token.encode()).hexdigest()
+        # codeql[py/weak-sensitive-data-hashing] -- high-entropy tokens, not passwords
+        expected_fingerprint = hashlib.sha256(api_key.encode()).hexdigest()
+        assert rows[0]["token_hash"] == expected_token_hash
         assert rows[0]["user_id"] == OWNER_USER_ID
-        assert rows[0]["key_fingerprint"] == hashlib.sha256(
-            api_key.encode()
-        ).hexdigest()
+        assert rows[0]["key_fingerprint"] == expected_fingerprint
         assert token not in dict(rows[0]).values()
 
 

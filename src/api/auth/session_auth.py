@@ -23,22 +23,30 @@ SESSION_TTL = timedelta(days=7)
 OWNER_USER_ID = "owner"
 
 
+def _credential_hash(value: str) -> str:
+    """SHA-256 fingerprint of a high-entropy credential (API key or session token).
+
+    A fast unsalted hash is correct here: these are 256-bit random values
+    (``secrets.token_hex(32)`` / ``secrets.token_urlsafe(32)``), not
+    user-chosen passwords, so there is no brute-force surface for a salted
+    KDF to defend. A slow KDF would add per-request latency for no benefit,
+    and its salted output could not be looked up by hash anyway.
+    """
+    # codeql[py/weak-sensitive-data-hashing] -- high-entropy tokens, not passwords; see docstring
+    return hashlib.sha256(value.encode()).hexdigest()
+
+
 def key_matches(provided: str | None) -> bool:
     """Return True when ``provided`` equals the configured API access key.
 
-    SHA-256 is intentional here: API keys are high-entropy random tokens
-    (256 bits via ``secrets.token_hex(32)``), not user passwords, so a
-    fast hash is appropriate — there is no realistic brute-force surface.
-    A slow KDF (PBKDF2/scrypt) would add per-request latency for no
-    security benefit. Comparison uses ``secrets.compare_digest`` to
-    prevent timing attacks.
+    Comparison uses ``secrets.compare_digest`` to prevent timing attacks.
     """
     configured = get_settings().API_ACCESS_KEY
     if not provided or not configured:
         return False
     return secrets.compare_digest(
-        hashlib.sha256(provided.encode()).hexdigest(),
-        hashlib.sha256(configured.encode()).hexdigest(),
+        _credential_hash(provided),
+        _credential_hash(configured),
     )
 
 
@@ -60,9 +68,9 @@ def create_session(user_id: str) -> str:
             VALUES (?, ?, ?, datetime('now', '+' || ? || ' seconds'))
             """,
             (
-                hashlib.sha256(token.encode()).hexdigest(),
+                _credential_hash(token),
                 user_id,
-                hashlib.sha256(api_key.encode()).hexdigest(),
+                _credential_hash(api_key),
                 int(SESSION_TTL.total_seconds()),
             ),
         )
@@ -92,8 +100,8 @@ def session_user_id(token: str | None) -> str | None:
               AND expires_at > datetime('now')
             """,
             (
-                hashlib.sha256(token.encode()).hexdigest(),
-                hashlib.sha256(api_key.encode()).hexdigest(),
+                _credential_hash(token),
+                _credential_hash(api_key),
             ),
         ).fetchone()
         return row["user_id"] if row else None
@@ -139,7 +147,7 @@ def delete_session(token: str | None) -> None:
     try:
         conn.execute(
             "DELETE FROM auth_sessions WHERE token_hash = ?",
-            (hashlib.sha256(token.encode()).hexdigest(),),
+            (_credential_hash(token),),
         )
         conn.commit()
     finally:

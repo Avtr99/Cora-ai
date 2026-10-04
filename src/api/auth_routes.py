@@ -74,9 +74,8 @@ async def get_token(request: TokenRequest):
         # Create JWT token for the user
         token = create_access_token(user_id=request.user_id)
         # Use a safe anonymization that doesn't expose secret key absence
-        anonymized_id = hashlib.sha256(
-            request.user_id.encode("utf-8")
-        ).hexdigest()[:8]
+        # codeql[py/weak-sensitive-data-hashing] -- log pseudonymization, not password storage
+        anonymized_id = hashlib.sha256(request.user_id.encode("utf-8")).hexdigest()[:8]
         logger.info(f"Issued token for user hash: {anonymized_id}")
         
         return TokenResponse(

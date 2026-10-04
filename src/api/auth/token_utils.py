@@ -108,6 +108,7 @@ def create_access_token(
             settings.JWT_SECRET_KEY,
             algorithm=settings.JWT_ALGORITHM
         )
+        # codeql[py/weak-sensitive-data-hashing] -- log pseudonymization, not password storage
         anonymized_id = hashlib.sha256(normalized_user_id.encode("utf-8")).hexdigest()[:8]
         logger.debug(f"Created access token for user hash: {anonymized_id}")
         return encoded_jwt
