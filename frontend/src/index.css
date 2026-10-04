@@ -2,15 +2,13 @@
 
 @plugin 'tailwindcss-animate';
 
+/* v3 container config was center + 2rem padding. The width cap stays with the
+   explicit max-w-* utilities on each .container element (all call sites pair
+   them) — a max-width here would emit after utilities and wrongly override
+   max-w-7xl / 3xl:max-w-[1600px] / 4xl:max-w-[1800px]. */
 @utility container {
   margin-inline: auto;
   padding-inline: 2rem;
-  @media (width >= --theme(--breakpoint-3xl)) {
-    max-width: none;
-  }
-  @media (width >= 1400px) {
-    max-width: 1400px;
-  }
 }
 
 @theme {
@@ -19,8 +17,11 @@
   --font-poppins: Poppins, sans-serif;
   --font-inter: Inter, sans-serif;
 
-  --breakpoint-3xl: 1920px;
-  --breakpoint-4xl: 2400px;
+  /* rem units are required: the engine sorts variant media blocks by unit
+     groups, and px values emitted before the built-in rem breakpoints would
+     lose the cascade to lg:/xl:/2xl: at wide viewports. */
+  --breakpoint-3xl: 120rem; /* 1920px */
+  --breakpoint-4xl: 150rem; /* 2400px */
 
   --shadow-xs: var(--shadow-xs);
   --shadow-card: var(--shadow-card);
