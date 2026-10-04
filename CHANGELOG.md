@@ -4,6 +4,40 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+# [3.0.0](https://github.com/Avtr99/Cora-ai/compare/v2.0.0...v3.0.0) (2026-10-04)
+
+
+* feat!: migrate frontend to Tailwind CSS v4 ([5645a12](https://github.com/Avtr99/Cora-ai/commit/5645a1210635ff5112bfd6901075a5af2d811f25))
+* feat!: add instance auth, server-side chats, and rework citation pipeline ([198df73](https://github.com/Avtr99/Cora-ai/commit/198df73e8f12017f7038914cda58ca4cf21ea436))
+* feat!: correct health probe semantics and fix setup-mode readiness ([61f6541](https://github.com/Avtr99/Cora-ai/commit/61f6541de991db8d9350d9c87157e4f37656602c))
+
+
+### Bug Fixes
+
+* align websockets pin across lockfiles and drop deprecated ORJSONResponse ([a8753b0](https://github.com/Avtr99/Cora-ai/commit/a8753b02bd8234ef3b1664d3c6989e03a8763073))
+* close Dependabot and CodeQL alerts on credential hashing and deps ([113612c](https://github.com/Avtr99/Cora-ai/commit/113612cb9dd26ff2a1f52f3f0e69b4135cc13ef6))
+* resolve frontend audit failures in CI ([8e4d0fc](https://github.com/Avtr99/Cora-ai/commit/8e4d0fc77246a3a93a86323ee23313760f4b9573))
+* restore pointer cursor on buttons under Tailwind v4 preflight ([0bef0f3](https://github.com/Avtr99/Cora-ai/commit/0bef0f3fc829d3f1044755ebcc7a853b98dd29ab))
+* restore wide-viewport layout after Tailwind v4 migration ([2b3dce6](https://github.com/Avtr99/Cora-ai/commit/2b3dce69a23bf83f80b4a7629a1de3b9ca349e55))
+
+
+### BREAKING CHANGES
+
+* Tailwind CSS v4 requires Safari 16.4+, Chrome 111+,
+and Firefox 128+.
+* /v1/query and /v1/query/stream ignore `history` and
+`history_signature`. Send `conversation_id` to continue a chat. Optional
+`message_id`. The response drops `history` and `history_signature`, and
+adds `message_id` and `answer_id`. `metadata` drops
+`history_verification_failed` and `history_items_dropped`. Chats move to
+the server — the upgrade deletes chats saved in the browser. Copy
+anything you need before you upgrade. Every browser signs in again once.
+Queued async jobs are dropped.
+* /ready returns 503 while not ready (previously always
+200). Public /health no longer returns component detail; use /v1/health
+(API key when protection is on). The llm component replaces gemini_api
+in /v1/health output.
+
 # [2.0.0](https://github.com/Avtr99/Cora-ai/compare/v1.4.1...v2.0.0) (2026-09-24)
 
 
