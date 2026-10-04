@@ -402,4 +402,11 @@
   body {
     @apply bg-background text-foreground antialiased;
   }
+
+  /* v4 preflight drops `cursor: pointer` on buttons (it was a v3 default).
+     Restore it so clickable affordance matches the previous UI. */
+  button:not(:disabled),
+  [role='button']:not(:disabled) {
+    cursor: pointer;
+  }
 }
