@@ -64,7 +64,6 @@ PyJWT[crypto]>=2.15.0,<3.0
 
 # Utilities
 python-dotenv==1.2.2
-orjson>=3.11.9,<4.0
 tenacity>=9.1.4,<10.0
 loguru==0.7.3
 cachetools>=7.1.4,<8.0

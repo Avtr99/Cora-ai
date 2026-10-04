@@ -29,6 +29,12 @@ torchvision>=0.26.0,<1.0
 # The standard path no longer uses PyMuPDF — Docling handles text extraction.
 pymupdf>=1.24.0,<2.0
 
+# This lock installs on top of requirements-core.lock, which pins langgraph-sdk
+# (via langchain -> langgraph). langgraph-sdk requires websockets<16, but this
+# file resolved 16.x standalone and overwrote the core pin, breaking pip check.
+# Cap it here so both lockfiles agree.
+websockets>=14,<16
+
 # Optional: FastEmbed local CPU embeddings
 # FastEmbed is NOT wired into the current provider factory (only voyage/cohere/ollama/openai
 # are supported). If you add a FastEmbed provider in src/embeddings/provider_factory.py,

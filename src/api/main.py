@@ -12,7 +12,7 @@ Main FastAPI application entry point. Routes and handlers are organized into:
 """
 from fastapi import FastAPI, HTTPException, Request, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, ORJSONResponse, StreamingResponse, FileResponse
+from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ValidationError
 from typing import List, Dict, Any, Optional, Literal
@@ -67,7 +67,6 @@ app = FastAPI(
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",
-    default_response_class=ORJSONResponse,
 )
 
 # Register custom exception handlers
@@ -499,7 +498,7 @@ async def serve_spa(full_path: str):
         response.headers["Expires"] = "0"
         return response
 
-    return ORJSONResponse(content={"error": "Not Found"}, status_code=404)
+    return JSONResponse(content={"error": "Not Found"}, status_code=404)
 
 if __name__ == "__main__":
     import uvicorn

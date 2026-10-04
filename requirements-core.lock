@@ -1458,7 +1458,6 @@ orjson==3.11.9 \
     --hash=sha256:f5d89a2ed90731df3be64bab0aa44f78bff39fdc9d71c291f4a8023aa46425b7 \
     --hash=sha256:ffe02797b5e9f3a9d8292ddcd289b474ad13e81ad83cd1891a240811f1d2cb81
     # via
-    #   -r requirements-core.txt
     #   langgraph-sdk
     #   langsmith
 ormsgpack==1.12.2 \

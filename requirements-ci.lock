@@ -2239,7 +2239,6 @@ orjson==3.11.9 \
     --hash=sha256:f5d89a2ed90731df3be64bab0aa44f78bff39fdc9d71c291f4a8023aa46425b7 \
     --hash=sha256:ffe02797b5e9f3a9d8292ddcd289b474ad13e81ad83cd1891a240811f1d2cb81
     # via
-    #   -r requirements-core.txt
     #   langgraph-sdk
     #   langsmith
 ormsgpack==1.12.2 \
@@ -4282,6 +4281,7 @@ websockets==15.0.1 \
     --hash=sha256:f7a866fbc1e97b5c617ee4116daaa09b722101d4a3c170c787450ba409f9736f \
     --hash=sha256:fcd5cf9e305d7b8338754470cf69cf81f420459dbae8a3b40cee57417f4614a7
     # via
+    #   -r requirements-ingestion.txt
     #   docling-slim
     #   google-genai
     #   langgraph-sdk

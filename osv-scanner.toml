@@ -234,12 +234,6 @@ vulnerability.ignore = true
 reason = "False positive — transitive dep. Lockfile pins 1.1.2, above all fix versions."
 
 [[PackageOverrides]]
-name = "orjson"
-ecosystem = "PyPI"
-vulnerability.ignore = true
-reason = "False positive — transitive dep. Lockfile pins 3.11.9, above all fix versions."
-
-[[PackageOverrides]]
 name = "pydantic"
 ecosystem = "PyPI"
 vulnerability.ignore = true
