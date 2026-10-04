@@ -19,7 +19,6 @@ from .route_processor_utils import emit_text_as_token_events
 from .router import RouteDecision
 from ..query_processing.streaming_rag_wrapper import StreamingRAGWrapper
 from ..query_processing.filter_extractor import extract_filters
-from ..query_processing.citation_verifier import renumber_citation_markers
 from ..config import get_settings
 from .orchestrator_query_utils import (
     query_changed_substantially,
@@ -381,33 +380,17 @@ class StreamingRAGOrchestrator(RAGOrchestrator):
                                 total_time > self.config.max_total_time_ms)
 
             citations = final_result.get("citations", [])
-            answer_text = final_result.get("answer", "")
 
             if final_result.get("_citations_finalized"):
-                # Route processor already filtered, suppressed, aligned, and
-                # renumbered.  Skip redundant work and go straight to formatting.
+                # Route processor already selected the cited subset.
                 filtered_citations = citations
             else:
-                # No finalization callback ran — do it here.
-                filtered_citations = self.citation_manager.filter_citations_by_answer(
-                    citations, answer_text, query=query
+                # No finalization callback ran — select the cited sources
+                # from the answer's own markers here instead.
+                self.citation_manager.finalize(
+                    final_result, query, final_result.get("coverage_score", 1.0)
                 )
-                coverage_score = final_result.get("coverage_score", 1.0)
-                if self.citation_manager.should_suppress_citations(
-                    query, answer_text, filtered_citations, coverage_score
-                ):
-                    filtered_citations = []
-
-                # Renumber inline citation markers so their numbers match the
-                # filtered citation list. Markers referencing filtered-out
-                # sources are removed. Also runs when filtered is empty
-                # (suppressed) to strip orphaned markers.
-                # Note: this only affects the final result event, not the
-                # already-streamed tokens.
-                if answer_text and (filtered_citations or citations):
-                    renumbered = renumber_citation_markers(answer_text, citations, filtered_citations)
-                    if renumbered != answer_text:
-                        final_result["answer"] = renumbered
+                filtered_citations = final_result["citations"]
 
             citation_info = self.citation_manager.format_citations_for_response(
                 filtered_citations,

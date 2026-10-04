@@ -1,6 +1,6 @@
 import * as React from "react"
 
-// Mirrors the custom screens in tailwind.config.ts (`extend.screens`).
+// Mirrors the custom breakpoints in src/index.css (@theme --breakpoint-3xl/4xl).
 // Used where layout dimensions are computed in JS (e.g. the animated sidebar
 // width) and therefore cannot use 3xl:/4xl: CSS variants.
 const BREAKPOINT_3XL = 1920

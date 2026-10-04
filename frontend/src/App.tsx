@@ -2,6 +2,8 @@ import { lazy, Suspense, type ReactNode, useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { DocumentHead } from "@/components/ui/DocumentHead";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { AuthGate } from "@/components/auth/AuthGate";
+import { PageLoader } from "@/components/PageLoader";
 import NotFound from "@/pages/NotFound";
 import { getLLMSettings } from "@/services/llmSettingsApi";
 import { ONBOARDING_COMPLETE_KEY } from "@/components/onboarding/onboardingState";
@@ -23,15 +25,6 @@ const CookiePolicyPage = lazy(() => import("@/pages/CookiePolicyPage"));
 // Lazy-load @tanstack/react-query + the query client together so pricing
 // / case-study pages never pay for them.
 const DataProviders = lazy(() => import("@/providers/DataProviders"));
-
-// Loading fallback for lazy-loaded pages
-function PageLoader(): JSX.Element {
-  return (
-    <div className="min-h-screen bg-surface-base flex items-center justify-center">
-      <div className="animate-pulse text-text-muted font-inter text-sm">Loading...</div>
-    </div>
-  );
-}
 
 /** Wrap every top-level route so a component crash doesn't bring down the whole SPA. */
 function Safe({ children }: { children: ReactNode }): JSX.Element {
@@ -135,43 +128,45 @@ function App(): JSX.Element {
   return (
     <BrowserRouter>
       <DocumentHead />
-      <FirstRunRedirect />
-      <Suspense fallback={<PageLoader />}>
-        <Routes>
-          {/* Setup / Settings / Onboarding routes (no data providers needed). */}
-          <Route path="/onboarding/" element={<Safe><OnboardingPage /></Safe>} />
-          <Route path="/onboarding" element={<Navigate to="/onboarding/" replace />} />
-          <Route path="/setup/" element={<Safe><SetupPage /></Safe>} />
-          <Route path="/setup" element={<Navigate to="/setup/" replace />} />
-          <Route path="/settings/" element={<Safe><SetupPage /></Safe>} />
-          <Route path="/settings" element={<Navigate to="/settings/" replace />} />
-          {/* Data routes (use @tanstack/react-query). */}
-          <Route path="/" element={<Safe><WithData><HomePage /></WithData></Safe>} />
-          <Route path="/projects/" element={<Safe><WithData><ProjectsPage /></WithData></Safe>} />
-          <Route path="/projects" element={<Navigate to="/projects/" replace />} />
-          <Route path="/documents/" element={<Safe><WithData><DocumentStorePage /></WithData></Safe>} />
-          <Route path="/documents" element={<Navigate to="/documents/" replace />} />
-          <Route path="/about/" element={<Safe><WithData><AboutPage /></WithData></Safe>} />
-          <Route path="/about" element={<Navigate to="/about/" replace />} />
-          {/* Static routes (no data fetching). */}
-          <Route path="/case-studies/" element={<Safe><CaseStudiesPage /></Safe>} />
-          <Route path="/case-studies" element={<Navigate to="/case-studies/" replace />} />
-          <Route path="/case-study/:id/" element={<Safe><CaseStudyPage /></Safe>} />
-          <Route path="/case-study/" element={<Navigate to="/case-study/mangrove-myanmar/" replace />} />
-          <Route path="/case-study" element={<Navigate to="/case-study/mangrove-myanmar/" replace />} />
-          <Route path="/pricing/" element={<Safe><PricingPage /></Safe>} />
-          <Route path="/pricing" element={<Navigate to="/pricing/" replace />} />
-          {/* Legal / Policy pages */}
-          <Route path="/privacy-policy/" element={<Safe><PrivacyPolicyPage /></Safe>} />
-          <Route path="/privacy-policy" element={<Navigate to="/privacy-policy/" replace />} />
-          <Route path="/terms-of-service/" element={<Safe><TermsOfServicePage /></Safe>} />
-          <Route path="/terms-of-service" element={<Navigate to="/terms-of-service/" replace />} />
-          <Route path="/cookie-policy/" element={<Safe><CookiePolicyPage /></Safe>} />
-          <Route path="/cookie-policy" element={<Navigate to="/cookie-policy/" replace />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<Safe><NotFound /></Safe>} />
-        </Routes>
-      </Suspense>
+      <AuthGate>
+        <FirstRunRedirect />
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
+            {/* Setup / Settings / Onboarding routes (no data providers needed). */}
+            <Route path="/onboarding/" element={<Safe><OnboardingPage /></Safe>} />
+            <Route path="/onboarding" element={<Navigate to="/onboarding/" replace />} />
+            <Route path="/setup/" element={<Safe><SetupPage /></Safe>} />
+            <Route path="/setup" element={<Navigate to="/setup/" replace />} />
+            <Route path="/settings/" element={<Safe><SetupPage /></Safe>} />
+            <Route path="/settings" element={<Navigate to="/settings/" replace />} />
+            {/* Data routes (use @tanstack/react-query). */}
+            <Route path="/" element={<Safe><WithData><HomePage /></WithData></Safe>} />
+            <Route path="/projects/" element={<Safe><WithData><ProjectsPage /></WithData></Safe>} />
+            <Route path="/projects" element={<Navigate to="/projects/" replace />} />
+            <Route path="/documents/" element={<Safe><WithData><DocumentStorePage /></WithData></Safe>} />
+            <Route path="/documents" element={<Navigate to="/documents/" replace />} />
+            <Route path="/about/" element={<Safe><WithData><AboutPage /></WithData></Safe>} />
+            <Route path="/about" element={<Navigate to="/about/" replace />} />
+            {/* Static routes (no data fetching). */}
+            <Route path="/case-studies/" element={<Safe><CaseStudiesPage /></Safe>} />
+            <Route path="/case-studies" element={<Navigate to="/case-studies/" replace />} />
+            <Route path="/case-study/:id/" element={<Safe><CaseStudyPage /></Safe>} />
+            <Route path="/case-study/" element={<Navigate to="/case-study/mangrove-myanmar/" replace />} />
+            <Route path="/case-study" element={<Navigate to="/case-study/mangrove-myanmar/" replace />} />
+            <Route path="/pricing/" element={<Safe><PricingPage /></Safe>} />
+            <Route path="/pricing" element={<Navigate to="/pricing/" replace />} />
+            {/* Legal / Policy pages */}
+            <Route path="/privacy-policy/" element={<Safe><PrivacyPolicyPage /></Safe>} />
+            <Route path="/privacy-policy" element={<Navigate to="/privacy-policy/" replace />} />
+            <Route path="/terms-of-service/" element={<Safe><TermsOfServicePage /></Safe>} />
+            <Route path="/terms-of-service" element={<Navigate to="/terms-of-service/" replace />} />
+            <Route path="/cookie-policy/" element={<Safe><CookiePolicyPage /></Safe>} />
+            <Route path="/cookie-policy" element={<Navigate to="/cookie-policy/" replace />} />
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<Safe><NotFound /></Safe>} />
+          </Routes>
+        </Suspense>
+      </AuthGate>
     </BrowserRouter>
   );
 }

@@ -21,12 +21,12 @@ Because Cora AI is open-source and self-hosted, the operator (the person or orga
 
 ### Local-First Data Storage
 
-Cora AI does not require user accounts or logins. All data is stored locally on the machine where the instance is deployed, using SQLite (for caches and metadata) and Qdrant (for vector embeddings and conversation memory). No data leaves the machine unless an external API provider is explicitly configured.
+Each Cora AI instance has one built-in owner account. There is no sign-up. If the operator enables access protection, users sign in with the instance key and Cora AI sets an essential session cookie. All data is stored locally on the machine where the instance is deployed, using SQLite (for chats, caches, and metadata) and Qdrant (for vector embeddings and conversation memory). No data leaves the machine unless an external API provider is explicitly configured.
 
 ### Conversation History
 
 - **Chat messages:** Your conversations are stored in the local Qdrant instance under the `cora_memories` collection. User identifiers are HMAC-hashed before storage, pseudonymizing them and reducing the direct linkability of conversation history.
-- **Session data:** Chat sessions are stored locally in your browser via local storage. You can clear this at any time from your browser settings.
+- **Session data:** Chats are stored in the instance's SQLite database under the owner account and sync across the devices you sign in from. When access protection is enabled, the browser holds one HttpOnly session cookie (`cora_session`); signing out deletes the session on the server. The browser's local storage holds only a locally generated profile ID and onboarding flags, never chat content.
 
 ### Query and Cache Data
 
@@ -94,7 +94,7 @@ Under GDPR and similar regulations, you have the following rights regarding data
 
 - **Right to Access:** Request information about data stored in the local databases. The operator can query SQLite and Qdrant directly.
 - **Right to Rectification:** Request correction of inaccurate data stored in the system.
-- **Right to Erasure (Right to be Forgotten):** You can clear your chat history from your browser at any time. The operator can delete conversation memories via the `DELETE /v1/memory/delete` API endpoint or by clearing the Qdrant `cora_memories` collection.
+- **Right to Erasure (Right to be Forgotten):** You can delete a chat from the sidebar at any time, which removes it from the server database. The operator can delete conversation memories via the `DELETE /v1/memory/delete` API endpoint or by clearing the Qdrant `cora_memories` collection.
 - **Right to Data Portability:** Data can be exported from SQLite (standard SQL dumps) and Qdrant (via the Qdrant API) in machine-readable formats.
 - **Right to Object:** Object to processing by disabling the relevant features (e.g. disable conversation memory via configuration).
 
@@ -104,7 +104,7 @@ To exercise these rights, contact the operator of the Cora AI instance you are u
 
 Data retention is controlled by the operator. The default behaviour is:
 
-- **Chat history:** Stored in the browser's local storage until cleared by the user. Conversation memory in Qdrant persists until explicitly deleted.
+- **Chat history:** Stored in the instance's SQLite database until deleted by the user (sidebar delete) or the operator. Conversation memory in Qdrant persists until explicitly deleted.
 - **Query cache:** Automatically expires after 24 hours.
 - **Embedding cache:** Persists until the corresponding documents are deleted or the database is cleared.
 - **Uploaded documents:** Persist until explicitly deleted by the operator via the document store UI or API.

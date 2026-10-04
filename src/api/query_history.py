@@ -1,60 +1,99 @@
-"""History parsing and sanitization helpers for query requests."""
+"""Server-side chat history helpers shared by all query paths (Phase 7).
 
-from typing import List, Optional, Tuple
+``open_turn`` resolves the caller's identity, owns the ``conversation_id``
+ownership check (a foreign chat 404s, D33), and loads server-side history.
+``close_turn`` stores the turn when the result is worth keeping (A8). The
+client no longer sends history — it is read from the ``chat_turns`` table.
+"""
 
-from loguru import logger
+import asyncio
+import uuid
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
 
-from ..utils.security import verify_history_signature
-from .query_models import Message
+from fastapi import HTTPException, Request
+
+from ..db.chats import get_chat_owner, load_history, record_turn
+from .auth.session_auth import current_user_id
+from .query_models import Message, Query, Response
 
 TRUSTED_HISTORY_ROLES = {"user", "assistant"}
+HISTORY_CONTEXT_MAX_MESSAGES = 10
 
 
-def resolve_trusted_history(
-    history: Optional[List[Message]],
-    *,
-    conversation_id: Optional[str],
-    history_signature: Optional[str],
-    signing_secret: Optional[str],
-    scope_key: str = "",
-    max_messages: int = 10,
-) -> Tuple[Optional[List[Message]], bool]:
-    """Verify client-provided history and discard it unless its signature is trusted."""
-    if not history:
-        return None, False
-    if not signing_secret:
-        logger.warning("History signing secret not configured. Discarding untrusted history.")
-        return None, False
-    if not conversation_id:
-        logger.warning("History provided without conversation_id. Discarding unassociated history.")
-        return None, False
-    if not history_signature:
-        logger.warning("History provided without signature. Discarding untrusted history.")
-        return None, False
+@dataclass(frozen=True)
+class TurnContext:
+    """Resolved identity and history for one query turn."""
 
-    history_window = history[-max_messages:]
-    history_list = [
-        {"role": message.role, "content": message.content}
-        for message in history_window
-    ]
-    if not verify_history_signature(
-        history_list,
-        conversation_id,
-        history_signature,
-        signing_secret,
-        scope_key=scope_key,
-    ):
-        logger.warning(
-            f"History signature verification FAILED for conversation {conversation_id}. "
-            "Discarding untrusted history."
+    user_id: str
+    conversation_id: str
+    message_id: str
+    history: List[Message]
+
+
+async def open_turn(query: Query, request: Request) -> TurnContext:
+    """Resolve the turn's identity and load its server-side history.
+
+    A ``conversation_id`` owned by another user raises HTTP 404 (D33). A new
+    conversation starts with empty history; an existing one replays the last
+    ``HISTORY_CONTEXT_MAX_MESSAGES // 2`` turns, minus the in-flight
+    ``message_id`` (a retry sees the chat without its own row).
+    """
+    user_id = current_user_id(request)
+    conversation_id = query.conversation_id or str(uuid.uuid4())
+    message_id = query.message_id or str(uuid.uuid4())
+
+    owner = await asyncio.to_thread(get_chat_owner, conversation_id)
+    if owner is not None and owner != user_id:
+        raise HTTPException(status_code=404, detail="Chat not found")
+
+    history: List[Message] = []
+    if owner == user_id:
+        raw_history = await asyncio.to_thread(
+            load_history, conversation_id, message_id, HISTORY_CONTEXT_MAX_MESSAGES
         )
-        return None, False
+        history = sanitize_history_messages(
+            [Message(role=m["role"], content=m["content"]) for m in raw_history]
+        )
 
-    logger.debug(f"History signature verified for conversation {conversation_id}")
-    return [
-        message for message in history_window
-        if message.role in TRUSTED_HISTORY_ROLES
-    ], True
+    return TurnContext(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        message_id=message_id,
+        history=history,
+    )
+
+
+def is_storable(raw_result: Dict[str, Any]) -> bool:
+    """Decide from the raw orchestrator result whether the turn is kept (A8).
+
+    Reads the raw result, not the sanitized response: ``query_service`` fills
+    empty ``sources`` with ``["knowledge_base"]`` and ``timeout_exceeded`` is
+    set on complete-but-slow answers — neither is a failure signal here.
+    """
+    return not raw_result.get("error") and "error_fallback" not in (
+        raw_result.get("sources") or []
+    )
+
+
+async def close_turn(
+    ctx: TurnContext, user_text: str, response: Response, raw_result: Dict[str, Any]
+) -> None:
+    """Store the sanitized response as this turn's row when storable.
+
+    ``user_text`` is the exact text the client sent (``query.text``), as the
+    old signing code used. A ``ChatNotFound`` from ``record_turn`` (ownership
+    race) propagates — it must not be swallowed.
+    """
+    if is_storable(raw_result):
+        await asyncio.to_thread(
+            record_turn,
+            ctx.user_id,
+            ctx.conversation_id,
+            ctx.message_id,
+            user_text,
+            response.model_dump(),
+        )
 
 
 def sanitize_history_messages(
@@ -62,8 +101,7 @@ def sanitize_history_messages(
 ) -> List[Message]:
     """
     Enforce length limits on history messages.
-    Full threat sanitization is skipped here because history is cryptographically
-    verified in query_service.py and was sanitized upon initial entry.
+    Messages come from the server-side store, so they were sanitized on entry.
 
     Default 4000 chars/message * 10 history messages gives a ~40k char history
     block. Gemini Flash has a 1M context window, so this is a conservative prompt
@@ -84,7 +122,7 @@ def sanitize_history_messages(
         if content:
             if len(content) > max_msg_len:
                 content = content[:max_msg_len] + "..."
-            
+
             filtered_messages.append(Message(role=role, content=content))
 
     return filtered_messages
@@ -97,15 +135,3 @@ def format_history_string(messages: List[Message]) -> str:
         if message.content:
             lines.append(f"{message.role}: {message.content}")
     return "\n".join(lines)
-
-
-def format_history_context(
-    history: Optional[List[Message]], max_msg_len: int = 4000
-) -> Tuple[str, List[Message]]:
-    """
-    Legacy wrapper: Format recent conversation history for short-term context with sanitization.
-    Returns (formatted_string, list_of_messages).
-    """
-    cleaned_messages = sanitize_history_messages(history, max_msg_len)
-    history_str = format_history_string(cleaned_messages)
-    return history_str, cleaned_messages

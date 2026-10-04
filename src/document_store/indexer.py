@@ -177,9 +177,77 @@ def _prepend_header(chunks: list[Document], header: str) -> None:
         chunk.page_content = f"{header}\n\n{chunk.page_content}"
 
 
-def chunk_markdown(record: DocumentRecord) -> list[Document]:
-    from langchain_text_splitters import RecursiveCharacterTextSplitter
+# Docling structure-aware chunking singletons. Created lazily because docling
+# only exists where ingestion runs — the query-serving app image does not
+# ship it, and module import must stay cheap and dependency-free there.
+_docling_md_converter: Optional[Any] = None
+_docling_chunker: Optional[Any] = None
+_docling_lock = threading.Lock()
 
+
+def _get_md_converter():
+    """Lazy singleton DocumentConverter restricted to the Markdown backend."""
+    global _docling_md_converter
+    if _docling_md_converter is not None:
+        return _docling_md_converter
+    with _docling_lock:
+        if _docling_md_converter is not None:
+            return _docling_md_converter
+        from docling.datamodel.base_models import InputFormat
+        from docling.document_converter import DocumentConverter
+
+        _docling_md_converter = DocumentConverter(allowed_formats=[InputFormat.MD])
+        return _docling_md_converter
+
+
+def _get_hybrid_chunker():
+    """Lazy singleton HybridChunker with a character-counting tokenizer.
+
+    The token unit is arbitrary — the chunking contract is defined in
+    characters (``CHUNK_SIZE`` / ``MAX_CONTEXT_CHARS``), so counting
+    characters directly is exact, not an approximation.
+    """
+    global _docling_chunker
+    if _docling_chunker is not None:
+        return _docling_chunker
+    with _docling_lock:
+        if _docling_chunker is not None:
+            return _docling_chunker
+        from docling.chunking import HybridChunker
+        from docling_core.transforms.chunker.tokenizer.base import BaseTokenizer
+
+        class _CharTokenizer(BaseTokenizer):
+            def count_tokens(self, text: str) -> int:
+                return len(text)
+
+            def get_max_tokens(self) -> int:
+                return get_settings().CHUNK_SIZE
+
+            def get_tokenizer(self):
+                return len
+
+        _docling_chunker = HybridChunker(tokenizer=_CharTokenizer())
+        return _docling_chunker
+
+
+def _docling_document_from_markdown(text: str):
+    """Parse stored markdown into a DoclingDocument for structured chunking.
+
+    Docling's Markdown backend recovers pipe tables and inline HTML tables as
+    typed TableItems, so every conversion mode — standard, llm_api, uploaded
+    .md — funnels through one structure-aware chunk path.
+    """
+    import io
+
+    from docling_core.types.io import DocumentStream
+
+    result = _get_md_converter().convert(
+        DocumentStream(name="document.md", stream=io.BytesIO(text.encode("utf-8")))
+    )
+    return result.document
+
+
+def chunk_markdown(record: DocumentRecord) -> list[Document]:
     header = _build_chunk_header(record)
     row_records, rows_truncated = read_row_data_file(record)
     if row_records:
@@ -193,48 +261,59 @@ def chunk_markdown(record: DocumentRecord) -> list[Document]:
     # llm_api mode writes real image descriptions — keep those.
     if record.conversion_mode == "standard":
         text = _IMAGE_PLACEHOLDER_RE.sub("", text)
-    settings = get_settings()
-    splitter = RecursiveCharacterTextSplitter(
-        chunk_size=settings.CHUNK_SIZE,
-        chunk_overlap=settings.CHUNK_OVERLAP,
-        separators=["\n\n", "\n", ". ", " ", ""],
-    )
+    if not text.strip():
+        return []
+
     # Read the title and VCM metadata from the record (single source of truth,
     # extracted once during conversion and persisted). Fall back to the first
     # heading in the markdown if the record has no title (e.g. pre-migration).
     title = record.title or _extract_first_heading(text) or Path(record.original_filename).stem
-    base_doc = Document(
-        page_content=text,
-        metadata={
-            "source": record.original_filename,
-            "doc_store_id": record.id,
-            "original_filename": record.original_filename,
-            "file_type": record.extension.lstrip("."),
-            "tags": record.tags,
-            # document_id = the VCM registry document ID (e.g. "VM0047"),
-            # matching what the query rewriter extracts. The internal doc
-            # store ID is in doc_store_id above.
-            "document_id": record.document_id,
-            "title": title,
-            "registry": record.registry,
-            "category": record.category,
-            "publisher": record.publisher,
-            "registry_document_id": record.document_id,
-            "version_number": record.version_number,
-            "doc_type": _doc_type_for_record(record),
-        },
-    )
-    chunks = splitter.split_documents([base_doc])
-    # Prepend the source header BEFORE the methodology_codes pass so the
-    # header text (which may contain the document_id) is included in
-    # search_text and its codes are captured.
-    _prepend_header(chunks, header)
-    for index, chunk in enumerate(chunks):
-        chunk.metadata["chunk_index"] = index
-        chunk.metadata["source_chunk_index"] = index
-        search_text = f"{record.original_filename or ''}\n{record.document_id or ''}\n{chunk.page_content or ''}"
+    chunker = _get_hybrid_chunker()
+    dl_doc = _docling_document_from_markdown(text)
+
+    chunks: list[Document] = []
+    for doc_chunk in chunker.chunk(dl_doc):
+        meta = doc_chunk.meta.export_json_dict()
+        headings = [str(h) for h in (meta.get("headings") or [])]
+        # contextualize() prefixes the heading ancestry (title + section path)
+        # and captions, so every headed chunk is self-describing.
+        page_content = chunker.contextualize(doc_chunk).strip()
+        if not page_content:
+            continue
+        # Heading-less chunks (front matter before the first heading, plain
+        # uploads) carry no ancestry — restore document identity so retrieval
+        # and methodology_codes still see the title.
+        if not headings and header:
+            page_content = f"{header}\n\n{page_content}"
+        search_text = f"{record.original_filename or ''}\n{record.document_id or ''}\n{page_content}"
         codes = {m.upper() for m in find_document_codes(search_text)}
-        chunk.metadata["methodology_codes"] = sorted(codes) if codes else None
+        chunks.append(
+            Document(
+                page_content=page_content,
+                metadata={
+                    "source": record.original_filename,
+                    "doc_store_id": record.id,
+                    "original_filename": record.original_filename,
+                    "file_type": record.extension.lstrip("."),
+                    "tags": record.tags,
+                    # document_id = the VCM registry document ID (e.g.
+                    # "VM0047"), matching what the query rewriter extracts.
+                    # The internal doc store ID is in doc_store_id above.
+                    "document_id": record.document_id,
+                    "title": title,
+                    "registry": record.registry,
+                    "category": record.category,
+                    "publisher": record.publisher,
+                    "registry_document_id": record.document_id,
+                    "version_number": record.version_number,
+                    "doc_type": _doc_type_for_record(record),
+                    "section": " / ".join(headings) or None,
+                    "chunk_index": len(chunks),
+                    "source_chunk_index": len(chunks),
+                    "methodology_codes": sorted(codes) if codes else None,
+                },
+            )
+        )
     return chunks
 
 

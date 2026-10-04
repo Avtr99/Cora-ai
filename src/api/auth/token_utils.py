@@ -18,10 +18,9 @@ ALLOWED_CLAIM_VALUE_TYPES = (str, int, float, bool)
 
 class JWTError(Exception):
     """Custom exception for JWT-related errors."""
-    
-    def __init__(self, message: str, error_code: str = "JWT_ERROR"):
+
+    def __init__(self, message: str):
         self.message = message
-        self.error_code = error_code
         super().__init__(self.message)
 
 
@@ -45,10 +44,7 @@ def _sanitize_additional_claims(additional_claims: Dict[str, Any]) -> Dict[str, 
             logger.warning(f"Ignoring attempt to override protected JWT claim: {key}")
             continue
         if value is not None and not isinstance(value, ALLOWED_CLAIM_VALUE_TYPES):
-            raise JWTError(
-                f"Claim '{key}' must be a primitive JSON value",
-                "JWT_INVALID_CLAIM"
-            )
+            raise JWTError(f"Claim '{key}' must be a primitive JSON value")
         sanitized[key] = value
     return sanitized
 
@@ -56,13 +52,10 @@ def _sanitize_additional_claims(additional_claims: Dict[str, Any]) -> Dict[str, 
 def _validate_jwt_secret_key(secret: Optional[str]) -> None:
     """Validate that the JWT secret key is present and sufficiently long for HS256."""
     if not secret:
-        raise JWTError("JWT_SECRET_KEY environment variable is required but not set", "JWT_CONFIG_ERROR")
+        raise JWTError("JWT_SECRET_KEY environment variable is required but not set")
 
     if len(secret.encode("utf-8")) < 32:
-        raise JWTError(
-            "JWT_SECRET_KEY must be at least 32 bytes long for HS256 security",
-            "JWT_CONFIG_ERROR"
-        )
+        raise JWTError("JWT_SECRET_KEY must be at least 32 bytes long for HS256 security")
 
 
 def create_access_token(
@@ -87,7 +80,7 @@ def create_access_token(
     try:
         normalized_user_id = _normalize_user_id(user_id)
     except ValueError as exc:
-        raise JWTError(str(exc), "JWT_INVALID_INPUT") from exc
+        raise JWTError(str(exc)) from exc
     
     settings = get_settings()
     _validate_jwt_secret_key(settings.JWT_SECRET_KEY)
@@ -115,12 +108,13 @@ def create_access_token(
             settings.JWT_SECRET_KEY,
             algorithm=settings.JWT_ALGORITHM
         )
+        # codeql[py/weak-sensitive-data-hashing] -- log pseudonymization, not password storage
         anonymized_id = hashlib.sha256(normalized_user_id.encode("utf-8")).hexdigest()[:8]
         logger.debug(f"Created access token for user hash: {anonymized_id}")
         return encoded_jwt
     except Exception as e:
         logger.error("Failed to create access token", exc_info=False)
-        raise JWTError("Failed to create token", "JWT_CREATE_ERROR") from e
+        raise JWTError("Failed to create token") from e
 
 
 def decode_access_token(token: str) -> dict:
@@ -148,11 +142,11 @@ def decode_access_token(token: str) -> dict:
         
         user_id = payload.get("sub")
         if not user_id:
-            raise JWTError("Token missing user identifier", "JWT_INVALID_PAYLOAD")
+            raise JWTError("Token missing user identifier")
         
         token_type = payload.get("type")
         if token_type != "access":
-            raise JWTError("Invalid token type", "JWT_INVALID_TYPE")
+            raise JWTError("Invalid token type")
         
         return {
             "user_id": user_id,
@@ -163,12 +157,12 @@ def decode_access_token(token: str) -> dict:
         
     except jwt.ExpiredSignatureError:
         logger.warning("Attempted to use expired token")
-        raise JWTError("Token has expired", "JWT_EXPIRED")
+        raise JWTError("Token has expired")
     except jwt.InvalidTokenError:
         logger.warning("Invalid token detected")
-        raise JWTError("Invalid token", "JWT_INVALID")
+        raise JWTError("Invalid token")
     except JWTError:
         raise
     except Exception:
         logger.error("Unexpected error decoding token", exc_info=False)
-        raise JWTError("Token validation failed", "JWT_DECODE_ERROR")
+        raise JWTError("Token validation failed")

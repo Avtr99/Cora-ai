@@ -16,6 +16,13 @@ def pytest_configure(config):
     os.environ["QDRANT_URL"] = "http://localhost:6333"
     os.environ["SECRET_KEY"] = "test-secret-key-for-ci-testing"
     os.environ["JWT_SECRET_KEY"] = "test-jwt-secret-key-for-ci-testing"
+    # Env vars beat the .env file in pydantic-settings, so forcing protection
+    # off here keeps a developer's real .env from 401-ing the whole suite.
+    # Tests that exercise protection set the flag back on via monkeypatch.
+    os.environ["ENABLE_API_KEY_PROTECTION"] = "false"
+    # env_ignore_empty turns this into None, so no test ever matches the
+    # developer's real key by accident.
+    os.environ["API_ACCESS_KEY"] = ""
 
 
 @pytest.fixture(autouse=True)
@@ -25,6 +32,8 @@ def _reset_settings_singleton(monkeypatch):
     monkeypatch.setenv("QDRANT_URL", "http://localhost:6333")
     monkeypatch.setenv("SECRET_KEY", "test-secret-key-for-ci-testing")
     monkeypatch.setenv("JWT_SECRET_KEY", "test-jwt-secret-key-for-ci-testing")
+    monkeypatch.setenv("ENABLE_API_KEY_PROTECTION", "false")
+    monkeypatch.setenv("API_ACCESS_KEY", "")
     reset_settings_singleton()
 
 

@@ -51,9 +51,9 @@ export const caseStudies: CaseStudyData[] = [
     ratingNote: 'AA - Very high likelihood of achieving 1 tonne of CO₂e avoided or removed',
     projectType: 'Mangroves restoration / Conservation',
     location: '16 villages in Ayeyarwady Region in Myanmar',
-    duration: '2018 to 2048',
+    duration: '2015 to 2035',
     reductionRemoval: 'Both',
-    methodology: 'AR-AMS004',
+    methodology: 'AR-AM0014: Afforestation and reforestation of degraded mangrove habitats',
     about: 'Restoring the degraded mangrove landscape covering 2,065 ha. It involves planting about 9.1 million mangrove trees in the Magu, Thabaung, and Thaegone village tracts.',
     summary: 'Restoring 2,065 ha of degraded mangrove landscape. 9.1 million trees planted across 16 villages in Myanmar\'s Ayeyarwady Region.',
     overviewMap: {
@@ -85,12 +85,11 @@ export const caseStudies: CaseStudyData[] = [
       },
     ],
     statistics: {
-      carbonSequestered: '44,345',
-      bufferPool: '32,882',
-      creditsIssued: '211,636',
-      creditsRetired: '167,291',
-      source: 'VCS',
-      permanenceRisk: { percentage: 21, label: 'Risk to permanency' }
+      carbonSequestered: '60,707',
+      bufferPool: '48,937',
+      creditsIssued: '290,025',
+      creditsRetired: '226,210',
+      source: 'VCS'
     },
     benefits: [
       {
@@ -100,8 +99,8 @@ export const caseStudies: CaseStudyData[] = [
       },
       {
         number: 2,
-        title: 'Low permanence risk',
-        description: 'The project has a low permanence risk and adequate buffer pool of 21%. The project uses 30-year land use agreements to ensure sustained restoration, reducing the risk of reversal.'
+        title: 'Managed permanence risk',
+        description: 'The project carries a 24% non-permanence risk rating under Verra\'s AFOLU risk tool (3rd Periodic Review, 2023), applied as a buffer withholding on issued credits. The project uses 30-year land use agreements to ensure sustained restoration, reducing the risk of reversal.'
       },
       {
         number: 3,
@@ -117,7 +116,7 @@ export const caseStudies: CaseStudyData[] = [
     keywords: [
       'mangrove', 'myanmar', 'blue carbon', 'coastal', 'marine', 'wetland', 'wetlands',
       'restoration', 'reforestation', 'afforestation', 'conservation', 'biodiversity',
-      'community', 'livelihood', 'AR-AMS004', 'AMS', 'small-scale', 'ayeyarwady',
+      'community', 'livelihood', 'AR-AM0014', 'AM0014', 'large-scale', 'ayeyarwady',
       'methodology', 'protocol', 'standard', 'validation', 'verification', 'high quality',
       'VCM', 'voluntary carbon market'
     ]
@@ -140,7 +139,6 @@ export const caseStudies: CaseStudyData[] = [
       { text: 'Farmer Managed Natural Regeneration (FMNR), low-cost, proven restoration technique' }
     ],
     sdgs: [
-      { number: 1, title: 'No Poverty' },
       { number: 5, title: 'Gender Equality' },
       { number: 8, title: 'Decent Work and Economic Growth' },
       { number: 13, title: 'Climate Action' },
@@ -171,12 +169,10 @@ export const caseStudies: CaseStudyData[] = [
       },
     ],
     statistics: {
-      carbonSequestered: '13,572',
-      bufferPool: '29,343',
+      carbonSequestered: '12,887',
       creditsIssued: '240,371',
-      creditsRetired: '226,799',
-      source: 'Gold Standard',
-      permanenceRisk: { percentage: 15, label: 'Risk to permanency' }
+      creditsRetired: '227,484',
+      source: 'Gold Standard'
     },
     benefits: [
       {
@@ -197,7 +193,7 @@ export const caseStudies: CaseStudyData[] = [
       {
         number: 4,
         title: 'SDG Co-benefits',
-        description: 'Certified impacts across five SDGs: No Poverty (195 jobs, income diversification), Gender Equality (women\'s economic empowerment), Decent Work (cooperative enterprise), Climate Action (29,343 tCO₂e/year), and Life on Land (restoration of threatened Ethiopian Montane woodlands).'
+        description: 'Certified impacts across four SDGs: Gender Equality (women\'s economic empowerment), Decent Work (cooperative enterprise, 195 jobs), Climate Action (29,343 tCO₂e/year), and Life on Land (restoration of threatened Ethiopian Montane woodlands).'
       }
     ],
     keywords: [

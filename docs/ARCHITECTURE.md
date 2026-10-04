@@ -51,7 +51,8 @@
 │   │  cora_db_data            │   │  at /app/data/documents      │   │
 │   │  at /app/db/cora.db      │   │  uploaded/converted docs     │   │
 │   │  SQLite (cache, jobs,    │   │                              │   │
-│   │  feedback, embeddings)   │   │                              │   │
+│   │  chats, feedback,        │   │                              │   │
+│   │  embeddings)             │   │                              │   │
 │   └──────────────────────────┘   └──────────────────────────────┘   │
 │                                                                     │
 │   Host ports: app published on 127.0.0.1:8000 only                  │
@@ -125,16 +126,18 @@ Access in request handlers is via the module-level globals `retriever`, `llm_cli
 
 ```
 Client
-  │  POST /v1/query  { text, conversation_id?, include_debug? }
+  │  POST /v1/query  { text, conversation_id?, message_id?, include_debug? }
   ▼
 FastAPI middleware stack:
   CORS → SecurityHeaders → Logging → RequestSizeLimit (5 MB)
   │
   ▼
+open_turn (src/api/query_history.py)
+  ├─ Resolve user_id. A foreign conversation_id 404s
+  ├─ Load chat history from the chats / chat_turns tables
+  ▼
 query_routes.process_query_core
-  ├─ Verify SECRET_KEY (history HMAC) — auto-generated on first run if not set in .env
-  ├─ Assemble chat history from memory store
-  ├─ StreamingRAGOrchestrator.run()
+  ├─ StreamingRAGOrchestrator.process()
   │     ├─ QueryRewriter      (local acronym expand OR Gemini Lite)
   │     ├─ Router             (regex → year check → keyword count → optional LLM fallback)
   │     ├─ RouteProcessor     (KB | Web | Hybrid | Conversational)
@@ -143,9 +146,10 @@ query_routes.process_query_core
   │     │     ├─ Hybrid:    KB first, web fallback on low confidence
   │     │     └─ Conversational: short-circuit, no RAG
   │     └─ Validator (optional, off by default — adds latency)
-  ├─ CitationManager.extract()
+  ├─ CitationManager.finalize()
   ├─ SQLite cache write (backend_cache table, 24h TTL)
-  └─ Return JSON { answer, citations, reasoning_steps, ... }
+  ├─ close_turn stores the turn in chat_turns (skipped on error results)
+  └─ Return JSON { answer, citations, reasoning_steps, message_id, answer_id, ... }
 ```
 
 ### 4.2 Streaming query — `POST /v1/query/stream`
@@ -156,7 +160,7 @@ Same pipeline, but the orchestrator emits `AgentStep` events as Server-Sent Even
 
 ### 4.3 Async query — `POST /v1/query/async` + `GET /v1/query/async/{job_id}`
 
-For long-running queries. Returns a `job_id` immediately; an in-process worker (default `ASYNC_QUERY_WORKERS=1`) executes the same `process_query_core` and stores the result in an in-memory job table keyed by `job_id`. Jobs expire after `ASYNC_QUERY_JOB_TTL_SECONDS` (1h). **No external broker** — the queue is in-process and lost on restart.
+For long-running queries. Returns a `job_id` immediately. An in-process worker (default `ASYNC_QUERY_WORKERS=1`) executes the same `process_query_core` and stores the result in the `async_query_jobs` SQLite table keyed by `job_id`. Every job row carries the `user_id` of the request that queued it, and status lookups filter on it, so another user's job returns 404. Jobs expire after `ASYNC_QUERY_JOB_TTL_SECONDS` (1h). **No external broker** — workers are in-process, but job state lives in SQLite and survives restarts. Queued jobs resume on startup. A job interrupted mid-processing is marked failed.
 
 ---
 
@@ -180,6 +184,9 @@ locking needed).
 | `feedback` | User thumbs up/down on answers | `POST /v1/feedback` | Operator-only (manual SQLite query) |
 | `backend_cache` | Persistent query cache (24h TTL) | `process_query_core` on cache miss | `process_query_core` on every query |
 | `embedding_cache` | Durable embedding cache (avoids re-paying for embeddings on restart) | Ingestion + retriever | Retriever |
+| `users` | Instance accounts. One built-in `owner` row in Phase 7 | Migration `011_users_and_chats.sql` | `current_user_id`, `auth_sessions.user_id` foreign key |
+| `chats` | Server-side chat list, scoped by `user_id` | `record_turn` on each stored turn | `list_chats`, `get_chat`, `get_chat_owner` |
+| `chat_turns` | One row per user/assistant turn (`message_id` + `response_json`) | `record_turn` (upsert by `message_id`) | `load_history`, `GET /v1/chats/{id}` |
 
 > **Note on `feedback`:** This is a **write-only collection sink**. There is no read-back endpoint, no UI to view submissions, and no wiring into retrieval or answer generation. The operator reviews it by querying `cora.db` directly. If no one reviews it, the widget is dead weight.
 
@@ -248,7 +255,7 @@ All external dependencies are swappable via env vars. The default stack uses hos
 | `VOYAGE_API_KEY` | Only if `EMBEDDING_PROVIDER=voyage` or `RERANK_PROVIDER=voyage` | Default stack |
 | `TAVILY_API_KEY` | Required when `ENABLE_WEB_SEARCH=true` and `SEARCH_PROVIDER=tavily` or `SEARCH_PROVIDER=none` (the `none` setting falls back to Tavily when web search is enabled) | Default stack |
 | `COHERE_API_KEY` | Only if using Cohere for embed/rerank | Optional |
-| `SECRET_KEY` | **Auto-generated** | Signs conversation-history HMAC and pseudonymizes memory user IDs. Auto-generated on first run and persisted to SQLite. Set in `.env` only for multi-instance deployments that need to share signed history. |
+| `SECRET_KEY` | **Auto-generated** | Fallback key for memory user-ID anonymization (`MEMORY_SECRET_KEY` is preferred). Auto-generated on first run and persisted to SQLite. Set in `.env` only to use your own key. |
 | `JWT_SECRET_KEY` | Only if auth endpoints are used | Optional |
 
 The app **starts successfully with no keys configured**. `/live` returns 200, `/ready` returns 503 `setup_required`, and providers fail lazily on first use. This is by design, so the container health probe does not depend on external services.
@@ -365,13 +372,15 @@ stateDiagram-v2
 |---|---|
 | **PII redaction** | Enabled by default (`PII_REDACTION_ENABLED=True` in `config.py`). Applied before memory storage. |
 | **User ID anonymization** | Memory store hashes user IDs via HMAC with `MEMORY_SECRET_KEY` (falls back to `SECRET_KEY`). |
-| **History integrity** | Conversation history is HMAC-signed with `SECRET_KEY` (auto-generated on first run if not set in `.env`). |
+| **Chat ownership** | Chats live in the server-side `chats`/`chat_turns` tables under a `user_id`. Every chat read and delete filters by `user_id`. A `conversation_id` owned by another user returns 404. |
 | **Request size** | Hard limit `MAX_REQUEST_BODY_SIZE_BYTES=5 MB`. |
 | **Rate limiting** | **None.** Users bring their own API keys; rate limiting the operator is an anti-feature in a local-first tool. |
 | **Path traversal** | Document access is constrained to `ALLOWED_DOCUMENT_DIRS`. |
 | **Container user** | The `app` container runs as non-root UID 1000. |
+| **API key protection** | When `ENABLE_API_KEY_PROTECTION=true`, `SecurityMiddleware` requires a credential on protected paths (`/v1`, `/api`, `/query`). Two auth modes work: the `X-API-Key` header, or the `cora_session` cookie that `POST /api/auth/session` issues after a login with the access key. The cookie holds an opaque token backed by a server-side row in the `auth_sessions` table (7-day lifetime). The row carries the session `user_id`, and sign-out deletes it. `API_ACCESS_KEY` must have 32 characters or more, enforced by `Settings.validate_api_access_key` at startup. |
+| **CSRF guard** | Cookie-authenticated requests with a method other than GET/HEAD/OPTIONS and a `Sec-Fetch-Site` value other than `same-origin` or `none` get a 403 `forbidden`. Requests without the header pass. `X-API-Key` auth is exempt. |
 
-> **Local-only caveat:** `CORS_ORIGINS` defaults to a localhost list. If you expose the server beyond localhost, tighten this list. `SECRET_KEY` is auto-generated per instance — for multi-instance deployments, set a shared key in `.env`.
+> **Local-only caveat:** `CORS_ORIGINS` defaults to a localhost list, and CORS runs with `allow_credentials=False`. CORS does not grant access: the SPA is same-origin, and when `ENABLE_API_KEY_PROTECTION=true` every protected request needs a credential. Exposing Cora beyond localhost needs `ENABLE_API_KEY_PROTECTION` and HTTPS (see [Self-hosting Cora](SELF_HOSTING.md)). `SECRET_KEY` is auto-generated per instance. Set it in `.env` only to use your own key.
 
 ---
 
@@ -383,7 +392,7 @@ stateDiagram-v2
 | Gemini / embeddings | Circuit breaker | 5 failures → open 30s → 3 successes to close |
 | Retries | Only 5xx / transient | 429s fail fast (no retry) |
 | Qdrant | `QDRANT_TIMEOUT` | 120s |
-| Async jobs | `ASYNC_QUERY_JOB_TTL_SECONDS` | 1h (in-memory, lost on restart) |
+| Async jobs | `ASYNC_QUERY_JOB_TTL_SECONDS` | 1h (SQLite, survives restart) |
 
 Timeout checks happen at three points in the orchestrator: after rewrite/route, after main processing, and before validation. Each check cancels the pipeline if the budget is exhausted.
 

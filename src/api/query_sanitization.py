@@ -149,8 +149,6 @@ def sanitize_metadata(
     raw_metadata: Any,
     output_sanitizer,
     *,
-    history_verification_failed: bool,
-    history_items_dropped: int,
     config_version: int = 0,
 ) -> QueryMetadataResponse:
     """Sanitize metadata payload and enforce QueryMetadataResponse schema."""
@@ -161,8 +159,6 @@ def sanitize_metadata(
         logger.warning("Metadata structure truncated due to excessive nesting")
         sanitized_metadata_dict = {}
 
-    sanitized_metadata_dict["history_verification_failed"] = history_verification_failed
-    sanitized_metadata_dict["history_items_dropped"] = history_items_dropped
     sanitized_metadata_dict["config_version"] = config_version
 
     try:
@@ -176,9 +172,5 @@ def sanitize_metadata(
             error_summary.append(f"{loc}({err_type})")
         logger.warning(f"Metadata validation failed, using defaults. Fields: {'; '.join(error_summary)}")
         return QueryMetadataResponse(
-            history_verification_failed=sanitized_metadata_dict.get(
-                "history_verification_failed", False
-            ),
-            history_items_dropped=sanitized_metadata_dict.get("history_items_dropped", 0),
             config_version=sanitized_metadata_dict.get("config_version"),
         )

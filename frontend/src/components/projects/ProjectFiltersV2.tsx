@@ -96,7 +96,7 @@ export const ProjectFiltersV2: React.FC<ProjectFiltersV2Props> = ({
       {/* Unified toolbar: search + filters + count */}
       <div className="flex items-center gap-2 3xl:gap-3 flex-wrap">
         {/* Inline search */}
-        <div className="relative flex-shrink-0 w-full sm:w-[280px] md:w-[260px] lg:w-[320px] 3xl:w-[380px] 4xl:w-[420px]">
+        <div className="relative shrink-0 w-full sm:w-[280px] md:w-[260px] lg:w-[320px] 3xl:w-[380px] 4xl:w-[420px]">
           <Search
             className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-muted pointer-events-none"
             aria-hidden="true"
@@ -108,7 +108,7 @@ export const ProjectFiltersV2: React.FC<ProjectFiltersV2Props> = ({
             placeholder="Search projects..."
             className="w-full h-8 3xl:h-10 4xl:h-11 pl-8 3xl:pl-10 pr-8 font-inter text-xs 3xl:text-sm 4xl:text-[15px] text-text-primary placeholder:text-text-muted
               bg-surface-card border border-border-ui rounded-lg 3xl:rounded-xl
-              focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2
+              focus:outline-hidden focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2
               transition-shadow"
             aria-label="Search projects"
           />
@@ -165,7 +165,7 @@ export const ProjectFiltersV2: React.FC<ProjectFiltersV2Props> = ({
                 type="button"
                 onClick={() => setShowPrimaryMobile(!showPrimaryMobile)}
                 className={`inline-flex items-center gap-1.5 h-8 3xl:h-10 4xl:h-11 px-3 3xl:px-4 rounded-lg 3xl:rounded-xl font-inter text-xs 3xl:text-[13px] 4xl:text-sm font-medium transition-all
-                  border focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2
+                  border focus:outline-hidden focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2
                   ${showPrimaryMobile || primaryActiveCount > 0
                     ? 'bg-brand-900 text-white border-brand-900'
                     : 'bg-surface-card text-text-secondary border-border-ui hover:border-border-ui'
@@ -205,7 +205,7 @@ export const ProjectFiltersV2: React.FC<ProjectFiltersV2Props> = ({
               type="button"
               onClick={() => setShowMore(!showMore)}
               className={`inline-flex items-center gap-1.5 h-8 3xl:h-10 4xl:h-11 px-3 3xl:px-4 rounded-lg 3xl:rounded-xl font-inter text-xs 3xl:text-[13px] 4xl:text-sm font-medium transition-all
-                border focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2
+                border focus:outline-hidden focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2
                 ${showMore || secondaryActiveCount > 0
                   ? 'bg-brand-900 text-white border-brand-900'
                   : 'bg-surface-card text-text-secondary border-border-ui hover:border-text-muted hover:bg-surface-subtle'
@@ -251,7 +251,7 @@ export const ProjectFiltersV2: React.FC<ProjectFiltersV2Props> = ({
         </div>
 
         {(activeFilterCount > 0 || searchValue) && (
-          <div aria-live="polite" className="font-inter text-xs 3xl:text-[13px] 4xl:text-sm text-text-muted flex-shrink-0">
+          <div aria-live="polite" className="font-inter text-xs 3xl:text-[13px] 4xl:text-sm text-text-muted shrink-0">
             <span className="font-semibold text-text-primary">{filteredCount.toLocaleString()}</span>
             {' '}of {totalCount.toLocaleString()} projects
           </div>

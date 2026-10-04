@@ -1,6 +1,238 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+@plugin 'tailwindcss-animate';
+
+/* v3 container config was center + 2rem padding. The width cap stays with the
+   explicit max-w-* utilities on each .container element (all call sites pair
+   them) — a max-width here would emit after utilities and wrongly override
+   max-w-7xl / 3xl:max-w-[1600px] / 4xl:max-w-[1800px]. */
+@utility container {
+  margin-inline: auto;
+  padding-inline: 2rem;
+}
+
+@theme {
+  --font-*: initial;
+  --font-sans: Inter, ui-sans-serif, system-ui, sans-serif;
+  --font-poppins: Poppins, sans-serif;
+  --font-inter: Inter, sans-serif;
+
+  /* rem units are required: the engine sorts variant media blocks by unit
+     groups, and px values emitted before the built-in rem breakpoints would
+     lose the cascade to lg:/xl:/2xl: at wide viewports. */
+  --breakpoint-3xl: 120rem; /* 1920px */
+  --breakpoint-4xl: 150rem; /* 2400px */
+
+  --shadow-xs: var(--shadow-xs);
+  --shadow-card: var(--shadow-card);
+  --shadow-card-md: var(--shadow-card-md);
+  --shadow-card-sm: var(--shadow-card-sm);
+  --shadow-bottom-bar: var(--shadow-bottom-bar);
+  --shadow-modal: var(--shadow-modal);
+  --shadow-scroll-btn: var(--shadow-scroll-btn);
+
+  --min-height-touch: 44px;
+  --min-height-touch-lg: 72px;
+
+  --text-2xs: max(10px, 0.625rem);
+  --text-2xs--line-height: 1.25;
+  --text-micro: max(10px, 0.625rem);
+  --text-micro--line-height: 1.25;
+  --text-micro--letter-spacing: 0.05em;
+  --text-overline: max(11px, 0.6875rem);
+  --text-overline--line-height: 1.3;
+  --text-caption: max(12px, 0.75rem);
+  --text-caption--line-height: 1.4;
+  --text-ui: max(13px, 0.8125rem);
+  --text-ui--line-height: 1.35;
+  --text-body-sm: max(14px, 0.875rem);
+  --text-body-sm--line-height: 1.5;
+  --text-body: 1rem;
+  --text-body--line-height: 1.6;
+  --text-heading-3: 1rem;
+  --text-heading-3--line-height: 1.3;
+  --text-heading-2: 1.125rem;
+  --text-heading-2--line-height: 1.25;
+  --text-heading-1: 1.375rem;
+  --text-heading-1--line-height: 1.2;
+  --text-display: 1.75rem;
+  --text-display--line-height: 1.1;
+  --text-display--letter-spacing: -0.02em;
+
+  --tracking-widest: 0.14em;
+
+  --width-4_5: 1.125rem;
+
+  --height-4_5: 1.125rem;
+
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-focus: hsl(var(--focus));
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+
+  --color-surface-page: #f7f8fb;
+  --color-surface-base: #fafafa;
+  --color-surface-card: #ffffff;
+  --color-surface-subtle: #f3f4f6;
+  --color-surface-muted: #e5e7eb;
+  --color-surface-thumb: #d1d5db;
+  --color-surface-inverse: #171717;
+  --color-surface-overlay: #000000;
+  --color-border-ui: #e5e7eb;
+  --color-border-strong: #d1d5db;
+  --color-border-muted: #6b7280;
+  --color-text-primary: #171717;
+  --color-text-secondary: #525252;
+  --color-text-muted: #6b7280;
+  --color-text-disabled: #b8bec8;
+  --color-text-inverse: #ffffff;
+  --color-chart-retired: #4b5563;
+
+  --color-brand-50: #faf5ff;
+  --color-brand-100: #f3e8ff;
+  --color-brand-200: #e9d5ff;
+  --color-brand-300: #c4b5fd;
+  --color-brand-500: #6f4ecb;
+  --color-brand-700: #4a2aa3;
+  --color-brand-900: #403d85;
+  --color-brand-950: #2e1065;
+  --color-brand-primary: hsl(var(--brand-primary));
+  --color-brand-secondary: hsl(var(--brand-secondary));
+  --color-brand-link: hsl(var(--brand-link));
+  --color-brand-hover: hsl(var(--brand-hover));
+
+  --color-semantic-success-bg: #ecfdf5;
+  --color-semantic-success-text: #065f46;
+  --color-semantic-success-border: #d1fae5;
+  --color-semantic-success-icon: #10b981;
+  --color-semantic-success-iconBg: #ecfdf5;
+  --color-semantic-success-button: #047857;
+  --color-semantic-success-buttonHover: #065f46;
+
+  --color-semantic-error-bg: #fef2f2;
+  --color-semantic-error-text: #991b1b;
+  --color-semantic-error-border: #fecaca;
+  --color-semantic-error-icon: #ef4444;
+  --color-semantic-error-iconBg: #fef2f2;
+  --color-semantic-error-button: #b91c1c;
+  --color-semantic-error-buttonHover: #991b1b;
+
+  --color-semantic-warning-bg: #fffbeb;
+  --color-semantic-warning-text: #92400e;
+  --color-semantic-warning-border: #fef3c7;
+  --color-semantic-warning-icon: #f59e0b;
+  --color-semantic-warning-iconBg: #fef3c7;
+  --color-semantic-warning-button: #b45309;
+  --color-semantic-warning-buttonHover: #92400e;
+
+  --color-semantic-info-bg: #eff6ff;
+  --color-semantic-info-text: #1e40af;
+  --color-semantic-info-border: #bfdbfe;
+  --color-semantic-info-icon: #3b82f6;
+  --color-semantic-info-iconBg: #eff6ff;
+  --color-semantic-info-button: #1d4ed8;
+  --color-semantic-info-buttonHover: #1e40af;
+
+  --color-sdg-1: #e5243b;
+  --color-sdg-2: #dda63a;
+  --color-sdg-3: #4c9f38;
+  --color-sdg-4: #c5192d;
+  --color-sdg-5: #ff3a21;
+  --color-sdg-6: #26bde2;
+  --color-sdg-7: #fcc30b;
+  --color-sdg-8: #a21942;
+  --color-sdg-9: #fd6925;
+  --color-sdg-10: #dd1367;
+  --color-sdg-11: #fd9d24;
+  --color-sdg-12: #bf8b2e;
+  --color-sdg-13: #3f7e44;
+  --color-sdg-14: #0a97d9;
+  --color-sdg-15: #56c02b;
+  --color-sdg-16: #00689d;
+  --color-sdg-17: #19486a;
+
+  --color-kpi-reduction: #c4627a;
+  --color-kpi-removal: #2d9d78;
+  --color-kpi-other: #6b7280;
+
+  --color-gauge-retired: #4f46e5;
+  --color-gauge-remaining: #10b981;
+
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+
+  --color-sidebar: hsl(var(--sidebar-background));
+  --color-sidebar-foreground: hsl(var(--sidebar-foreground));
+  --color-sidebar-primary: hsl(var(--sidebar-primary));
+  --color-sidebar-primary-foreground: hsl(var(--sidebar-primary-foreground));
+  --color-sidebar-accent: hsl(var(--sidebar-accent));
+  --color-sidebar-accent-foreground: hsl(var(--sidebar-accent-foreground));
+  --color-sidebar-border: hsl(var(--sidebar-border));
+  --color-sidebar-ring: hsl(var(--sidebar-ring));
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-xs: 2px;
+
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+
+  @keyframes accordion-down {
+    from {
+      height: 0;
+    }
+    to {
+      height: var(--radix-accordion-content-height);
+    }
+  }
+  @keyframes accordion-up {
+    from {
+      height: var(--radix-accordion-content-height);
+    }
+    to {
+      height: 0;
+    }
+  }
+}
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+}
 
 @layer base {
   /* Reserve the scrollbar gutter at all times so that dynamically changing
@@ -170,5 +402,12 @@
 
   body {
     @apply bg-background text-foreground antialiased;
+  }
+
+  /* v4 preflight drops `cursor: pointer` on buttons (it was a v3 default).
+     Restore it so clickable affordance matches the previous UI. */
+  button:not(:disabled),
+  [role='button']:not(:disabled) {
+    cursor: pointer;
   }
 }

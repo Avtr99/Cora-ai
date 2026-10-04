@@ -185,6 +185,10 @@ class TestMetadataExtractor:
         Regression: the priority tie-break previously looked at id_patterns
         presence, so a category pattern with id_patterns could beat a real
         registry without them. The tie-break must use is_registry instead.
+
+        Since the provenance split, the winner lands in ``category`` when only
+        content markers matched — registry requires declared provenance
+        (filename convention or an issuer-scoped document ID).
         """
         registry_pattern = RegistryPattern(
             name="Registry Without IDs",
@@ -205,10 +209,11 @@ class TestMetadataExtractor:
         )
         result = custom_extractor.extract("A document about a shared topic.", "test.md")
 
-        # Both patterns score the same (one marker, no ID match). The real
-        # registry should win the final tie-break.
-        assert result.get("registry") == "Registry Without IDs"
-        assert "category" not in result or result.get("category") is None
+        # Both patterns score the same (one marker, no ID match). The registry
+        # pattern wins the tie-break, but markers alone are topic evidence —
+        # so the name lands in category, not registry.
+        assert result.get("category") == "Registry Without IDs"
+        assert "registry" not in result or result.get("registry") is None
 
     # Edge cases
     def test_no_metadata_found(self, extractor):
@@ -278,6 +283,86 @@ class TestMetadataExtractor:
         result = extractor.extract("Generic content.", "VM0007.md")
         # Publisher falls back to the detected registry (Verra) here.
         assert result.get("publisher") == "Verra"
+
+    def test_publisher_from_underscore_separated_filename(self, extractor):
+        """Download-safe 'Publisher_-_Title' names must yield a publisher too.
+        Otherwise the field falls back to whatever registry the content
+        happens to mention (observed: an AIM Platform file labelled
+        'Gold Standard')."""
+        result = extractor.extract(
+            "Guidance for value chain interventions.",
+            "AIM_Platform_Secretariat_-_AIM_Platform_Standard_Guidance_v1.0.md",
+        )
+        assert result.get("publisher") == "AIM Platform Secretariat"
+
+    def test_underscore_filename_keeps_registry_publisher(self, extractor):
+        """'Verra_-_Doc' names still map the prefix to the canonical publisher."""
+        result = extractor.extract(
+            "VCS Methodology content",
+            "Verra_-_VCS_Methodology_VM0007_for_REDD_v1.8.md",
+        )
+        assert result.get("publisher") == "Verra"
+
+    def test_hyphenated_name_does_not_create_publisher(self, extractor):
+        """Bare hyphens inside a name ('State-of-the-Market') are word
+        punctuation, not the publisher separator."""
+        result = extractor.extract(
+            "Generic market analysis.",
+            "State-of-the-Market-2024.md",
+        )
+        # No ' - ' convention -> no filename publisher (registry fallback or None).
+        assert result.get("publisher") != "State"
+
+    # Provenance vs topic — registry requires a declared signal
+    def test_registry_mention_without_provenance_is_category_not_registry(self, extractor):
+        """A document that discusses a registry but declares no provenance
+        gets the org as topic (category), never as publisher (registry).
+        Observed mislabel: an AIM Platform file heavy on Gold Standard
+        references was stamped registry='Gold Standard'."""
+        result = extractor.extract(
+            "Requirements aligned with Gold Standard principles and the Gold "
+            "Standard Foundation approach to certification.",
+            "AIM_Platform_Standard_Guidance.md",
+        )
+        assert result.get("registry") is None
+        assert result.get("category") == "Gold Standard"
+
+    def test_registry_from_filename_name_without_publisher_prefix(self, extractor):
+        """A registry name inside a plain filename is still a declaration."""
+        result = extractor.extract(
+            "Program requirements and eligibility.",
+            "Gold_Standard_Program_Guide_v4.5.pdf",
+        )
+        assert result.get("registry") == "Gold Standard"
+
+    def test_publisher_prefix_overrides_content_mentions(self, extractor):
+        """'ICVCM - Review of Gold Standard' is an ICVCM document about Gold
+        Standard — declared provenance beats content markers."""
+        result = extractor.extract(
+            "A review of Gold Standard methodologies and the Gold Standard "
+            "Foundation approach, with commentary.",
+            "ICVCM - Review of Gold Standard Approaches.md",
+        )
+        assert result.get("publisher") == "ICVCM"
+        assert result.get("registry") is None
+        assert result.get("category") == "Gold Standard"
+
+    def test_document_id_still_sets_registry(self, extractor):
+        """An issuer-scoped ID is authorship evidence even with no filename
+        convention and no registry name in the title."""
+        result = extractor.extract(
+            "Methodology requirements and procedures.",
+            "methodology_doc.md",
+        )
+        # No VCM markers or IDs -> nothing at all (control case).
+        assert result.get("registry") is None
+
+        result = extractor.extract(
+            "VM0007 methodology requirements and procedures.",
+            "methodology_doc.md",
+        )
+        assert result.get("registry") == "Verra"
+        assert result.get("document_id") == "VM0007"
 
     def test_version_from_filename_takes_priority(self, extractor):
         """Filename version (vX.Y) is preferred over content version scanning."""

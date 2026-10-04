@@ -45,7 +45,7 @@ export const MapCountryTooltip: React.FC<MapCountryTooltipProps> = ({
       role="dialog"
       aria-label={`Details for ${agg.country}`}
     >
-      <div className="bg-surface-card/95 backdrop-blur-sm rounded-xl border border-border-ui shadow-card overflow-hidden ring-1 ring-black/[0.02]">
+      <div className="bg-surface-card/95 backdrop-blur-xs rounded-xl border border-border-ui shadow-card overflow-hidden ring-1 ring-black/2">
         {/* Country + totals */}
         <div className="px-3 pt-2.5 pb-2 border-b border-surface-subtle">
           <div className="flex items-baseline justify-between">
@@ -90,7 +90,7 @@ export const MapCountryTooltip: React.FC<MapCountryTooltipProps> = ({
               {agg.scopes.slice(0, 3).map((s) => (
                 <div key={s.scope} className="flex items-center gap-1.5">
                   <span
-                    className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                    className="w-1.5 h-1.5 rounded-full shrink-0"
                     style={{ backgroundColor: s.color }}
                   />
                   <span className="font-inter text-[10.5px] 3xl:text-xs text-text-secondary flex-1 truncate">
@@ -117,7 +117,7 @@ export const MapCountryTooltip: React.FC<MapCountryTooltipProps> = ({
                   type="button"
                   onClick={() => onProjectClick(p)}
                   aria-label={`Open project ${p.name} — ${formatCredits(p.creditsIssued)}, ${p.type}`}
-                  className="w-full text-left px-2 py-1.5 rounded-md hover:bg-surface-base transition-colors focus:outline-none focus-visible:bg-brand-100"
+                  className="w-full text-left px-2 py-1.5 rounded-md hover:bg-surface-base transition-colors focus:outline-hidden focus-visible:bg-brand-100"
                 >
                   <div className="font-inter text-xs 3xl:text-sm 4xl:text-base text-text-primary font-medium leading-tight line-clamp-1">
                     {p.name}

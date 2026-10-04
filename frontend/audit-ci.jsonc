@@ -1,0 +1,4 @@
+{
+  // Threshold matches the old `npm audit --audit-level=high` step.
+  "high": true
+}

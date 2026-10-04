@@ -104,7 +104,7 @@ async def add_conversation(
     Stores the conversation messages for later retrieval, enabling
     the AI to remember past interactions with the user.
     
-    Requires X-User-ID header matching request.user_id.
+    Requires a Bearer JWT whose ``sub`` matches request.user_id.
     """
     # Validate authenticated user matches requested user_id
     validate_user_access(auth_user, request.user_id)
@@ -152,7 +152,7 @@ async def search_memories(
     Returns memories that are semantically similar to the query,
     filtered by user and optionally by session.
     
-    Requires X-User-ID header matching request.user_id.
+    Requires a Bearer JWT whose ``sub`` matches request.user_id.
     """
     # Validate authenticated user matches requested user_id
     validate_user_access(auth_user, request.user_id)
@@ -192,7 +192,7 @@ async def get_context(
     Returns a formatted string of relevant past conversations
     that can be included in prompts for personalized responses.
     
-    Requires X-User-ID header matching request.user_id.
+    Requires a Bearer JWT whose ``sub`` matches request.user_id.
     """
     # Validate authenticated user matches requested user_id
     validate_user_access(auth_user, request.user_id)
@@ -232,7 +232,7 @@ async def get_all_memories(
     Returns paginated memories, optionally filtered by session.
     Supports pagination via limit (max 1000) and offset parameters.
     
-    Requires X-User-ID header matching path user_id.
+    Requires a Bearer JWT whose ``sub`` matches the path user_id.
     """
     # Validate authenticated user matches requested user_id
     validate_user_access(auth_user, user_id)
@@ -270,7 +270,7 @@ async def get_delete_token(
     This token must be included in delete requests to authorize
     the deletion. Tokens are user-specific and required for security.
     
-    Requires X-User-ID header matching query user_id.
+    Requires a Bearer JWT whose ``sub`` matches the query user_id.
     """
     # Validate authenticated user matches requested user_id
     validate_user_access(auth_user, user_id)
@@ -306,7 +306,7 @@ async def delete_memories(
     Requires a valid auth_token from /memory/delete-token endpoint
     and confirm=True to prevent accidental deletion.
     
-    Requires X-User-ID header matching request.user_id.
+    Requires a Bearer JWT whose ``sub`` matches request.user_id.
     
     NOTE: Future improvement - have memory_client raise specific exceptions
     (AuthorizationError, ValidationError) instead of returning error dicts,

@@ -11,17 +11,13 @@ Shared by GeminiClient and OpenAICompatibleClient. Contains:
 from typing import Dict, Any, Optional, List, Tuple, AsyncIterator
 import asyncio
 import hashlib
-import html
 import json
 from loguru import logger
 
 from ..config import get_settings
 from ..utils.cache import query_cache
-from ..citations import CitationManager
-from ..citations.source_name import get_source_name
 from .prompts import (
     MAX_QUERY_LENGTH,
-    MAX_CONTEXT_LENGTH,
     get_system_instruction,
     build_query_prompt,
     _today_utc,
@@ -32,7 +28,7 @@ from .suggested_prompts import (
     split_answer_and_suggested_prompts,
 )
 from .prompt_guard import get_prompt_guard, PromptInjectionError
-from .fallback_answers import is_cacheable_answer
+from .fallback_answers import NO_ANSWER_FOUND, is_cacheable_answer
 
 
 class BaseRAGClient:
@@ -220,15 +216,12 @@ class BaseRAGClient:
             logger.warning(f"Potential prompt injection detected. Query hash: {query_hash}")
             query = sanitized_query
 
-        from .post_processor import postprocess_answer
-        from .citation_verifier import (
-            deduplicate_inline_citations,
-            normalize_kb_citations,
-            verify_citations,
-        )
+        from ..citations.check import build_citation_correction, check_citations
+        from ..citations.context import build_kb_context
 
         try:
-            context_text, summaries, sources = self._prepare_context(vector_results)
+            ctx = build_kb_context(vector_results)
+            context_text, summaries, sources = ctx.text, ctx.summaries, ctx.sources
             context_fingerprint = self._build_context_fingerprint(
                 context_text, summaries, sources, resolved_query=resolved_query
             )
@@ -276,17 +269,45 @@ class BaseRAGClient:
             full_prompt = f"{formatted_instruction}\n\n{prompt}"
 
             answer_text, usage = await self._generate_for_rag(full_prompt)
-            answer_text, quiz_payload = split_answer_and_quiz(answer_text)
-            answer_text, suggested_prompts = split_answer_and_suggested_prompts(answer_text)
-            answer_text, was_truncated = postprocess_answer(answer_text, structured_mode=structured_mode)
+            answer_text, quiz_payload, suggested_prompts, was_truncated = self._shape_answer(
+                answer_text, structured_mode
+            )
 
-            # Citation verification: ensure every [source] in the answer
-            # matches a retrieved source. Repairs fuzzy matches, removes
-            # hallucinated citations.
-            if sources:
-                answer_text, unmatched = verify_citations(answer_text, sources)
-                answer_text = deduplicate_inline_citations(answer_text)
-                answer_text = normalize_kb_citations(answer_text, sources)
+            # Citation check: marker numbers are the prompt's own
+            # <source index="N"> values, so the only possible errors are
+            # out-of-range or missing markers. Retry once with a correction
+            # prompt; a still-invalid answer becomes the non-answer sentinel.
+            valid_kb_indices = {c.index for c in ctx.citations if c.index is not None}
+            if valid_kb_indices:
+                citation_errors = check_citations(
+                    answer_text, {"knowledge_base": valid_kb_indices}
+                )
+                if citation_errors:
+                    logger.info(
+                        "Citation errors detected; retrying once: {}", citation_errors
+                    )
+                    retry_text, retry_usage = await self._generate_for_rag(
+                        build_citation_correction(
+                            full_prompt, answer_text, citation_errors, web=False
+                        )
+                    )
+                    for key in ("tokens_in", "tokens_out"):
+                        usage[key] = int(usage.get(key, 0)) + int(
+                            retry_usage.get(key, 0)
+                        )
+                    answer_text, quiz_payload, suggested_prompts, was_truncated = (
+                        self._shape_answer(retry_text, structured_mode)
+                    )
+                    citation_errors = check_citations(
+                        answer_text, {"knowledge_base": valid_kb_indices}
+                    )
+                    if citation_errors:
+                        logger.info(
+                            "Citation errors persist after retry: {}", citation_errors
+                        )
+                        answer_text = NO_ANSWER_FOUND
+                        quiz_payload = None
+                        suggested_prompts = None
 
             # A structured scroll already enumerates the full matching dataset;
             # the response is fully covered by the retrieved records — unless
@@ -307,6 +328,9 @@ class BaseRAGClient:
                 "sources": sources if sources else ["knowledge_base"],
                 "coverage_score": coverage_score,
                 "truncated": was_truncated,
+                # Every citable chunk, numbered exactly as the prompt saw it.
+                # Consumers pop this via citations_from_result().
+                "context_citations": [c.to_dict() for c in ctx.citations],
                 "meta": {
                     "model": self.model_main,
                     "tokens_in": usage.get("tokens_in", 0),
@@ -339,78 +363,24 @@ class BaseRAGClient:
     # Shared helper methods (provider-agnostic)
     # ------------------------------------------------------------------
 
-    def _prepare_context(self, vector_results: Dict[str, Any]) -> Tuple[str, List[str], List[str]]:
-        """Extract context from vector payload.
+    def _shape_answer(
+        self, raw_answer: str, structured_mode: Optional[str]
+    ) -> Tuple[str, Any, Any, bool]:
+        """Split quiz/suggested-prompt blocks, postprocess, dedupe markers.
 
-        Each chunk is wrapped with a human-readable <source> tag so the LLM can
-        cite documents by their real titles instead of internal doc IDs.
+        Shared by the first generation and the single citation-correction
+        retry so both attempts produce an identically shaped result.
         """
-        docs = vector_results.get("documents", [])
-        metas = vector_results.get("metadatas", [])
+        from .post_processor import postprocess_answer
+        from ..citations.markers import deduplicate_inline_citations
 
-        if not docs:
-            return "", [], []
-
-        if vector_results.get("structured_mode"):
-            # Structured dataset context is already formatted by the retriever.
-            # Do not wrap it in per-source tags or apply per-chunk limits.
-            return docs[0], [], []
-
-        settings = get_settings()
-        max_context_chars = getattr(settings, "MAX_CONTEXT_CHARS", MAX_CONTEXT_LENGTH)
-        max_docs = getattr(settings, "MAX_DOCUMENTS_FOR_ANSWER", 10)
-
-        sources: List[str] = []
-        summaries: List[str] = []
-        context_parts: List[str] = []
-        current_length = 0
-
-        for i, doc in enumerate(docs):
-            if not doc or i >= max_docs:
-                continue
-
-            meta = metas[i] if i < len(metas) else None
-            source_name = ""
-            if meta and isinstance(meta, dict):
-                # Prefer the extracted document title (from the converted markdown)
-                # over the raw filename, which may be a placeholder name.
-                src = get_source_name(meta)
-                if src:
-                    source_name = CitationManager.clean_source_name(src) or src
-                    if source_name and source_name not in sources:
-                        sources.append(source_name)
-                if meta.get("summary"):
-                    summaries.append(meta["summary"])
-
-            # Wrap the chunk with a source label and 1-indexed citation number
-            # so the LLM can cite with [cite_kb: N] instead of raw source names.
-            tag_name = html.escape(source_name or f"Document {i + 1}", quote=True)
-            source_index = (sources.index(source_name) + 1) if source_name in sources else (i + 1)
-            wrapped = f"<source index=\"{source_index}\" name=\"{tag_name}\">\n{doc}\n</source>"
-            wrapped_len = len(wrapped)
-
-            if current_length + wrapped_len > max_context_chars:
-                remaining = max_context_chars - current_length
-                if remaining > 100:
-                    truncated = wrapped[:remaining]
-                    last_para = truncated.rfind("\n\n")
-                    if last_para > 0:
-                        context_parts.append(wrapped[:last_para])
-                    else:
-                        for punct in [".", "!", "?"]:
-                            last_punct = truncated.rfind(punct)
-                            if last_punct > 0 and last_punct + 1 < len(truncated) and truncated[last_punct + 1].isspace():
-                                context_parts.append(wrapped[:last_punct + 1])
-                                break
-                        else:
-                            context_parts.append(wrapped[:remaining])
-                break
-
-            context_parts.append(wrapped)
-            current_length += wrapped_len
-
-        full_context = "\n\n".join(context_parts)
-        return full_context, summaries, sources
+        answer_text, quiz_payload = split_answer_and_quiz(raw_answer)
+        answer_text, suggested_prompts = split_answer_and_suggested_prompts(answer_text)
+        answer_text, was_truncated = postprocess_answer(
+            answer_text, structured_mode=structured_mode
+        )
+        answer_text = deduplicate_inline_citations(answer_text)
+        return answer_text, quiz_payload, suggested_prompts, was_truncated
 
     @staticmethod
     def _structured_record_count(vector_results: Dict[str, Any]) -> Optional[int]:

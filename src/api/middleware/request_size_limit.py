@@ -85,7 +85,6 @@ class RequestSizeLimitMiddleware:
     async def _send_payload_too_large(self, send: Send) -> None:
         payload = {
             "error": "payload_too_large",
-            "error_code": "REQ_001",
             "message": f"Request body exceeds maximum allowed size ({self.max_content_length} bytes)",
             "max_bytes": self.max_content_length,
         }

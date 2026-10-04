@@ -52,7 +52,7 @@ export const ComparePanel: React.FC<ComparePanelProps> = ({ projects, onClose })
   // Show loading state while detail data is being fetched
   if (detailLoading) {
     return (
-      <div className="bg-surface-page rounded-2xl border border-border-ui shadow-sm mb-6 overflow-hidden">
+      <div className="bg-surface-page rounded-2xl border border-border-ui shadow-xs mb-6 overflow-hidden">
         <div className="flex items-center justify-center py-12">
           <div className="flex items-center gap-3">
             <div className="w-5 h-5 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
@@ -82,7 +82,7 @@ export const ComparePanel: React.FC<ComparePanelProps> = ({ projects, onClose })
   const diffCount = METRIC_ROWS.filter(isDifferent).length;
 
   return (
-    <div className="bg-surface-page rounded-2xl border border-border-ui shadow-sm mb-6 overflow-hidden">
+    <div className="bg-surface-page rounded-2xl border border-border-ui shadow-xs mb-6 overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-3.5 bg-surface-card border-b border-border-ui">
         <div className="flex items-center gap-2.5">

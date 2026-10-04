@@ -1,10 +1,11 @@
 import pytest
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 
 from src.api.middleware.logging_middleware import LoggingMiddleware
 from src.api.middleware.security import SecurityMiddleware, generate_api_key
-from src.config import get_settings
+from src.config import get_settings, reset_settings_singleton
+from src.db.database import run_migrations
 
 
 @pytest.fixture
@@ -23,6 +24,10 @@ def minimal_app() -> FastAPI:
     @app.get("/v1/private")
     def private():
         return {"message": "private"}
+
+    @app.get("/v1/whoami")
+    def whoami(request: Request):
+        return {"user_id": request.state.user_id}
 
     @app.post("/query")
     def root_query():
@@ -106,37 +111,32 @@ class TestAPIKeyProtection:
 
     def test_valid_api_key_on_protected_path(self, minimal_app: FastAPI, monkeypatch):
         """Protected path with correct API key returns 200."""
-        import src.api.middleware.security as security_module
-
         api_key = generate_api_key()
-        app = minimal_app
-        app.add_middleware(
+        monkeypatch.setattr(get_settings(), "API_ACCESS_KEY", api_key)
+        minimal_app.add_middleware(
             SecurityMiddleware,
             protected_paths=["/v1"],
         )
 
-        # Inject the configured API key via Settings and temporarily override loader
-        settings = get_settings()
-        original_key = getattr(settings, "API_ACCESS_KEY", None)
-        settings.API_ACCESS_KEY = api_key
-        original_loader = security_module.SecurityMiddleware._load_api_keys
-        monkeypatch.setattr(
-            security_module.SecurityMiddleware,
-            "_load_api_keys",
-            lambda self: {self._hash_key(api_key)}
+        response = TestClient(minimal_app).get(
+            "/v1/private", headers={"X-API-Key": api_key}
         )
-
-        client = TestClient(app)
-        response = client.get("/v1/private", headers={"X-API-Key": api_key})
         assert response.status_code == 200
 
-        # Restore
-        settings.API_ACCESS_KEY = original_key
-        monkeypatch.setattr(
-            security_module.SecurityMiddleware,
-            "_load_api_keys",
-            original_loader
+    def test_valid_api_key_sets_owner_user_id(self, minimal_app: FastAPI, monkeypatch):
+        """X-API-Key auth marks the request state as the built-in owner."""
+        api_key = generate_api_key()
+        monkeypatch.setattr(get_settings(), "API_ACCESS_KEY", api_key)
+        minimal_app.add_middleware(
+            SecurityMiddleware,
+            protected_paths=["/v1"],
         )
+
+        response = TestClient(minimal_app).get(
+            "/v1/whoami", headers={"X-API-Key": api_key}
+        )
+        assert response.status_code == 200
+        assert response.json() == {"user_id": "owner"}
 
     def test_excluded_paths_bypass_api_key(self, minimal_app: FastAPI):
         """Excluded paths like /health bypass API key requirement."""
@@ -188,6 +188,101 @@ class TestAPIKeyProtection:
 
         assert client.get("/health").status_code == 200
         response = client.get("/v1/health")
+        assert response.status_code == 401
+        assert response.json()["error"] == "unauthorized"
+
+
+class TestSessionCookieAuth:
+    """Cookie-based session auth and the Sec-Fetch-Site CSRF guard."""
+
+    @pytest.fixture
+    def api_key(self, tmp_path, monkeypatch) -> str:
+        """Isolated SQLite DB (migrations applied) plus a configured API key."""
+        key = generate_api_key()
+        monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'cora.db'}")
+        monkeypatch.setenv("API_ACCESS_KEY", key)
+        reset_settings_singleton()
+        run_migrations()
+        return key
+
+    @pytest.fixture
+    def protected_client(self, minimal_app: FastAPI) -> TestClient:
+        minimal_app.add_middleware(
+            SecurityMiddleware,
+            protected_paths=["/v1", "/api", "/query"],
+        )
+        return TestClient(minimal_app)
+
+    def test_valid_session_cookie_on_get(
+        self, protected_client: TestClient, api_key: str
+    ):
+        """A valid session cookie authenticates a GET on a protected path."""
+        from src.api.auth.session_auth import OWNER_USER_ID, SESSION_COOKIE, create_session
+
+        protected_client.cookies.set(SESSION_COOKIE, create_session(OWNER_USER_ID))
+        response = protected_client.get("/v1/private")
+        assert response.status_code == 200
+
+    def test_session_cookie_post_cross_site_rejected(
+        self, protected_client: TestClient, api_key: str
+    ):
+        """Cookie-authenticated unsafe method with cross-site fetch is forbidden."""
+        from src.api.auth.session_auth import OWNER_USER_ID, SESSION_COOKIE, create_session
+
+        protected_client.cookies.set(SESSION_COOKIE, create_session(OWNER_USER_ID))
+        response = protected_client.post(
+            "/v1/query", headers={"Sec-Fetch-Site": "cross-site"}
+        )
+        assert response.status_code == 403
+        assert response.json()["error"] == "forbidden"
+
+    def test_session_cookie_post_same_origin_allowed(
+        self, protected_client: TestClient, api_key: str
+    ):
+        from src.api.auth.session_auth import OWNER_USER_ID, SESSION_COOKIE, create_session
+
+        protected_client.cookies.set(SESSION_COOKIE, create_session(OWNER_USER_ID))
+        response = protected_client.post(
+            "/v1/query", headers={"Sec-Fetch-Site": "same-origin"}
+        )
+        assert response.status_code == 200
+
+    def test_session_cookie_post_without_fetch_site_allowed(
+        self, protected_client: TestClient, api_key: str
+    ):
+        """Requests without Sec-Fetch-Site (non-browser clients) are allowed."""
+        from src.api.auth.session_auth import OWNER_USER_ID, SESSION_COOKIE, create_session
+
+        protected_client.cookies.set(SESSION_COOKIE, create_session(OWNER_USER_ID))
+        response = protected_client.post("/v1/query")
+        assert response.status_code == 200
+
+    def test_api_key_post_ignores_fetch_site(
+        self, protected_client: TestClient, api_key: str
+    ):
+        """The CSRF check applies only to cookie auth, not X-API-Key."""
+        response = protected_client.post(
+            "/v1/query",
+            headers={"X-API-Key": api_key, "Sec-Fetch-Site": "cross-site"},
+        )
+        assert response.status_code == 200
+
+    def test_session_cookie_sets_session_user_id(
+        self, protected_client: TestClient, api_key: str
+    ):
+        """Cookie auth marks the request state with the session row's user_id."""
+        from src.api.auth.session_auth import OWNER_USER_ID, SESSION_COOKIE, create_session
+
+        protected_client.cookies.set(SESSION_COOKIE, create_session(OWNER_USER_ID))
+        response = protected_client.get("/v1/whoami")
+        assert response.status_code == 200
+        assert response.json() == {"user_id": OWNER_USER_ID}
+
+    def test_invalid_session_cookie_rejected(
+        self, protected_client: TestClient, api_key: str
+    ):
+        protected_client.cookies.set("cora_session", "not-a-real-token")
+        response = protected_client.get("/v1/private")
         assert response.status_code == 401
         assert response.json()["error"] == "unauthorized"
 

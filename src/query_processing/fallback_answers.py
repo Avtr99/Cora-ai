@@ -83,6 +83,46 @@ _ERROR_SOURCE_MARKERS: set[str] = {
 }
 
 
+# User-facing refusal for queries outside the assistant's domain. The scope
+# gate (web_search.py) and the KB system prompt (prompts.py) share this text
+# via scope_refusal_answer() — generation and detection cannot drift apart.
+SCOPE_REFUSAL_ANSWER = (
+    "I can only help with questions about sustainability, climate, "
+    "and carbon markets."
+)
+
+
+def scope_refusal_answer() -> str:
+    """Scope refusal matching the active collection's domain.
+
+    When a custom collection is configured (COLLECTION_SYSTEM_INSTRUCTION),
+    the refusal names that collection — mirroring _collection_scope_guard in
+    prompts.py — otherwise the sustainability default is returned.
+    """
+    from ..config import get_settings
+
+    settings = get_settings()
+    if (settings.COLLECTION_SYSTEM_INSTRUCTION or "").strip():
+        name = (settings.COLLECTION_NAME or "").strip()
+        if name:
+            return f"I can only help with questions about {name}."
+        return "I can only help with questions related to this collection."
+    return SCOPE_REFUSAL_ANSWER
+
+
+# Opening shared by every scope-refusal variant ("I can only help with
+# questions about ..." / "... related to this collection."). A refusal is a
+# terminal answer, not a citation failure — detection lives here, but it must
+# NOT join is_non_answer: a refusal must not trigger web supplementation,
+# which would answer the off-scope question.
+_SCOPE_REFUSAL_PREFIX = "i can only help"
+
+
+def is_refusal(answer: str) -> bool:
+    """Return True if the answer is a scope refusal rather than a citable answer."""
+    return (answer or "").strip().lower().startswith(_SCOPE_REFUSAL_PREFIX)
+
+
 def is_non_answer(answer: str) -> bool:
     """Return True if the answer text is an explicit non-answer fallback.
 

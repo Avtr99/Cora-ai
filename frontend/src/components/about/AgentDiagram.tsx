@@ -294,7 +294,7 @@ export function AgentDiagram() {
           return (
             <div
               key={`label-${a.id}`}
-              className={`absolute font-inter font-semibold text-center leading-none select-none bg-surface-card border rounded-full px-2 py-0.5 shadow-sm ${transition} ${opacity} z-20 ${
+              className={`absolute font-inter font-semibold text-center leading-none select-none bg-surface-card border rounded-full px-2 py-0.5 shadow-xs ${transition} ${opacity} z-20 ${
                 isHovered
                   ? "border-border-ui text-text-secondary scale-105 shadow-md bg-surface-card"
                   : isDimmed

@@ -39,6 +39,12 @@ class CitationFormatter:
                 "source_type": citation.source_type,
                 "relevance_score": citation.relevance_score,
             }
+            if citation.index is not None:
+                detail["index"] = citation.index
+            if citation.marker_type:
+                detail["marker_type"] = citation.marker_type
+            if citation.document_key:
+                detail["document_key"] = citation.document_key
             if citation.page_number is not None:
                 detail["page_number"] = citation.page_number
             if citation.section is not None:

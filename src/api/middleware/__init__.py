@@ -34,8 +34,6 @@ from .circuit_breaker import (
     qdrant_circuit
 )
 from .error_handler import (
-    APIError,
-    ErrorCode,
     ErrorResponse,
     register_exception_handlers
 )
@@ -73,8 +71,6 @@ __all__ = [
     "voyage_circuit",
     "qdrant_circuit",
     # Error handling
-    "APIError",
-    "ErrorCode",
     "ErrorResponse",
     "register_exception_handlers",
     # Request size limits

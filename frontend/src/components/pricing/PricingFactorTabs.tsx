@@ -51,7 +51,7 @@ const PricingFactorTabs: React.FC<PricingFactorTabsProps> = ({ activeForce, onCh
 
   return (
     <div ref={scrollRef} className="relative overflow-x-auto border-b border-surface-subtle md:rounded-xl md:border md:border-border-ui md:bg-surface-base">
-      <div className="flex items-center md:grid md:min-w-[58rem] md:grid-cols-5 3xl:min-w-[72rem] 4xl:min-w-[84rem]" role="tablist" aria-label="Price factors">
+      <div className="flex items-center md:grid md:min-w-232 md:grid-cols-5 3xl:min-w-6xl 4xl:min-w-336" role="tablist" aria-label="Price factors">
         {FORCE_ORDER.map((id, index) => {
           const force = FORCES[id];
           const isActive = id === activeForce;
@@ -69,7 +69,7 @@ const PricingFactorTabs: React.FC<PricingFactorTabsProps> = ({ activeForce, onCh
               tabIndex={isActive ? 0 : -1}
               onClick={() => onChange(id)}
               onKeyDown={(event) => handleKeyDown(event, index)}
-              className={`relative inline-flex min-h-touch shrink-0 items-center whitespace-nowrap px-3 py-2.5 text-left font-inter transition-colors duration-200 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-inset active:bg-surface-muted motion-reduce:transition-none md:min-h-[88px] md:flex-col md:items-start md:justify-center md:gap-1.5 md:border-r md:border-border-ui md:px-5 md:py-4 md:last:border-r-0 3xl:min-h-[104px] 3xl:gap-2 3xl:px-6 3xl:py-5 4xl:min-h-[120px] 4xl:gap-2.5 4xl:px-7 4xl:py-6 ${
+              className={`relative inline-flex min-h-touch shrink-0 items-center whitespace-nowrap px-3 py-2.5 text-left font-inter transition-colors duration-200 focus-visible:z-10 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-inset active:bg-surface-muted motion-reduce:transition-none md:min-h-[88px] md:flex-col md:items-start md:justify-center md:gap-1.5 md:border-r md:border-border-ui md:px-5 md:py-4 md:last:border-r-0 3xl:min-h-[104px] 3xl:gap-2 3xl:px-6 3xl:py-5 4xl:min-h-[120px] 4xl:gap-2.5 4xl:px-7 4xl:py-6 ${
                 isActive
                   ? 'text-text-primary md:bg-surface-card md:shadow-xs'
                   : 'text-text-muted hover:text-text-primary md:text-text-secondary md:hover:bg-surface-subtle'

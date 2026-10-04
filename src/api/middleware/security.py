@@ -7,11 +7,17 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 from typing import List, Optional, Callable
+import asyncio
 import secrets
-import hashlib
 import re
 
-from ...config import get_settings
+from ..auth.session_auth import (
+    OWNER_USER_ID,
+    SESSION_COOKIE,
+    is_cross_site_request,
+    key_matches,
+    session_user_id,
+)
 from ..auth.token_utils import decode_access_token, JWTError
 
 
@@ -54,32 +60,7 @@ class SecurityMiddleware(BaseHTTPMiddleware):
             "/openapi.json",
             "/rate-limit-info"
         ]
-        self._api_keys = self._load_api_keys()
-    
-    def _load_api_keys(self) -> set:
-        """Load valid API keys from environment."""
-        settings = get_settings()
-        api_keys = set()
-        
-        # Load API key from settings if configured
-        api_key = getattr(settings, 'API_ACCESS_KEY', None)
-        if api_key:
-            api_keys.add(self._hash_key(api_key))
-        
-        return api_keys
-    
-    def _hash_key(self, key: str) -> str:
-        """Hash API key for secure comparison.
 
-        SHA-256 is intentional here: API keys are high-entropy random tokens
-        (256 bits via ``secrets.token_hex(32)``), not user passwords, so a
-        fast hash is appropriate — there is no realistic brute-force surface.
-        A slow KDF (PBKDF2/scrypt) would add per-request latency for no
-        security benefit. Comparison uses ``secrets.compare_digest`` to
-        prevent timing attacks.
-        """
-        return hashlib.sha256(key.encode()).hexdigest()
-    
     def _is_path_protected(self, path: str) -> bool:
         """Check if path requires API key authentication."""
         # Check exclusions first (exact match or prefix-with-slash-boundary)
@@ -98,19 +79,6 @@ class SecurityMiddleware(BaseHTTPMiddleware):
                 return True
         
         return False
-    
-    def _validate_api_key(self, api_key: Optional[str]) -> bool:
-        """Validate provided API key."""
-        if not api_key:
-            return False
-        
-        # If no API keys are configured, deny all requests to protected paths
-        if not self._api_keys:
-            return False
-        
-        # Use constant-time comparison to prevent timing attacks
-        hashed_key = self._hash_key(api_key)
-        return any(secrets.compare_digest(hashed_key, valid_key) for valid_key in self._api_keys)
     
     def _add_security_headers(self, response) -> None:
         """Add security headers to response."""
@@ -134,20 +102,35 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         """Process request through security middleware."""
         path = request.url.path
         
-        # Check API key for protected paths
+        # Check credentials for protected paths: X-API-Key header or session cookie
         if self._is_path_protected(path):
             api_key = request.headers.get(self.api_key_header)
-            
-            if not self._validate_api_key(api_key):
-                return JSONResponse(
-                    status_code=401,
-                    content={
-                        "error": "unauthorized",
-                        "error_code": "AUTH_001",
-                        "message": "Invalid or missing API key"
-                    }
+
+            if key_matches(api_key):
+                request.state.user_id = OWNER_USER_ID
+            else:
+                user_id = await asyncio.to_thread(
+                    session_user_id, request.cookies.get(SESSION_COOKIE)
                 )
-        
+                if user_id is not None:
+                    if is_cross_site_request(request):
+                        return JSONResponse(
+                            status_code=403,
+                            content={
+                                "error": "forbidden",
+                                "message": "Cross-origin request rejected"
+                            }
+                        )
+                    request.state.user_id = user_id
+                else:
+                    return JSONResponse(
+                        status_code=401,
+                        content={
+                            "error": "unauthorized",
+                            "message": "Invalid or missing API key"
+                        }
+                    )
+
         # Process request
         response = await call_next(request)
         
@@ -203,7 +186,6 @@ async def get_authenticated_user(request: Request) -> AuthenticatedUser:
             status_code=401,
             detail={
                 "error": "unauthorized",
-                "error_code": "AUTH_002",
                 "message": "Valid Bearer token is required"
             }
         )
@@ -219,7 +201,6 @@ async def get_authenticated_user(request: Request) -> AuthenticatedUser:
             status_code=401,
             detail={
                 "error": "unauthorized",
-                "error_code": e.error_code,
                 "message": e.message
             }
         )
@@ -230,7 +211,6 @@ async def get_authenticated_user(request: Request) -> AuthenticatedUser:
             status_code=401,
             detail={
                 "error": "unauthorized",
-                "error_code": "AUTH_003",
                 "message": "Invalid user_id format in token"
             }
         )
@@ -254,7 +234,6 @@ def validate_user_access(auth_user: AuthenticatedUser, requested_user_id: str) -
             status_code=403,
             detail={
                 "error": "forbidden",
-                "error_code": "AUTH_004",
                 "message": "You do not have permission to access this user's data"
             }
         )

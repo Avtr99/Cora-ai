@@ -17,7 +17,7 @@ export const BenefitCard = ({
   description
 }: BenefitCardProps) => {
   return (
-    <div className="bg-surface-card rounded-2xl p-5 md:p-10 3xl:p-12 4xl:p-14 shadow-sm border border-border-ui w-full h-full">
+    <div className="bg-surface-card rounded-2xl p-5 md:p-10 3xl:p-12 4xl:p-14 shadow-xs border border-border-ui w-full h-full">
       <div className="flex flex-col gap-3 md:gap-8 3xl:gap-10 4xl:gap-12">
         <div>
           <span className="font-poppins" style={{ color: CASE_STUDY.type.text }}>

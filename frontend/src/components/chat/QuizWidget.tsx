@@ -28,12 +28,12 @@ export const QuizWidget: React.FC<QuizWidgetProps> = ({ quiz }) => {
     <motion.div 
       layout="position"
       transition={{ type: 'spring', stiffness: 350, damping: 35 }}
-      className="mt-4 3xl:mt-5 4xl:mt-6 mb-6 3xl:mb-8 4xl:mb-10 w-full max-w-2xl 3xl:max-w-3xl 4xl:max-w-4xl bg-surface-card border border-border-ui/60 rounded-2xl p-4 sm:p-5 3xl:p-6 4xl:p-7 shadow-sm flex flex-col gap-3 3xl:gap-4 4xl:gap-5"
+      className="mt-4 3xl:mt-5 4xl:mt-6 mb-6 3xl:mb-8 4xl:mb-10 w-full max-w-2xl 3xl:max-w-3xl 4xl:max-w-4xl bg-surface-card border border-border-ui/60 rounded-2xl p-4 sm:p-5 3xl:p-6 4xl:p-7 shadow-xs flex flex-col gap-3 3xl:gap-4 4xl:gap-5"
     >
         
       {/* Header Label - Strict Minimalism */}
       <div>
-        <span className="inline-flex items-center px-2 3xl:px-2.5 4xl:px-3 py-0.5 3xl:py-1 rounded-md bg-brand-500/[0.08] text-brand-700 text-2xs 3xl:text-xs 4xl:text-sm font-bold uppercase tracking-[0.16em] font-inter">
+        <span className="inline-flex items-center px-2 3xl:px-2.5 4xl:px-3 py-0.5 3xl:py-1 rounded-md bg-brand-500/8 text-brand-700 text-2xs 3xl:text-xs 4xl:text-sm font-bold uppercase tracking-[0.16em] font-inter">
           Knowledge Check
         </span>
       </div>
@@ -51,15 +51,15 @@ export const QuizWidget: React.FC<QuizWidgetProps> = ({ quiz }) => {
           const isThisCorrect = index === quiz.correctIndex;
           
           // Base states - Highly refined
-          let stateClass = 'hover:border-brand-500/30 hover:bg-brand-500/[0.02] hover:shadow-sm border-border-ui bg-surface-card shadow-xs';
+          let stateClass = 'hover:border-brand-500/30 hover:bg-brand-500/2 hover:shadow-xs border-border-ui bg-surface-card shadow-xs';
           let letterClass = 'bg-surface-page border border-border-ui/50 text-text-muted group-hover:bg-brand-100 group-hover:text-brand-700 group-hover:border-transparent rounded-md';
           
           if (isAnswered) {
             if (isSelected && isCorrect) {
-              stateClass = 'border-semantic-success-icon bg-semantic-success-bg/30 shadow-sm z-10';
+              stateClass = 'border-semantic-success-icon bg-semantic-success-bg/30 shadow-xs z-10';
               letterClass = 'bg-semantic-success-icon text-white border-transparent rounded-md';
             } else if (isSelected && !isCorrect) {
-              stateClass = 'border-semantic-warning-border bg-semantic-warning-bg/50 shadow-sm z-10';
+              stateClass = 'border-semantic-warning-border bg-semantic-warning-bg/50 shadow-xs z-10';
               letterClass = 'bg-semantic-warning-iconBg border border-semantic-warning-border text-semantic-warning-text rounded-md';
             } else {
               stateClass = 'border-border-ui/50 bg-surface-page/30 opacity-50';
@@ -76,10 +76,10 @@ export const QuizWidget: React.FC<QuizWidgetProps> = ({ quiz }) => {
               onClick={() => handleOptionClick(index)}
               whileHover={!isAnswered ? { y: -1 } : {}}
               whileTap={!isAnswered ? { scale: 0.995 } : {}}
-              className={`group relative flex items-center gap-3 3xl:gap-4 text-left px-3.5 3xl:px-4.5 4xl:px-5 py-2 3xl:py-2.5 4xl:py-3 sm:px-4 sm:py-2.5 rounded-lg border transition-all duration-300 ease-out outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 ${stateClass}`}
+              className={`group relative flex items-center gap-3 3xl:gap-4 text-left px-3.5 3xl:px-4.5 4xl:px-5 py-2 3xl:py-2.5 4xl:py-3 sm:px-4 sm:py-2.5 rounded-lg border transition-all duration-300 ease-out outline-hidden focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 ${stateClass}`}
             >
               {/* Letter Indicator */}
-              <div className={`w-6 h-6 3xl:w-7 3xl:h-7 4xl:w-8 4xl:h-8 flex-shrink-0 flex items-center justify-center text-xs 3xl:text-sm 4xl:text-base font-bold transition-all duration-300 ${letterClass}`}>
+              <div className={`w-6 h-6 3xl:w-7 3xl:h-7 4xl:w-8 4xl:h-8 shrink-0 flex items-center justify-center text-xs 3xl:text-sm 4xl:text-base font-bold transition-all duration-300 ${letterClass}`}>
                 {isAnswered && isSelected ? (
                   isCorrect ? <Check className="w-3.5 h-3.5 3xl:w-4 3xl:h-4 4xl:w-5 4xl:h-5" strokeWidth={2.5} /> : <X className="w-3.5 h-3.5 3xl:w-4 3xl:h-4 4xl:w-5 4xl:h-5" strokeWidth={2.5} />
                 ) : (
@@ -110,11 +110,11 @@ export const QuizWidget: React.FC<QuizWidgetProps> = ({ quiz }) => {
             <div className={`mt-1 3xl:mt-2 py-3 3xl:py-4 px-3.5 3xl:px-4.5 sm:py-3.5 3xl:py-4.5 sm:px-4 3xl:px-5 rounded-xl border shadow-xs ${isCorrect ? 'bg-semantic-success-bg/40 border-semantic-success-border' : 'bg-semantic-warning-bg/50 border-semantic-warning-border'}`}>
               <div className="flex items-start gap-3">
                 {isCorrect ? (
-                  <div className="mt-0.5 3xl:mt-1 flex-shrink-0 w-7 h-7 3xl:w-8 3xl:h-8 4xl:w-9 4xl:h-9 rounded-full flex items-center justify-center bg-semantic-success-icon text-white">
+                  <div className="mt-0.5 3xl:mt-1 shrink-0 w-7 h-7 3xl:w-8 3xl:h-8 4xl:w-9 4xl:h-9 rounded-full flex items-center justify-center bg-semantic-success-icon text-white">
                     <Check className="w-3.5 h-3.5 3xl:w-4 3xl:h-4 4xl:w-5 4xl:h-5" strokeWidth={2.5} />
                   </div>
                 ) : (
-                  <div className="mt-0.5 3xl:mt-1 flex-shrink-0 w-7 h-7 3xl:w-8 3xl:h-8 4xl:w-9 4xl:h-9 rounded-full flex items-center justify-center bg-semantic-warning-iconBg border border-semantic-warning-border">
+                  <div className="mt-0.5 3xl:mt-1 shrink-0 w-7 h-7 3xl:w-8 3xl:h-8 4xl:w-9 4xl:h-9 rounded-full flex items-center justify-center bg-semantic-warning-iconBg border border-semantic-warning-border">
                     <AlertCircle className="w-3.5 h-3.5 3xl:w-4 3xl:h-4 4xl:w-5 4xl:h-5 text-semantic-warning-icon" strokeWidth={2.5} />
                   </div>
                 )}
@@ -131,7 +131,7 @@ export const QuizWidget: React.FC<QuizWidgetProps> = ({ quiz }) => {
                       onClick={handleTryAgain}
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
-                      className="inline-flex items-center gap-1.5 3xl:gap-2 font-inter font-semibold text-semantic-warning-text text-xs 3xl:text-sm px-4 3xl:px-5 py-2 3xl:py-2.5 4xl:py-3 rounded-lg bg-semantic-warning-bg border border-semantic-warning-border hover:bg-semantic-warning-iconBg hover:border-semantic-warning-border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2"
+                      className="inline-flex items-center gap-1.5 3xl:gap-2 font-inter font-semibold text-semantic-warning-text text-xs 3xl:text-sm px-4 3xl:px-5 py-2 3xl:py-2.5 4xl:py-3 rounded-lg bg-semantic-warning-bg border border-semantic-warning-border hover:bg-semantic-warning-iconBg hover:border-semantic-warning-border transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2"
                     >
                       Give it another shot
                       <ArrowRight className="w-3.5 h-3.5 3xl:w-4 3xl:h-4 4xl:w-5 4xl:h-5 text-semantic-warning-icon" strokeWidth={2.5} />

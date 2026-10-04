@@ -90,6 +90,13 @@ export default defineConfig(({ mode }) => {
               rewrite: (path) => path.replace(/^\/api\/documents/, "/v1/documents"),
               configure: setApiKeyOnProxy,
             },
+            "/api/chats": {
+              target: apiBase,
+              changeOrigin: true,
+              secure: proxySecure,
+              rewrite: (path) => path.replace(/^\/api\/chats/, "/v1/chats"),
+              configure: setApiKeyOnProxy,
+            },
             "/api/cora-health": {
               target: apiBase,
               changeOrigin: true,
@@ -102,6 +109,12 @@ export default defineConfig(({ mode }) => {
               changeOrigin: true,
               secure: proxySecure,
               rewrite: (path) => path.replace(/^\/api\/v1\/settings/, "/v1/settings"),
+              configure: setApiKeyOnProxy,
+            },
+            "/api/auth": {
+              target: apiBase,
+              changeOrigin: true,
+              secure: proxySecure,
               configure: setApiKeyOnProxy,
             },
           }

@@ -42,8 +42,12 @@ from .settings_routes import router as settings_router
 from .lifespan import lifespan
 from .async_query_jobs import get_async_query_job_manager
 from .public_routes import router as public_router
+from .session_routes import router as session_router
+from .chat_routes import router as chat_router
+from .auth.session_auth import current_user_id
 from ..config import get_settings
 from ..version import __version__
+from .query_history import open_turn
 from .query_routes import Query as QueryModel, Response as QueryResponse, process_query_core
 from .streaming_service import process_query_core_stream
 
@@ -84,14 +88,13 @@ app.add_middleware(
         "Content-Type",
         "X-API-Key",
         "X-Request-ID",
-        "X-User-ID",
     ],
     expose_headers=["X-Request-ID", "X-Response-Time"],
 )
 
 # Add security middleware (security headers + optional API key auth)
 API_KEY_PROTECTED_PATHS = ["/v1", "/api", "/query"]
-API_KEY_EXCLUDED_PATHS = ["/health", "/live", "/ready", "/docs", "/redoc", "/openapi.json"]
+API_KEY_EXCLUDED_PATHS = ["/health", "/live", "/ready", "/docs", "/redoc", "/openapi.json", "/api/auth"]
 protected_paths = API_KEY_PROTECTED_PATHS if settings.ENABLE_API_KEY_PROTECTION else None
 app.add_middleware(
     SecurityMiddleware,
@@ -158,13 +161,14 @@ async def process_query(query: Query, request: Request):
     Process a user query using RAG pipeline with security sanitization.
     """
     try:
+        ctx = await open_turn(query, request)
         return await process_query_core(
             query,
             request,
+            ctx,
             include_reasoning=True,
             include_metadata=True,
             include_duration_ms=True,
-            include_chat_history_in_orchestrator=True,
         )
         
     except HTTPException:
@@ -178,7 +182,7 @@ async def process_query(query: Query, request: Request):
             detail=f"Internal server error processing query (error_id: {error_id})"
         )
 
-async def _process_async_query_job(payload: Dict[str, Any], job_id: str) -> Dict[str, Any]:
+async def _process_async_query_job(payload: Dict[str, Any], job_id: str, user_id: str) -> Dict[str, Any]:
     """Run queued async query jobs through the same pipeline as /query."""
     class _AsyncRequestState:
         def __init__(self, request_id: str, user_id: str) -> None:
@@ -203,7 +207,7 @@ async def _process_async_query_job(payload: Dict[str, Any], job_id: str) -> Dict
 
     request_context = _AsyncRequestContext(
         request_id=f"async-{job_id}",
-        user_id="async-job",
+        user_id=user_id,
     )
     result = await process_query(query, request_context)  # type: ignore[arg-type]
 
@@ -214,11 +218,13 @@ async def _process_async_query_job(payload: Dict[str, Any], job_id: str) -> Dict
 get_async_query_job_manager().register_processor(_process_async_query_job)
 
 @app.post("/query/async", response_model=AsyncQueryAcceptedResponse, status_code=202)
-async def enqueue_query_async(query: Query):
+async def enqueue_query_async(query: Query, request: Request):
     """Phase 3: Queue long-running query execution and return a job ID."""
     manager = get_async_query_job_manager()
     try:
-        return await manager.enqueue(query.model_dump())
+        return await manager.enqueue(
+            query.model_dump(), user_id=current_user_id(request)
+        )
     except ValueError as exc:
         raise HTTPException(status_code=413, detail="Request payload too large or invalid") from exc
     except asyncio.QueueFull:
@@ -233,10 +239,10 @@ async def enqueue_query_async(query: Query):
         )
 
 @app.get("/query/async/{job_id}", response_model=AsyncQueryStatusResponse)
-async def get_query_async_status(job_id: str):
-    """Get queued async query status/result by job ID."""
+async def get_query_async_status(job_id: str, request: Request):
+    """Get queued async query status/result by job ID (owner-scoped)."""
     manager = get_async_query_job_manager()
-    job = await manager.get_job(job_id)
+    job = await manager.get_job(job_id, current_user_id(request))
     if job is None:
         raise HTTPException(status_code=404, detail="Async query job not found")
     return job
@@ -252,14 +258,18 @@ async def process_query_stream(query: Query, request: Request, tokens: bool = Tr
             streaming tokens (e.g. the web UI).
     """
 
+    # Resolve identity + load server-side history before StreamingResponse so a
+    # foreign conversation_id fails as HTTP 404, not an SSE error event (D33).
+    ctx = await open_turn(query, request)
+
     async def event_generator():
         stream = process_query_core_stream(
             query,
             request,
+            ctx,
             include_reasoning=True,
             include_metadata=True,
             include_duration_ms=True,
-            include_chat_history_in_orchestrator=True,
             emit_tokens=tokens,
         )
         try:
@@ -293,14 +303,14 @@ async def v1_process_query_stream(query: Query, request: Request, tokens: bool =
     return await process_query_stream(query, request, tokens=tokens)
 
 @v1_router.post("/query/async", response_model=AsyncQueryAcceptedResponse, status_code=202)
-async def v1_enqueue_query_async(query: Query):
+async def v1_enqueue_query_async(query: Query, request: Request):
     """Queue long-running query execution for API v1."""
-    return await enqueue_query_async(query)
+    return await enqueue_query_async(query, request)
 
 @v1_router.get("/query/async/{job_id}", response_model=AsyncQueryStatusResponse)
-async def v1_get_query_async_status(job_id: str):
+async def v1_get_query_async_status(job_id: str, request: Request):
     """Get queued async query status/result for API v1."""
-    return await get_query_async_status(job_id)
+    return await get_query_async_status(job_id, request)
 
 @v1_router.get("/health")
 async def v1_health():
@@ -399,6 +409,14 @@ app.include_router(settings_router, prefix="/api/v1")
 
 # Include public router under /api for the local SPA (frontend calls /api/submit-feedback)
 app.include_router(public_router, prefix="/api")
+
+# Include session auth router under /api for the local SPA (frontend calls /api/auth/session)
+app.include_router(session_router, prefix="/api")
+
+# Include chat router under /v1 and /api (server-side chats, Phase 7).
+# Both prefixes are protected paths when API key protection is on.
+v1_router.include_router(chat_router)
+app.include_router(chat_router, prefix="/api")
 
 # -----------------------------------------------------------------------------
 # /api/* aliases for production-served SPA

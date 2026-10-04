@@ -33,6 +33,7 @@ from .repository import (
     insert_document,
     list_documents,
     release_document_lock,
+    set_document_metadata,
     try_acquire_document_lock,
     update_document,
 )
@@ -62,6 +63,7 @@ __all__ = [
     "_EXPECTED_MIME_PREFIXES",
     # repository
     "insert_document",
+    "set_document_metadata",
     "update_document",
     "get_document",
     "get_document_including_deleted",

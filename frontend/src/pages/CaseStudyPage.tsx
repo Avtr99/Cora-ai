@@ -70,7 +70,7 @@ function CaseStudyPage(): JSX.Element {
 
         {/* Hero Image + Strengths */}
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,600px)_1fr] 3xl:grid-cols-[minmax(0,760px)_1fr] 4xl:grid-cols-[minmax(0,900px)_1fr] gap-x-6 lg:gap-x-14 3xl:gap-x-16 4xl:gap-x-20 gap-y-4 3xl:gap-y-6 mb-12 3xl:mb-14 4xl:mb-16 items-stretch">
-          <div className="relative rounded-2xl overflow-hidden w-full min-w-0 aspect-[16/9] md:aspect-[3/2] lg:aspect-auto lg:h-full bg-surface-subtle max-h-[62.5vw] md:max-h-[480px] lg:max-h-none">
+          <div className="relative rounded-2xl overflow-hidden w-full min-w-0 aspect-video md:aspect-3/2 lg:aspect-auto lg:h-full bg-surface-subtle max-h-[62.5vw] md:max-h-[480px] lg:max-h-none">
             <img
               src={caseStudyData.mainImage}
               srcSet={caseStudyData.mainImageSrcSet}
@@ -113,7 +113,7 @@ function CaseStudyPage(): JSX.Element {
                     <DialogTrigger asChild>
                       <button
                         type="button"
-                        className="group relative flex w-full aspect-[4/3] cursor-pointer items-center justify-center overflow-hidden rounded-xl bg-surface-subtle border border-border-ui shadow-sm text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2"
+                        className="group relative flex w-full aspect-4/3 cursor-pointer items-center justify-center overflow-hidden rounded-xl bg-surface-subtle border border-border-ui shadow-xs text-left focus:outline-hidden focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2"
                       >
                         <img
                           src={caseStudyData.overviewMap.image}
@@ -127,7 +127,7 @@ function CaseStudyPage(): JSX.Element {
                         </span>
                       </button>
                     </DialogTrigger>
-                    <DialogContent className="max-w-[95vw] max-h-[95vh] border-0 bg-transparent p-0 shadow-none [&>button]:right-3 [&>button]:top-3 [&>button]:rounded-full [&>button]:bg-white [&>button]:p-1.5 [&>button]:text-black [&>button]:hover:bg-white [&>button]:hover:opacity-80 [&>button]:focus-visible:ring-white [&>button]:opacity-100">
+                    <DialogContent className="max-w-[95vw] max-h-[95vh] border-0 bg-transparent p-0 shadow-none [&>button]:right-3 [&>button]:top-3 [&>button]:rounded-full [&>button]:bg-white [&>button]:p-1.5 [&>button]:text-black hover:[&>button]:bg-white hover:[&>button]:opacity-80 focus-visible:[&>button]:ring-white [&>button]:opacity-100">
                       <DialogTitle className="sr-only">Project boundary map</DialogTitle>
                       <DialogDescription className="sr-only">
                         Full-resolution Sentinel-2 overview of the project boundary.
@@ -195,7 +195,7 @@ function CaseStudyPage(): JSX.Element {
                       beforeLabel={image.beforeLabel}
                       afterLabel={image.afterLabel}
                       caption={image.caption}
-                      aspectClass={caseStudyData.beforeAfterImages.length > 1 ? 'aspect-[4/3]' : 'aspect-video'}
+                      aspectClass={caseStudyData.beforeAfterImages.length > 1 ? 'aspect-4/3' : 'aspect-video'}
                     />
                   ))}
                 </div>
@@ -210,7 +210,7 @@ function CaseStudyPage(): JSX.Element {
             <p className="text-xs 3xl:text-[15px] 4xl:text-lg uppercase text-text-muted font-inter font-semibold leading-snug mb-4 3xl:mb-5 4xl:mb-6">Project Gallery</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 3xl:gap-6 4xl:gap-8">
               {caseStudyData.galleryImages.map((img, i) => (
-                <div key={i} className="relative aspect-[4/3] overflow-hidden rounded-xl bg-surface-subtle border border-border-ui shadow-sm">
+                <div key={i} className="relative aspect-4/3 overflow-hidden rounded-xl bg-surface-subtle border border-border-ui shadow-xs">
                   <img
                     src={img}
                     alt={`${caseStudyData.title} - gallery image ${i + 1}`}
@@ -227,7 +227,6 @@ function CaseStudyPage(): JSX.Element {
         {/* Project Statistics */}
         <ProjectStatistics
           carbonSequestered={caseStudyData.statistics.carbonSequestered}
-          permanenceRisk={caseStudyData.statistics.permanenceRisk}
           bufferPool={caseStudyData.statistics.bufferPool}
           creditsIssued={caseStudyData.statistics.creditsIssued}
           creditsRetired={caseStudyData.statistics.creditsRetired}

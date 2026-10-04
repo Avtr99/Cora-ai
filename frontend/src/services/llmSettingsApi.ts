@@ -5,6 +5,8 @@
  * and listing available models from a provider (e.g. Ollama).
  */
 
+import { apiFetch } from './apiFetch';
+
 const SETTINGS_BASE = '/api/v1/settings';
 
 export interface LLMSettings {
@@ -48,7 +50,7 @@ export interface ProviderSwitchResult {
  * for quick-switching via the chat toggle.
  */
 export async function getAvailableProviders(): Promise<AvailableProvidersResponse> {
-  const response = await fetch(`${SETTINGS_BASE}/llm/providers`);
+  const response = await apiFetch(`${SETTINGS_BASE}/llm/providers`);
   if (!response.ok) {
     throw new Error(`Failed to list providers: ${response.status}`);
   }
@@ -60,7 +62,7 @@ export async function getAvailableProviders(): Promise<AvailableProvidersRespons
  * the backend client without requiring a restart.
  */
 export async function switchLLMProvider(slug: string): Promise<ProviderSwitchResult> {
-  const response = await fetch(`${SETTINGS_BASE}/llm/switch`, {
+  const response = await apiFetch(`${SETTINGS_BASE}/llm/switch`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ label: slug }),
@@ -96,7 +98,7 @@ export interface LLMSettingsUpdate {
  * Get current LLM settings. The API key is never returned.
  */
 export async function getLLMSettings(): Promise<LLMSettings> {
-  const response = await fetch(`${SETTINGS_BASE}/llm`);
+  const response = await apiFetch(`${SETTINGS_BASE}/llm`);
   if (!response.ok) {
     throw new Error(`Failed to get LLM settings: ${response.status}`);
   }
@@ -108,7 +110,7 @@ export async function getLLMSettings(): Promise<LLMSettings> {
  * If api_key is null/undefined, the existing key is preserved.
  */
 export async function updateLLMSettings(update: LLMSettingsUpdate): Promise<LLMSettings> {
-  const response = await fetch(`${SETTINGS_BASE}/llm`, {
+  const response = await apiFetch(`${SETTINGS_BASE}/llm`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(update),
@@ -126,7 +128,7 @@ export async function updateLLMSettings(update: LLMSettingsUpdate): Promise<LLMS
  */
 export async function listLLMModels(baseUrl: string): Promise<LLMModel[]> {
   const params = new URLSearchParams({ base_url: baseUrl });
-  const response = await fetch(`${SETTINGS_BASE}/llm/models?${params}`);
+  const response = await apiFetch(`${SETTINGS_BASE}/llm/models?${params}`);
   if (!response.ok) {
     const error = await response.text();
     throw new Error(`Failed to list models: ${error}`);
@@ -187,7 +189,7 @@ export interface ConfigStatus {
  * Checks all providers and Qdrant dimension compatibility.
  */
 export async function getConfigStatus(): Promise<ConfigStatus> {
-  const response = await fetch(`${SETTINGS_BASE}/status`);
+  const response = await apiFetch(`${SETTINGS_BASE}/status`);
   if (!response.ok) {
     throw new Error(`Failed to get config status: ${response.status}`);
   }
@@ -221,7 +223,7 @@ export interface LLMTestResult {
  * Returns { success: false, ... } if the test fails (e.g. bad key).
  */
 export async function testLLMConnection(req: LLMTestRequest): Promise<LLMTestResult> {
-  const response = await fetch(`${SETTINGS_BASE}/llm/test`, {
+  const response = await apiFetch(`${SETTINGS_BASE}/llm/test`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(req),
@@ -255,7 +257,7 @@ export interface EmbeddingSettingsUpdate {
 }
 
 export async function getEmbeddingSettings(): Promise<EmbeddingSettings> {
-  const response = await fetch(`${SETTINGS_BASE}/embeddings`);
+  const response = await apiFetch(`${SETTINGS_BASE}/embeddings`);
   if (!response.ok) {
     throw new Error(`Failed to get embedding settings: ${response.status}`);
   }
@@ -263,7 +265,7 @@ export async function getEmbeddingSettings(): Promise<EmbeddingSettings> {
 }
 
 export async function updateEmbeddingSettings(update: EmbeddingSettingsUpdate): Promise<EmbeddingSettings> {
-  const response = await fetch(`${SETTINGS_BASE}/embeddings`, {
+  const response = await apiFetch(`${SETTINGS_BASE}/embeddings`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(update),
@@ -291,7 +293,7 @@ export interface SearchSettingsUpdate {
 }
 
 export async function getSearchSettings(): Promise<SearchSettings> {
-  const response = await fetch(`${SETTINGS_BASE}/search`);
+  const response = await apiFetch(`${SETTINGS_BASE}/search`);
   if (!response.ok) {
     throw new Error(`Failed to get search settings: ${response.status}`);
   }
@@ -299,7 +301,7 @@ export async function getSearchSettings(): Promise<SearchSettings> {
 }
 
 export async function updateSearchSettings(update: SearchSettingsUpdate): Promise<SearchSettings> {
-  const response = await fetch(`${SETTINGS_BASE}/search`, {
+  const response = await apiFetch(`${SETTINGS_BASE}/search`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(update),
@@ -329,7 +331,7 @@ export interface RerankerSettingsUpdate {
 }
 
 export async function getRerankerSettings(): Promise<RerankerSettings> {
-  const response = await fetch(`${SETTINGS_BASE}/reranker`);
+  const response = await apiFetch(`${SETTINGS_BASE}/reranker`);
   if (!response.ok) {
     throw new Error(`Failed to get reranker settings: ${response.status}`);
   }
@@ -337,7 +339,7 @@ export async function getRerankerSettings(): Promise<RerankerSettings> {
 }
 
 export async function updateRerankerSettings(update: RerankerSettingsUpdate): Promise<RerankerSettings> {
-  const response = await fetch(`${SETTINGS_BASE}/reranker`, {
+  const response = await apiFetch(`${SETTINGS_BASE}/reranker`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(update),

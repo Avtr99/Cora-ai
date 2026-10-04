@@ -36,7 +36,7 @@ export const SuggestedPrompts: React.FC<SuggestedPromptsProps> = ({ prompts, mes
     >
       {/* Label row */}
       <div className="flex items-center gap-2 3xl:gap-2.5 4xl:gap-3 mb-3 3xl:mb-4 4xl:mb-5">
-        <div className="flex items-center justify-center w-5 h-5 3xl:w-6 3xl:h-6 4xl:w-7 4xl:h-7 rounded-md bg-brand-500/[0.08]">
+        <div className="flex items-center justify-center w-5 h-5 3xl:w-6 3xl:h-6 4xl:w-7 4xl:h-7 rounded-md bg-brand-500/8">
           <IconWrapper Icon={ChatIcon} size={12} color="currentColor" className="text-brand-700" />
         </div>
         <span className="font-inter text-xs 3xl:text-sm 4xl:text-base font-semibold text-brand-700 uppercase tracking-wider">
@@ -60,10 +60,10 @@ export const SuggestedPrompts: React.FC<SuggestedPromptsProps> = ({ prompts, mes
             whileTap={isTyping ? {} : { scale: 0.98 }}
             onClick={() => handlePromptClick(prompt)}
             disabled={isTyping}
-            className={`group flex items-center gap-2 3xl:gap-2.5 4xl:gap-3 px-3.5 3xl:px-4 4xl:px-5 py-2 3xl:py-2.5 4xl:py-3 rounded-xl border text-left transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 ${
+            className={`group flex items-center gap-2 3xl:gap-2.5 4xl:gap-3 px-3.5 3xl:px-4 4xl:px-5 py-2 3xl:py-2.5 4xl:py-3 rounded-xl border text-left transition-all duration-200 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 ${
               isTyping
                 ? 'border-border-ui bg-surface-subtle/50 cursor-not-allowed opacity-50'
-                : 'border-border-ui bg-surface-card hover:bg-surface-subtle hover:shadow-sm hover:border-border-ui'
+                : 'border-border-ui bg-surface-card hover:bg-surface-subtle hover:shadow-xs hover:border-border-ui'
             }`}
           >
             <span className={`font-inter text-sm 3xl:text-base 4xl:text-lg leading-snug ${
@@ -72,7 +72,7 @@ export const SuggestedPrompts: React.FC<SuggestedPromptsProps> = ({ prompts, mes
               {prompt}
             </span>
             <svg
-              className="w-3.5 h-3.5 3xl:w-4 3xl:h-4 4xl:w-5 4xl:h-5 flex-shrink-0 text-text-muted"
+              className="w-3.5 h-3.5 3xl:w-4 3xl:h-4 4xl:w-5 4xl:h-5 shrink-0 text-text-muted"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"

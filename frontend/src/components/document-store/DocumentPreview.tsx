@@ -62,10 +62,10 @@ const markdownComponents = {
     <thead className="bg-surface-subtle" {...props}>{children}</thead>
   ),
   th: ({ children, ...props }: React.ThHTMLAttributes<HTMLTableCellElement>) => (
-    <th className="border border-border-ui px-2 3xl:px-3 py-1.5 3xl:py-2 text-left font-inter font-semibold text-caption 3xl:text-[13px] 4xl:text-sm text-text-primary break-words first:w-14 last:w-14" {...props}>{children}</th>
+    <th className="border border-border-ui px-2 3xl:px-3 py-1.5 3xl:py-2 text-left font-inter font-semibold text-caption 3xl:text-[13px] 4xl:text-sm text-text-primary wrap-break-word first:w-14 last:w-14" {...props}>{children}</th>
   ),
   td: ({ children, ...props }: React.TdHTMLAttributes<HTMLTableCellElement>) => (
-    <td className="border border-border-ui px-2 3xl:px-3 py-1.5 3xl:py-2 font-inter text-caption 3xl:text-[13px] 4xl:text-sm text-text-secondary break-words first:w-14 last:w-14" {...props}>{children}</td>
+    <td className="border border-border-ui px-2 3xl:px-3 py-1.5 3xl:py-2 font-inter text-caption 3xl:text-[13px] 4xl:text-sm text-text-secondary wrap-break-word first:w-14 last:w-14" {...props}>{children}</td>
   ),
 };
 
@@ -146,7 +146,7 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({ document, isBu
             type="button"
             disabled={isDisabled}
             onClick={handleMarkReviewed}
-            className="inline-flex h-8 3xl:h-10 4xl:h-11 items-center gap-1.5 3xl:gap-2 rounded-lg 3xl:rounded-xl border border-semantic-success-border bg-surface-card px-3 3xl:px-4 font-inter text-xs 3xl:text-[13px] 4xl:text-sm font-medium text-semantic-success-text transition-all hover:bg-semantic-success-bg focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex h-8 3xl:h-10 4xl:h-11 items-center gap-1.5 3xl:gap-2 rounded-lg 3xl:rounded-xl border border-semantic-success-border bg-surface-card px-3 3xl:px-4 font-inter text-xs 3xl:text-[13px] 4xl:text-sm font-medium text-semantic-success-text transition-all hover:bg-semantic-success-bg focus:outline-hidden focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <CheckCircle2 className="h-3.5 w-3.5 3xl:h-4 3xl:w-4" />
             {isMarkingReviewed ? 'Marking...' : 'Mark reviewed'}
@@ -158,7 +158,7 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({ document, isBu
         <div className="mt-3 3xl:mt-4 rounded-lg 3xl:rounded-xl bg-semantic-error-bg p-2.5 3xl:p-4 font-inter text-caption 3xl:text-[13px] 4xl:text-sm text-semantic-error-text">
           <div className="flex items-start gap-2 3xl:gap-3">
             <AlertTriangle className="h-4 w-4 3xl:h-5 3xl:w-5 shrink-0 mt-0.5" />
-            <span className="flex-1 break-words whitespace-pre-wrap select-text">{document.error}</span>
+            <span className="flex-1 wrap-break-word whitespace-pre-wrap select-text">{document.error}</span>
             <button
               type="button"
               onClick={handleCopyError}

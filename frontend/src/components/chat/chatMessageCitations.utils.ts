@@ -89,6 +89,10 @@ interface CitationDetailShape {
   source_type?: unknown;
   url?: unknown;
   snippet?: unknown;
+  index?: unknown;
+  marker_type?: unknown;
+  document_key?: unknown;
+  page_number?: unknown;
 }
 
 export function preprocessContent(content: string): string {
@@ -127,6 +131,9 @@ export function parseCitationSources(citations: CitationResponse | Record<string
 
   const links: CitationSource[] = [];
   const seen = new Set<string>();
+  // Group key -> badge for indexed details sharing a document_key (chunks of
+  // the same document merge into one badge).
+  const docGroups = new Map<string, CitationSource>();
 
   const isRoutingToken = (value: string): boolean => ROUTING_SOURCE_TOKENS.has(value.trim().toLowerCase());
 
@@ -203,6 +210,26 @@ const FILE_EXT_BLACKLIST = new Set([
       const sourceType = toStringValue(d.source_type).toLowerCase();
       const explicitUrl = toStringValue(d.url);
       const snippetText = toStringValue(d.snippet);
+      // The prompt position of this chunk (N in [cite_kb: N] / [Web, cite: N]).
+      const indexValue =
+        typeof d.index === 'number' && Number.isInteger(d.index) && d.index >= 1
+          ? d.index
+          : undefined;
+      // Which marker namespace the index belongs to.
+      const rawMarkerType = toStringValue(d.marker_type);
+      const markerType: 'kb' | 'web' | undefined =
+        rawMarkerType === 'web'
+          ? 'web'
+          : rawMarkerType === 'knowledge_base'
+            ? 'kb'
+            : undefined;
+      // Real document identity (doc store ID / URL) used to merge chunk
+      // badges; a page number when the chunk carries one.
+      const documentKey = toStringValue(d.document_key);
+      const pageNumber =
+        typeof d.page_number === 'number' && Number.isInteger(d.page_number)
+          ? d.page_number
+          : undefined;
       const snippetUrl = snippetText ? extractFirstUrl(snippetText) : undefined;
       const safeExplicitUrl = explicitUrl ? sanitizeUrl(explicitUrl) || undefined : undefined;
       const safeUrl = safeExplicitUrl || snippetUrl;
@@ -231,22 +258,54 @@ const FILE_EXT_BLACKLIST = new Set([
 
       if (!label || isRoutingToken(label)) continue;
 
-      const dedupeKey = url ? `url:${url}` : `${isWeb ? 'web' : 'kb'}:${label.toLowerCase()}`;
+      // Indexed entries sharing a document_key are chunks of the same
+      // document and merge into the first badge with that group key (same
+      // key in another marker namespace stays separate). Indexed entries
+      // without a key keep one badge per chunk; unindexed (legacy) entries
+      // keep the old label/url dedupe.
+      if (indexValue === undefined) {
+        const dedupeKey = url ? `url:${url}` : `${isWeb ? 'web' : 'kb'}:${label.toLowerCase()}`;
 
-      // Skip duplicates based on the final label (domain for web, sourceName for KB)
-      if (seen.has(dedupeKey)) {
-        if (import.meta.env.DEV) {
-          console.log('[parseCitationSources] Skipping duplicate:', dedupeKey);
+        // Skip duplicates based on the final label (domain for web, sourceName for KB)
+        if (seen.has(dedupeKey)) {
+          if (import.meta.env.DEV) {
+            console.log('[parseCitationSources] Skipping duplicate:', dedupeKey);
+          }
+          continue;
+        }
+        seen.add(dedupeKey);
+
+        links.push({
+          label,
+          url,
+          type: isWeb ? 'web' : 'knowledge_base',
+          markerType,
+        });
+        continue;
+      }
+
+      const groupKey = documentKey ? `${markerType ?? (isWeb ? 'web' : 'kb')}:${documentKey}` : undefined;
+      const existing = groupKey ? docGroups.get(groupKey) : undefined;
+      if (existing) {
+        if (!existing.indices?.includes(indexValue)) {
+          existing.indices = [...(existing.indices ?? []), indexValue];
+        }
+        if (pageNumber !== undefined && !existing.pages?.includes(pageNumber)) {
+          existing.pages = [...(existing.pages ?? []), pageNumber].sort((a, b) => a - b);
         }
         continue;
       }
-      seen.add(dedupeKey);
 
-      links.push({
+      const link: CitationSource = {
         label,
         url,
         type: isWeb ? 'web' : 'knowledge_base',
-      });
+        indices: [indexValue],
+        pages: pageNumber !== undefined ? [pageNumber] : undefined,
+        markerType,
+      };
+      if (groupKey) docGroups.set(groupKey, link);
+      links.push(link);
     }
   }
 
@@ -346,6 +405,47 @@ const FILE_EXT_BLACKLIST = new Set([
   debug('Final links:', links.length, 'items', links.map(l => ({ label: l.label, type: l.type })));
 
   return links;
+}
+
+/**
+ * Map marker references ("kb:N" / "web:N") to 1-based positions in
+ * `sourceLinks`. A source with `indices` answers to each of those prompt
+ * positions; otherwise the per-type ordinal is used — matching how legacy
+ * payloads mapped markers positionally.
+ */
+export function buildCitationNumberMap(sources: CitationSource[]): Record<string, number> {
+  const map: Record<string, number> = {};
+  const ordinals = { kb: 0, web: 0 };
+  sources.forEach((source, index) => {
+    const ns = source.markerType ?? (source.type === 'knowledge_base' ? 'kb' : 'web');
+    ordinals[ns] += 1;
+    if (source.indices?.length) {
+      for (const markerIndex of source.indices) {
+        map[`${ns}:${markerIndex}`] = index + 1;
+      }
+    } else {
+      map[`${ns}:${ordinals[ns]}`] = index + 1;
+    }
+  });
+  return map;
+}
+
+/**
+ * Resolve a marker's per-type numbers ("kb", [1,2,3]) to badge positions via
+ * `citationNumberMap`, dropping unmapped numbers and duplicates. Chunks merged
+ * into one badge (same document_key) all map to the same position, so a marker
+ * list like [cite_kb: 1..10] on one document renders "1", not "1,1,1,…".
+ */
+export function markerNumbersToGlobal(
+  type: string,
+  localNumbers: number[],
+  citationNumberMap: Record<string, number> | undefined
+): number[] {
+  return [...new Set(
+    localNumbers
+      .map((n) => citationNumberMap?.[`${type}:${n}`])
+      .filter((n): n is number => n !== undefined)
+  )];
 }
 
 function processCitationPart(

@@ -5,6 +5,8 @@
  * which stores it in the local SQLite database.
  */
 
+import { apiFetch } from './apiFetch';
+
 export type FeedbackRating = 'positive' | 'negative';
 
 export const FEEDBACK_TAGS = [
@@ -35,7 +37,7 @@ export async function submitFeedback(
   payload: SubmitFeedbackPayload,
   signal?: AbortSignal
 ): Promise<void> {
-  const response = await fetch('/api/submit-feedback', {
+  const response = await apiFetch('/api/submit-feedback', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),

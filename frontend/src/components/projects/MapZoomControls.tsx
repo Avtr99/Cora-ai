@@ -15,7 +15,7 @@ export const MapZoomControls: React.FC<MapZoomControlsProps> = ({ onZoomIn, onZo
       animate={{ opacity: 1, y: 0 }}
       transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.25, ease: 'easeOut', delay: 0.15 }}
       onClick={(e) => e.stopPropagation()}
-      className="absolute bottom-3 right-3 z-20 flex flex-col bg-surface-card/90 backdrop-blur-sm border border-border-ui rounded-xl shadow-xs overflow-hidden"
+      className="absolute bottom-3 right-3 z-20 flex flex-col bg-surface-card/90 backdrop-blur-xs border border-border-ui rounded-xl shadow-xs overflow-hidden"
       role="group"
       aria-label="Map zoom controls"
     >
@@ -50,7 +50,7 @@ const ZoomBtn: React.FC<{ onClick: () => void; label: string; children: React.Re
     type="button"
     onClick={onClick}
     aria-label={label}
-    className="w-8 h-8 flex items-center justify-center text-text-secondary hover:bg-surface-subtle hover:text-text-primary transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
+    className="w-8 h-8 flex items-center justify-center text-text-secondary hover:bg-surface-subtle hover:text-text-primary transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
   >
     {children}
   </button>

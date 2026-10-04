@@ -16,6 +16,8 @@ The query-cache key folds in every input that can change the answer so a
 stale entry is never served after a config or corpus change:
 
 - the normalized query (always present),
+- ``QUERY_CACHE_SCHEMA_VERSION`` — bump when answer/citation post-processing
+  changes so entries produced by an older pipeline are never served,
 - an optional retrieval-context fingerprint,
 - ``config_revision`` — bumped on any embedding/reranker/LLM model change,
 - ``corpus_revision`` — bumped once per ingestion batch,
@@ -46,6 +48,11 @@ logger = logging.getLogger(__name__)
 def generate_cache_key(prefix: str, text: str) -> str:
     """Generate a stable cache key from text content."""
     return f"{prefix}:{hashlib.sha256(text.encode()).hexdigest()}"
+
+
+# Bump when answer/citation post-processing changes so cached entries built
+# by an older pipeline are never served.
+QUERY_CACHE_SCHEMA_VERSION = 2
 
 
 def get_query_cache_key(query: str) -> str:
@@ -113,6 +120,7 @@ class QueryCache:
         key_material = json.dumps(
             {
                 "q": query,
+                "schema": QUERY_CACHE_SCHEMA_VERSION,
                 "ctx": context_fingerprint,
                 "cfg": revisions.get("config_revision", 0),
                 "corp": revisions.get("corpus_revision", 0),

@@ -7,6 +7,7 @@ from fastapi import HTTPException, Request
 from loguru import logger
 
 from ..config import get_settings
+from .query_history import open_turn
 from .query_models import (
     Message,
     Query,
@@ -17,43 +18,6 @@ from .query_models import (
 )
 from .query_sanitization import sanitize_quiz_payload
 from .query_service import process_query_core
-
-
-async def process_query(query: Query, request: Request) -> Response:
-    """
-    Process a user query using RAG pipeline with security sanitization.
-    
-    Args:
-        query: The query request
-        request: FastAPI request object
-        
-    Returns:
-        Response with answer, sources, and citations
-    """
-    try:
-        return await process_query_core(
-            query,
-            request,
-            include_reasoning=query.include_debug,
-            include_metadata=False,
-            include_duration_ms=False,
-            include_chat_history_in_orchestrator=True,
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        error_id = str(uuid.uuid4())[:8]
-        # Public log: only error type and ID (no sensitive query data)
-        logger.error(f"Error processing query [error_id={error_id}]: {type(e).__name__}")
-        # Secure audit log: full exception details with traceback (INFO ensures visibility in production)
-        logger.opt(depth=1).bind(audit=True, error_id=error_id).info(
-            "Full error details for debugging", exc_info=True
-        )
-        raise HTTPException(
-            status_code=500,
-            detail=f"Internal server error processing query (error_id: {error_id})"
-        )
 
 
 async def test_query(request: Request, test_request: TestQueryRequest) -> TestQueryResponse:
@@ -72,13 +36,14 @@ async def test_query(request: Request, test_request: TestQueryRequest) -> TestQu
     try:
         # Convert TestQueryRequest to Query and reuse the core pipeline
         query = Query(text=test_request.query, include_debug=test_request.include_reasoning)
+        ctx = await open_turn(query, request)
         response = await process_query_core(
             query,
             request,
+            ctx,
             include_reasoning=test_request.include_reasoning,
             include_metadata=True,
             include_duration_ms=True,
-            include_chat_history_in_orchestrator=False,
         )
         
         latency_ms = (time.time() - start_time) * 1000
@@ -136,7 +101,6 @@ __all__ = [
     "Response",
     "TestQueryRequest",
     "TestQueryResponse",
-    "process_query",
     "process_query_core",
     "sanitize_quiz_payload",
     "test_query",

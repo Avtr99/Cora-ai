@@ -63,7 +63,7 @@ export const MapLegend: React.FC<MapLegendProps> = ({ aggregates, totalProjects:
           onClick={() => setOpen((o) => !o)}
           aria-expanded={open}
           aria-controls="map-legend-body"
-          className="flex items-center gap-2 h-7 pl-2 pr-2.5 rounded-full bg-surface-card/90 backdrop-blur-sm border border-border-ui shadow-xs hover:shadow-card-sm transition-shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2"
+          className="flex items-center gap-2 h-7 pl-2 pr-2.5 rounded-full bg-surface-card/90 backdrop-blur-xs border border-border-ui shadow-xs hover:shadow-card-sm transition-shadow focus:outline-hidden focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2"
         >
           <span
             className="w-1.5 h-1.5 rounded-full bg-brand-500"
@@ -101,7 +101,7 @@ export const MapLegend: React.FC<MapLegendProps> = ({ aggregates, totalProjects:
               animate={{ opacity: 1, y: 0, height: 'auto' }}
               exit={{ opacity: 0, y: -4, height: 0 }}
               transition={{ duration: 0.2, ease: 'easeOut' }}
-              className="mt-1.5 w-[220px] 3xl:w-[260px] overflow-hidden bg-surface-card/95 backdrop-blur-sm border border-border-ui rounded-xl shadow-card-sm"
+              className="mt-1.5 w-[220px] 3xl:w-[260px] overflow-hidden bg-surface-card/95 backdrop-blur-xs border border-border-ui rounded-xl shadow-card-sm"
             >
               <div className="px-3 py-2">
                 <div className="font-poppins text-xs 3xl:text-[13px] 4xl:text-sm font-semibold text-text-muted uppercase tracking-widest mb-1.5">
@@ -111,13 +111,13 @@ export const MapLegend: React.FC<MapLegendProps> = ({ aggregates, totalProjects:
                   {scopes.map((s) => (
                     <div key={s.scope} className="flex items-center gap-2">
                       <span
-                        className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                        className="w-1.5 h-1.5 rounded-full shrink-0"
                         style={{ backgroundColor: s.color }}
                       />
                       <span className="font-inter text-[10.5px] 3xl:text-xs 4xl:text-sm text-text-primary leading-tight flex-1 truncate">
                         {s.scope}
                       </span>
-                      <span className="font-inter text-2xs 3xl:text-[11px] 4xl:text-[13px] text-text-muted tabular-nums flex-shrink-0">
+                      <span className="font-inter text-2xs 3xl:text-[11px] 4xl:text-[13px] text-text-muted tabular-nums shrink-0">
                         {s.count.toLocaleString()}
                       </span>
                     </div>
@@ -128,7 +128,7 @@ export const MapLegend: React.FC<MapLegendProps> = ({ aggregates, totalProjects:
               {unmappedCount > 0 && (
                 <div className="px-3 py-1.5 border-t border-surface-subtle">
                   <div className="flex items-start gap-1.5">
-                    <svg className="w-3 h-3 text-text-muted flex-shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <svg className="w-3 h-3 text-text-muted shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                       <circle cx="12" cy="12" r="10"/>
                       <path d="M12 16v-4M12 8h.01"/>
                     </svg>

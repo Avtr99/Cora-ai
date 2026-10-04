@@ -102,7 +102,7 @@ const DesktopGlossaryTerm: React.FC<{ text: string; entry: GlossaryEntry }> = ({
   <HoverCard openDelay={200} closeDelay={100}>
     <HoverCardTrigger asChild>
       <span
-        className="cursor-help underline decoration-dotted decoration-brand-500/50 underline-offset-2 hover:bg-brand-100/60 rounded-sm px-0.5 -mx-0.5 transition-colors duration-150"
+        className="cursor-help underline decoration-dotted decoration-brand-500/50 underline-offset-2 hover:bg-brand-100/60 rounded-xs px-0.5 -mx-0.5 transition-colors duration-150"
         role="term"
         title="Hover for definition"
       >
@@ -127,7 +127,7 @@ const MobileGlossaryTerm: React.FC<{ text: string; entry: GlossaryEntry }> = ({ 
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <span
-          className="cursor-pointer underline decoration-dotted decoration-brand-500/60 underline-offset-2 active:bg-brand-100/60 rounded-sm px-0.5 -mx-0.5"
+          className="cursor-pointer underline decoration-dotted decoration-brand-500/60 underline-offset-2 active:bg-brand-100/60 rounded-xs px-0.5 -mx-0.5"
           role="term"
           aria-expanded={open}
           title="Tap for definition"

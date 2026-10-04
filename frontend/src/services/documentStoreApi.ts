@@ -1,3 +1,5 @@
+import { apiFetch } from './apiFetch';
+
 export type DocumentStatus =
   | 'queued'
   | 'reading'
@@ -121,7 +123,7 @@ async function parseError(response: Response): Promise<string> {
 }
 
 async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, init);
+  const response = await apiFetch(url, init);
   if (!response.ok) {
     throw new Error(await parseError(response));
   }

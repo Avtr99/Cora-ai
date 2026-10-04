@@ -76,9 +76,12 @@ def enforce_word_limit(text: str, max_words: int = 650) -> Tuple[str, bool]:
 
     The algorithm:
     1. If under limit → return as-is.
-    2. Walk sentence boundaries. Keep the last boundary whose cumulative
+    2. Prefer the last paragraph boundary (``\\n\\n``) whose prefix fits
+       ``max_words``, so a kept paragraph never loses the citation marker
+       at its end.
+    3. Walk sentence boundaries. Keep the last boundary whose cumulative
        word count is ≤ ``max_words``. Skip numeric list markers at line start.
-    3. If no sentence boundary exists before the limit, fall back to a
+    4. If no sentence boundary exists before the limit, fall back to a
        word-level cut (rare with well-formed prose).
 
     Returns:
@@ -91,6 +94,18 @@ def enforce_word_limit(text: str, max_words: int = 650) -> Tuple[str, bool]:
     words = text.split()
     if len(words) <= max_words:
         return text, False
+
+    # Prefer a paragraph boundary: cutting mid-paragraph would drop a
+    # paragraph-ending citation marker the answer already emitted.
+    best_para = 0
+    for match in re.finditer(r"\n\n", text):
+        pos = match.start()
+        if len(text[:pos].split()) <= max_words:
+            best_para = pos
+        else:
+            break
+    if best_para > 0:
+        return text[:best_para].rstrip(), True
 
     # Find sentence boundaries, filtering out numeric list markers at line start
     boundaries: list[int] = []

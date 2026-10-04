@@ -39,12 +39,11 @@ from .orchestrator_utils import (
 from .rewrite_handler import RewriteHandler
 from .routing_handler import RoutingHandler
 from .conversational_handler import ConversationalHandler
-from ..config import get_settings, get_collection_threshold
+from ..config import get_settings
 from ..citations import CitationManager
 from ..query_processing.filter_extractor import extract_filters
 from ..query_processing.fallback_answers import is_cacheable_answer
 from ..query_processing.llm_provider import LLMClient
-from ..query_processing.citation_verifier import renumber_citation_markers
 
 logger = logging.getLogger(__name__)
 
@@ -149,11 +148,7 @@ class RAGOrchestrator:
         # relevance model (model_relevance), which resolves to the provider's lite
         # or main model by default.
         self.validator = validator or AnswerValidator(llm_client, model_name)
-        self.citation_manager = CitationManager(
-            min_relevance_score=get_collection_threshold(
-                settings, "CITATION_MIN_RELEVANCE_SCORE"
-            )
-        )
+        self.citation_manager = CitationManager()
 
         # Initialize handlers with in-memory + SQLite caching
         self.rewrite_handler = RewriteHandler(
@@ -576,33 +571,17 @@ class RAGOrchestrator:
             
             # Extract and format citations
             citations = result.get("citations", [])
-            answer_text = result.get("answer", "")
 
             if result.get("_citations_finalized"):
-                # Route processor already filtered, suppressed, aligned, and
-                # renumbered.  Skip the redundant work and go straight to
-                # response formatting.
+                # Route processor already selected the cited subset.
                 filtered_citations = citations
             else:
-                # No finalization callback ran — do it here.
-                filtered_citations = self.citation_manager.filter_citations_by_answer(
-                    citations, answer_text, query=query
+                # No finalization callback ran — select the cited sources
+                # from the answer's own markers here instead.
+                self.citation_manager.finalize(
+                    result, query, result.get("coverage_score", 1.0)
                 )
-
-                coverage_score = result.get("coverage_score", 1.0)
-                if self.citation_manager.should_suppress_citations(
-                    query, answer_text, filtered_citations, coverage_score
-                ):
-                    filtered_citations = []
-
-                # Renumber inline citation markers so their numbers match the
-                # filtered citation list. Markers referencing filtered-out
-                # sources are removed. Also runs when filtered is empty
-                # (suppressed) to strip orphaned markers.
-                if answer_text and (filtered_citations or citations):
-                    renumbered = renumber_citation_markers(answer_text, citations, filtered_citations)
-                    if renumbered != answer_text:
-                        result["answer"] = renumbered
+                filtered_citations = result["citations"]
 
             citation_info = self.citation_manager.format_citations_for_response(
                 filtered_citations,

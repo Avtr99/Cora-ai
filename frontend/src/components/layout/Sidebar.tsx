@@ -184,7 +184,7 @@ export const Sidebar: React.FC = () => {
 
       <motion.aside
         id="mobile-sidebar"
-        className={`bg-surface-base flex flex-col overflow-hidden border-r border-border-ui ${isMobile ? 'fixed top-0 left-0 h-[100dvh] max-h-[100dvh] z-50' : 'h-full'}`}
+        className={`bg-surface-base flex flex-col overflow-hidden border-r border-border-ui ${isMobile ? 'fixed top-0 left-0 h-dvh max-h-dvh z-50' : 'h-full'}`}
         initial={false}
         animate={isMobile ? { x: mobileOpen ? 0 : -256 } : { width: isCollapsed ? collapsedWidth : expandedWidth }}
         transition={shouldReduceMotion ? { duration: 0 } : (isMobile ? { duration: 0.18, ease: 'easeOut' } : { duration: 0.16, ease: 'easeOut' })}
@@ -195,13 +195,13 @@ export const Sidebar: React.FC = () => {
         }}
       >
         {/* Header: Cora Logo + Toggle Button */}
-        <div className={`flex items-center flex-shrink-0 ${isCollapsed ? 'justify-center pt-3.5 3xl:pt-4 4xl:pt-6 px-3.5' : 'justify-between px-4 3xl:px-5 pt-4 md:pt-5 3xl:pt-6'} pb-2 3xl:pb-3 4xl:pb-4`}>
+        <div className={`flex items-center shrink-0 ${isCollapsed ? 'justify-center pt-3.5 3xl:pt-4 4xl:pt-6 px-3.5' : 'justify-between px-4 3xl:px-5 pt-4 md:pt-5 3xl:pt-6'} pb-2 3xl:pb-3 4xl:pb-4`}>
           <button
             onClick={() => {
               if (isMobile) return setMobileOpen(false);
               if (isCollapsed) toggleSidebar();
             }}
-            className="flex items-center justify-center cursor-pointer bg-surface-card rounded-xl w-10 h-10 3xl:w-12 3xl:h-12 4xl:w-16 4xl:h-16 overflow-hidden flex-shrink-0"
+            className="flex items-center justify-center cursor-pointer bg-surface-card rounded-xl w-10 h-10 3xl:w-12 3xl:h-12 4xl:w-16 4xl:h-16 overflow-hidden shrink-0"
             aria-label="Cora Logo"
           >
             <img
@@ -225,7 +225,7 @@ export const Sidebar: React.FC = () => {
         </div>
 
         {/* New Chat Button */}
-        <div className={`flex-shrink-0 ${isCollapsed ? 'flex justify-center px-3.5 mt-3 3xl:mt-4 4xl:mt-6 pb-2 3xl:pb-3 4xl:pb-4' : 'px-4 3xl:px-5 mt-3 3xl:mt-4 pb-2'}`}>
+        <div className={`shrink-0 ${isCollapsed ? 'flex justify-center px-3.5 mt-3 3xl:mt-4 4xl:mt-6 pb-2 3xl:pb-3 4xl:pb-4' : 'px-4 3xl:px-5 mt-3 3xl:mt-4 pb-2'}`}>
           {isCollapsed ? (
             <motion.button
               className="flex items-center justify-center w-10 h-10 3xl:w-12 3xl:h-12 4xl:w-16 4xl:h-16 bg-surface-card border border-border-ui rounded-full hover:bg-surface-subtle transition-colors"
@@ -250,7 +250,7 @@ export const Sidebar: React.FC = () => {
         </div>
 
         {/* Navigation Items */}
-        <nav className={`flex flex-col flex-shrink-0 ${isCollapsed ? 'items-center gap-2 3xl:gap-3 4xl:gap-4 px-3.5 mt-2 3xl:mt-3 4xl:mt-4' : 'px-4 3xl:px-5 gap-2 3xl:gap-3 mt-2 3xl:mt-3'}`}>
+        <nav className={`flex flex-col shrink-0 ${isCollapsed ? 'items-center gap-2 3xl:gap-3 4xl:gap-4 px-3.5 mt-2 3xl:mt-3 4xl:mt-4' : 'px-4 3xl:px-5 gap-2 3xl:gap-3 mt-2 3xl:mt-3'}`}>
           <NavItem
             to="/case-studies/"
             label="Case studies"
@@ -299,7 +299,7 @@ export const Sidebar: React.FC = () => {
 
         {/* Separator between nav and chat history */}
         {!isCollapsed && (
-          <div className="mx-4 3xl:mx-5 mt-5 3xl:mt-6 border-t border-surface-subtle flex-shrink-0" />
+          <div className="mx-4 3xl:mx-5 mt-5 3xl:mt-6 border-t border-surface-subtle shrink-0" />
         )}
 
         <ChatListSection
@@ -325,7 +325,7 @@ export const Sidebar: React.FC = () => {
         />
 
         {/* Footer: About & User Menu */}
-        <div className="mt-auto flex-shrink-0 border-t border-surface-subtle/60 pt-3 3xl:pt-4">
+        <div className="mt-auto shrink-0 border-t border-surface-subtle/60 pt-3 3xl:pt-4">
           <div className={`${isCollapsed ? 'flex flex-col items-center gap-2.5 px-3.5' : 'px-4 3xl:px-5'} pb-3 md:pb-5 3xl:pb-6 4xl:pb-8`}>
             {/* User Menu */}
             <UserMenu

@@ -52,7 +52,7 @@ export const DocumentRow: React.FC<DocumentRowProps> = ({
         type="button"
         onClick={() => onSelect(document.id)}
         aria-label={`Open preview of ${document.original_filename}`}
-        className="absolute inset-0 z-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
+        className="absolute inset-0 z-0 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
       />
       <div className="relative z-10 grid grid-cols-[1fr_90px_80px_64px] sm:grid-cols-[1fr_100px_90px_64px] 3xl:grid-cols-[1fr_140px_130px_96px] 4xl:grid-cols-[1fr_160px_150px_112px] items-center gap-3 3xl:gap-4 px-4 3xl:px-6 4xl:px-8 py-3 3xl:py-4 4xl:py-5 pointer-events-none">
         <div className="flex items-center gap-3 3xl:gap-4 min-w-0 pointer-events-none">

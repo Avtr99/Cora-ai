@@ -39,6 +39,7 @@ from .storage import (
     get_document_including_deleted,
     release_document_lock,
     remove_document_files,
+    set_document_metadata,
     try_acquire_document_lock,
     update_document,
     update_job,
@@ -209,16 +210,7 @@ async def _process_document_job_inner(document_id: str, job_id: str) -> None:
         # Persist the VCM metadata extracted during conversion so the indexer
         # and RAG pipeline read from a single source of truth.
         start = time.perf_counter()
-        meta = result.metadata
-        record = update_document(
-            document_id,
-            title=meta.get("title"),
-            registry=meta.get("registry"),
-            category=meta.get("category"),
-            publisher=meta.get("publisher"),
-            document_id=meta.get("document_id"),
-            version_number=meta.get("version_number"),
-        )
+        record = set_document_metadata(document_id, result.metadata)
         _log_ingestion_stage("job", "metadata_extraction", document_id, job_id, time.perf_counter() - start)
 
         update_job(job_id, "processing", "Adding document to Cora")
@@ -275,16 +267,7 @@ async def _reindex_document_job_inner(document_id: str, job_id: str) -> None:
 
             # Persist freshly extracted VCM metadata.
             start = time.perf_counter()
-            meta = result.metadata
-            record = update_document(
-                document_id,
-                title=meta.get("title"),
-                registry=meta.get("registry"),
-                category=meta.get("category"),
-                publisher=meta.get("publisher"),
-                document_id=meta.get("document_id"),
-                version_number=meta.get("version_number"),
-            )
+            record = set_document_metadata(document_id, result.metadata)
             _log_ingestion_stage("job", "metadata_extraction", document_id, job_id, time.perf_counter() - start)
             record = _refresh_record(document_id, job_id)
             if record is None:

@@ -89,7 +89,7 @@ export const ScrollToTop: React.FC<ScrollToTopProps> = ({
   const isCompact = variant === 'compact';
   const buttonSize = isCompact ? 'w-8 h-8 3xl:w-10 3xl:h-10' : 'w-12 h-12 3xl:w-14 3xl:h-14 4xl:w-16 4xl:h-16';
   const iconSize = isCompact ? 16 : 20;
-  const iconClass = isCompact ? '3xl:!w-5 3xl:!h-5' : '3xl:!w-6 3xl:!h-6 4xl:!w-7 4xl:!h-7';
+  const iconClass = isCompact ? '3xl:w-5! 3xl:h-5!' : '3xl:w-6! 3xl:h-6! 4xl:w-7! 4xl:h-7!';
   // Shift up when CompareBar is visible so the button doesn't overlap
   const bottomClass = hasCompareBar ? 'bottom-20 3xl:bottom-24 4xl:bottom-28' : 'bottom-8 3xl:bottom-10 4xl:bottom-12';
   const position = `${bottomClass} right-8 3xl:right-[max(2.5rem,calc((100vw-1600px)/2-8.5rem))] 4xl:right-[max(3rem,calc((100vw-1800px)/2-9rem))]`;
@@ -104,7 +104,7 @@ export const ScrollToTop: React.FC<ScrollToTopProps> = ({
     >
       <button
         onClick={scrollToTop}
-        className={`${buttonSize} flex items-center justify-center rounded-full bg-surface-card/90 backdrop-blur-sm border border-border-ui shadow-scroll-btn text-text-muted transition-all duration-200 hover:shadow-card-md active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-focus focus-visible:ring-offset-surface-card`}
+        className={`${buttonSize} flex items-center justify-center rounded-full bg-surface-card/90 backdrop-blur-xs border border-border-ui shadow-scroll-btn text-text-muted transition-all duration-200 hover:shadow-card-md active:scale-95 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-focus focus-visible:ring-offset-surface-card`}
         aria-label="Scroll to top"
       >
         <IconWrapper

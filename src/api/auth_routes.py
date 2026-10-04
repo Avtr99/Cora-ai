@@ -59,16 +59,23 @@ async def get_token(request: TokenRequest):
     ```
     """
     settings = get_settings()
-    if not settings.ENABLE_INSECURE_TOKEN_ENDPOINT:
+    # Requires API-key protection too: without it the endpoint is reachable
+    # by anyone who can hit the API, and it mints a JWT for ANY user_id —
+    # i.e. unauthenticated access to every user's memory. With protection on,
+    # only an instance-credential holder (X-API-Key or session cookie) can
+    # reach this handler in the first place.
+    if not (
+        settings.ENABLE_INSECURE_TOKEN_ENDPOINT
+        and settings.ENABLE_API_KEY_PROTECTION
+    ):
         raise HTTPException(status_code=404, detail="Endpoint not available")
     
     try:
         # Create JWT token for the user
         token = create_access_token(user_id=request.user_id)
         # Use a safe anonymization that doesn't expose secret key absence
-        anonymized_id = hashlib.sha256(
-            request.user_id.encode("utf-8")
-        ).hexdigest()[:8]
+        # codeql[py/weak-sensitive-data-hashing] -- log pseudonymization, not password storage
+        anonymized_id = hashlib.sha256(request.user_id.encode("utf-8")).hexdigest()[:8]
         logger.info(f"Issued token for user hash: {anonymized_id}")
         
         return TokenResponse(

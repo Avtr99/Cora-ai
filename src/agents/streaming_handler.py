@@ -24,6 +24,7 @@ from .route_processor_utils import (
     try_serve_cached_answer,
 )
 from ..citations import CitationManager
+from ..citations.context import citations_from_result
 from ..query_processing.fallback_answers import is_non_answer
 
 logger = logging.getLogger(__name__)
@@ -284,17 +285,11 @@ class KBStreamingHandler:
                     return
 
             # Ensure citation objects are present before finalization. The
-            # non-streaming RAG client returns source names but not Citation
-            # objects; without them the finalization callback cannot align
-            # inline markers with source badges.
-            if result and not result.get("_citations_finalized"):
-                result.setdefault(
-                    "citations",
-                    self.citation_manager.extract_citations_from_vector_results(
-                        vector_results,
-                        max_citations=5,
-                    ),
-                )
+            # prompt's own context citations ride along on the result, so the
+            # finalization callback can align inline markers with source
+            # badges using the same numbering.
+            if result and not result.get("_citations_finalized") and "citations" not in result:
+                result["citations"] = citations_from_result(result)
 
             if finalize_citations_callback:
                 try:
@@ -434,18 +429,12 @@ class KBStreamingHandler:
                 yield {"type": "final", "result": web_result}
                 return
 
-        # Finalize and emit citations. The streaming RAG wrapper returns source
-        # names but not Citation objects; extract them so the finalization
-        # callback can align inline markers with source badges.
+        # Finalize and emit citations. The streamed result carries the
+        # prompt's own context citations, so finalization aligns inline
+        # markers with source badges using the same numbering.
         final_result = result or {}
-        if final_result and not final_result.get("_citations_finalized"):
-            final_result.setdefault(
-                "citations",
-                self.citation_manager.extract_citations_from_vector_results(
-                    vector_results,
-                    max_citations=5,
-                ),
-            )
+        if final_result and not final_result.get("_citations_finalized") and "citations" not in final_result:
+            final_result["citations"] = citations_from_result(final_result)
 
         if finalize_citations_callback:
             try:

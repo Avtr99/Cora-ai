@@ -20,8 +20,6 @@ from .route_processor_utils import get_relevance_checker
 from .kb_route_handler import KBRouteHandler
 from .web_route_handler import WebRouteHandler
 from .hybrid_route_handler import HybridRouteHandler
-from ..query_processing.citation_verifier import renumber_citation_markers
-from ..query_processing.fallback_answers import has_error_source_marker
 
 if TYPE_CHECKING:
     from .reasoning_formatter import AgentStep
@@ -91,61 +89,8 @@ class RouteProcessor:
         query: str,
         coverage_score: float = 1.0,
     ) -> None:
-        """Apply citation filtering/suppression and keep sources aligned."""
-        citations = result.get("citations") or []
-        answer = result.get("answer", "")
-
-        filtered = self.citation_manager.filter_citations_by_answer(
-            citations, answer, query=query
-        )
-
-        # Align the citation list with the citation format actually used in the
-        # answer. If the answer cites web sources, drop KB citations that only
-        # made it through on generic snippet overlap. If the answer cites KB
-        # sources, drop web citations. This prevents a web-based answer from
-        # showing KB documents and vice versa.
-        if filtered:
-            answer_lower = answer.lower()
-            has_web_markers = "[web, cite:" in answer_lower or "[source_" in answer_lower
-            has_kb_markers = "[cite_kb:" in answer_lower or "[knowledge base," in answer_lower
-
-            if has_web_markers and not has_kb_markers:
-                filtered = [c for c in filtered if c.source_type == "web"]
-            elif has_kb_markers and not has_web_markers:
-                filtered = [c for c in filtered if c.source_type != "web"]
-
-        if self.citation_manager.should_suppress_citations(
-            query, answer, filtered, coverage_score
-        ):
-            filtered = []
-
-        # Renumber inline citation markers so their numbers match the filtered
-        # citation list. Markers referencing filtered-out sources are removed.
-        # Also runs when filtered is empty (suppressed) to strip orphaned markers.
-        if answer and (filtered or citations):
-            renumbered = renumber_citation_markers(answer, citations, filtered)
-            if renumbered != answer:
-                result["answer"] = renumbered
-
-        result["citations"] = filtered
-        result["_citations_finalized"] = True
-        if filtered:
-            sources = []
-            for c in filtered:
-                source_name = getattr(c, "source_name", None)
-                source_type = getattr(c, "source_type", None)
-                if source_name is None:
-                    continue
-                if source_type == "web":
-                    sources.append(source_name)
-                else:
-                    cleaned_name = self.citation_manager.clean_source_name(source_name)
-                    # Only append if non-None and non-empty after stripping
-                    if cleaned_name and cleaned_name.strip():
-                        sources.append(cleaned_name)
-            result["sources"] = sources
-        elif not has_error_source_marker(result.get("sources")):
-            result["sources"] = []
+        """Select the displayed citations from the answer's own markers."""
+        self.citation_manager.finalize(result, query, coverage_score)
     
     async def process_kb_route(
         self,

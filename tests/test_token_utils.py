@@ -78,14 +78,14 @@ class TestDecodeAccessToken:
         assert "iat" in payload
 
     def test_decode_expired_token(self):
-        """An expired token raises JWTError with code JWT_EXPIRED."""
+        """An expired token raises JWTError."""
         token = create_access_token(
             user_id="user-123",
             expires_delta=timedelta(seconds=-1)
         )
         with pytest.raises(JWTError) as exc_info:
             decode_access_token(token)
-        assert exc_info.value.error_code == "JWT_EXPIRED"
+        assert "expired" in exc_info.value.message
 
     def test_decode_invalid_signature(self):
         """A token signed with a different secret is rejected."""
@@ -95,13 +95,13 @@ class TestDecodeAccessToken:
             mock_settings.return_value.JWT_ALGORITHM = "HS256"
             with pytest.raises(JWTError) as exc_info:
                 decode_access_token(token)
-            assert exc_info.value.error_code == "JWT_INVALID"
+            assert "Invalid token" in exc_info.value.message
 
     def test_decode_malformed_token(self):
         """A malformed token raises JWTError."""
         with pytest.raises(JWTError) as exc_info:
             decode_access_token("not-a-jwt")
-        assert exc_info.value.error_code == "JWT_INVALID"
+        assert "Invalid token" in exc_info.value.message
 
     def test_decode_wrong_token_type(self):
         """A token with wrong 'type' claim is rejected."""
@@ -118,31 +118,30 @@ class TestDecodeAccessToken:
         token = jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm="HS256")
         with pytest.raises(JWTError) as exc_info:
             decode_access_token(token)
-        assert exc_info.value.error_code == "JWT_INVALID_TYPE"
+        assert "token type" in exc_info.value.message
 
 
 class TestJWTSecretKeyValidation:
     """Tests for JWT_SECRET_KEY configuration validation."""
 
     def test_missing_secret_key_raises_config_error(self):
-        """Missing JWT_SECRET_KEY raises JWT_CONFIG_ERROR."""
+        """Missing JWT_SECRET_KEY raises JWTError."""
         with patch("src.api.auth.token_utils.get_settings") as mock_settings:
             mock_settings.return_value.JWT_SECRET_KEY = None
             mock_settings.return_value.JWT_ALGORITHM = "HS256"
             mock_settings.return_value.JWT_ACCESS_TOKEN_EXPIRE_MINUTES = 60
             with pytest.raises(JWTError) as exc_info:
                 create_access_token(user_id="user-123")
-            assert exc_info.value.error_code == "JWT_CONFIG_ERROR"
+            assert "JWT_SECRET_KEY" in exc_info.value.message
 
     def test_short_secret_key_raises_config_error(self):
-        """JWT_SECRET_KEY shorter than 32 bytes raises JWT_CONFIG_ERROR."""
+        """JWT_SECRET_KEY shorter than 32 bytes raises JWTError."""
         with patch("src.api.auth.token_utils.get_settings") as mock_settings:
             mock_settings.return_value.JWT_SECRET_KEY = "short-secret"
             mock_settings.return_value.JWT_ALGORITHM = "HS256"
             mock_settings.return_value.JWT_ACCESS_TOKEN_EXPIRE_MINUTES = 60
             with pytest.raises(JWTError) as exc_info:
                 create_access_token(user_id="user-123")
-            assert exc_info.value.error_code == "JWT_CONFIG_ERROR"
             assert "32 bytes" in exc_info.value.message
 
     def test_exactly_32_byte_secret_key_is_accepted(self):

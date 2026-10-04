@@ -7,7 +7,6 @@
 
 export type {
   AgentReasoningStep,
-  ChatHistoryMessage,
   CoraResponse,
   CitationResponse,
   QueryCoraOptions,
@@ -29,5 +28,5 @@ export type {
 } from './cora/types';
 
 export { buildAgentReasoning } from './cora/agentReasoning';
-export { queryCoraStream } from './cora/streaming';
+export { queryCoraStream, toCoraResponse, validateQueryResponse } from './cora/streaming';
 export { checkHealth } from './cora/healthCheck';

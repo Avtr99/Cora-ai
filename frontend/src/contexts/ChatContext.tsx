@@ -5,6 +5,7 @@ import type { ChatContextType } from './useChatContext';
 import { useChatStore, useActiveChat } from '@/store/chatStore.simple';
 import type { Chat } from '@/store/chatStore.types';
 import { useChatActions } from './chat/useChatActions';
+import { loadChatList, loadChatMessages } from './chat/chatSync';
 
 interface ChatProviderProps {
   children: ReactNode;
@@ -13,11 +14,9 @@ interface ChatProviderProps {
 /**
  * ChatProvider - Simplified using Zustand for state management
  *
- * Changes from old version:
- * - No useState for chats (using Zustand)
- * - No useRef for chatsRef (Zustand's getState() always fresh)
- * - No localStorage useEffects (Zustand persist middleware handles it)
- * - 558 lines shorter!
+ * Chats live on the server (Phase 7): on mount the chat list is fetched and
+ * each chat's messages are loaded on demand when it becomes active. The
+ * store is memory-only — sign-out unmounts this provider and clears it.
  */
 export function ChatProvider({ children }: ChatProviderProps) {
   // ==========================================
@@ -25,6 +24,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
   // ==========================================
   const chats = useChatStore((state) => state.chats);
   const activeChat = useActiveChat();
+  const loadingChatIds = useChatStore((state) => state.loadingChatIds);
   const { addChat, updateChat, deleteChat: deleteChatFromStore, setActiveChat: setActiveChatId } = useChatStore();
 
   // UI state (not persisted) - still use useState
@@ -47,8 +47,25 @@ export function ChatProvider({ children }: ChatProviderProps) {
     };
   }, []);
 
-  // Computed property
+  // Load the server chat list once per mount. On re-login the auth status
+  // flips back from 'required', AuthGate remounts this provider, and the
+  // list is fetched again (clearAll reset listStatus to 'idle').
+  useEffect(() => {
+    void loadChatList();
+  }, []);
+
+  // Fetch a server-listed chat's messages when it becomes active.
+  const activeChatId = activeChat?.id;
+  const activeMessagesLoaded = activeChat?.messagesLoaded;
+  useEffect(() => {
+    if (activeChatId && activeMessagesLoaded === false) {
+      void loadChatMessages(activeChatId);
+    }
+  }, [activeChatId, activeMessagesLoaded]);
+
+  // Computed properties
   const isTyping = activeChat ? typingChatIds.has(activeChat.id) : false;
+  const isLoadingMessages = activeChat ? loadingChatIds.includes(activeChat.id) : false;
 
   // External dependencies
   const { userProfile } = useUserContext();
@@ -129,6 +146,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
     chats,
     activeChat,
     isTyping,
+    isLoadingMessages,
     createNewChat,
     prepareNewChat,
     setActiveChat: handleSetActiveChat,
@@ -142,6 +160,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
     chats,
     activeChat,
     isTyping,
+    isLoadingMessages,
     createNewChat,
     prepareNewChat,
     handleSetActiveChat,

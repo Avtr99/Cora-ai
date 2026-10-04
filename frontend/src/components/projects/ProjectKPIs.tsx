@@ -84,7 +84,7 @@ export const ProjectKPIs: React.FC<ProjectKPIsProps> = ({ projects, filteredCoun
         
         {/* Card 1: Projects */}
         <div className={cardClass}>
-          <h2 className="font-poppins text-2xs 3xl:text-xs 4xl:text-sm font-semibold text-text-muted uppercase tracking-[0.14em]">Projects</h2>
+          <h2 className="font-poppins text-2xs 3xl:text-xs 4xl:text-sm font-semibold text-text-muted uppercase tracking-widest">Projects</h2>
           <div className="flex flex-col pt-3 3xl:pt-4">
             <div className="flex items-baseline gap-1.5">
               <span className="font-poppins font-semibold text-[1.6rem] 3xl:text-4xl leading-none text-text-primary tracking-tight tabular-nums">
@@ -105,7 +105,7 @@ export const ProjectKPIs: React.FC<ProjectKPIsProps> = ({ projects, filteredCoun
 
         {/* Card 2: Volume */}
         <div className={cardClass}>
-          <h2 className="font-poppins text-2xs 3xl:text-xs 4xl:text-sm font-semibold text-text-muted uppercase tracking-[0.14em]">Volume Issued</h2>
+          <h2 className="font-poppins text-2xs 3xl:text-xs 4xl:text-sm font-semibold text-text-muted uppercase tracking-widest">Volume Issued</h2>
           <div className="flex flex-col pt-3 3xl:pt-4">
             <span className="font-poppins font-semibold text-[1.6rem] 3xl:text-4xl leading-none text-text-primary tracking-tight tabular-nums">
               {formatCredits(stats.totalIssued)}
@@ -119,7 +119,7 @@ export const ProjectKPIs: React.FC<ProjectKPIsProps> = ({ projects, filteredCoun
 
         {/* Card 3: Quality Standards */}
         <div className={cardClass}>
-          <h2 className="font-poppins text-2xs 3xl:text-xs 4xl:text-sm font-semibold text-text-muted uppercase tracking-[0.14em]">Quality Standards</h2>
+          <h2 className="font-poppins text-2xs 3xl:text-xs 4xl:text-sm font-semibold text-text-muted uppercase tracking-widest">Quality Standards</h2>
           <div className="flex flex-col gap-[5px] 3xl:gap-1.5 pt-3 3xl:pt-4">
             {stats.registryData.map((r) => {
               const rawPct = registryTotal > 0 ? (r.value / registryTotal) * 100 : 0;
@@ -130,10 +130,10 @@ export const ProjectKPIs: React.FC<ProjectKPIsProps> = ({ projects, filteredCoun
                   <span className="font-poppins text-[11px] 3xl:text-[13px] 4xl:text-sm font-medium text-text-secondary tracking-wide flex-1 min-w-0 truncate">
                     {label}
                   </span>
-                  <span className="font-poppins font-semibold text-[11px] 3xl:text-[13px] 4xl:text-sm text-text-primary tabular-nums w-[32px] 3xl:w-[40px] text-right flex-shrink-0">
+                  <span className="font-poppins font-semibold text-[11px] 3xl:text-[13px] 4xl:text-sm text-text-primary tabular-nums w-[32px] 3xl:w-[40px] text-right shrink-0">
                     {pct}%
                   </span>
-                  <span className="font-inter text-2xs 3xl:text-xs 4xl:text-[13px] text-text-muted tabular-nums w-[40px] 3xl:w-[48px] text-right flex-shrink-0">
+                  <span className="font-inter text-2xs 3xl:text-xs 4xl:text-[13px] text-text-muted tabular-nums w-[40px] 3xl:w-[48px] text-right shrink-0">
                     {r.value.toLocaleString()}
                   </span>
                 </div>
@@ -144,7 +144,7 @@ export const ProjectKPIs: React.FC<ProjectKPIsProps> = ({ projects, filteredCoun
 
         {/* Card 4: Methodology Split */}
         <div className={cardClass}>
-          <h2 className="font-poppins text-2xs 3xl:text-xs 4xl:text-sm font-semibold text-text-muted uppercase tracking-[0.14em]">Methodology Split</h2>
+          <h2 className="font-poppins text-2xs 3xl:text-xs 4xl:text-sm font-semibold text-text-muted uppercase tracking-widest">Methodology Split</h2>
           <div className="flex flex-col pt-3 3xl:pt-4">
             {stats.rrTotal > 0 ? (
               <>
@@ -152,7 +152,7 @@ export const ProjectKPIs: React.FC<ProjectKPIsProps> = ({ projects, filteredCoun
                   {stats.rrData.map((r) => (
                     <div key={r.name} className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5 3xl:gap-2">
-                        <span className="w-1.5 h-1.5 3xl:w-2 3xl:h-2 rounded-sm" style={{ backgroundColor: RR_COLORS[r.name] || RR_COLORS.Other }}></span>
+                        <span className="w-1.5 h-1.5 3xl:w-2 3xl:h-2 rounded-xs" style={{ backgroundColor: RR_COLORS[r.name] || RR_COLORS.Other }}></span>
                         <span className="font-poppins text-[11px] 3xl:text-[13px] 4xl:text-sm font-medium text-text-secondary tracking-wide">{r.name}</span>
                       </div>
                       <span className="font-poppins font-semibold text-[11px] 3xl:text-[13px] 4xl:text-sm text-text-primary tabular-nums">

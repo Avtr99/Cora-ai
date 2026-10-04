@@ -4,56 +4,14 @@ Used by ``AsyncQueryJobManager`` so queued and in-flight jobs survive restarts.
 All functions are synchronous and run inside ``asyncio.to_thread`` from the
 async manager.
 
-The table is created by migration ``007_async_query_jobs.sql`` at startup via
-``run_migrations()``. ``ensure_schema()`` is called once during manager startup
-as a safety net for environments that bypass migrations (e.g. tests).
+The table is created by migration ``011_users_and_chats.sql`` at startup via
+``run_migrations()``, which always runs before the job manager starts (B4).
 """
 
 import json
 from typing import Any, Dict, List, Optional
 
 from .database import get_connection
-
-
-def ensure_schema() -> None:
-    """Create the table + indexes if missing. Called once per manager start.
-
-    ``CREATE TABLE IF NOT EXISTS`` is a cheap no-op when the migration already
-    created the table, so this is safe to call even when migrations ran first.
-    """
-    conn = get_connection()
-    try:
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS async_query_jobs (
-                job_id TEXT PRIMARY KEY,
-                status TEXT NOT NULL,
-                submitted_at TEXT NOT NULL,
-                started_at TEXT,
-                completed_at TEXT,
-                payload TEXT NOT NULL,
-                result TEXT,
-                error TEXT,
-                expires_at REAL,
-                client_request_id TEXT
-            )
-            """
-        )
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_async_query_jobs_status "
-            "ON async_query_jobs(status)"
-        )
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_async_query_jobs_expires_at "
-            "ON async_query_jobs(expires_at)"
-        )
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_async_query_jobs_client_request_id "
-            "ON async_query_jobs(client_request_id)"
-        )
-        conn.commit()
-    finally:
-        conn.close()
 
 
 def _loads(value: Optional[str]) -> Any:
@@ -84,26 +42,27 @@ def create_job(
     job_id: str,
     payload: Dict[str, Any],
     submitted_at: str,
+    user_id: str,
     client_request_id: Optional[str] = None,
 ) -> None:
-    """Insert a new queued job."""
+    """Insert a new queued job owned by ``user_id``."""
     conn = get_connection()
     try:
         conn.execute(
             """
             INSERT INTO async_query_jobs
-            (job_id, status, submitted_at, payload, client_request_id, expires_at)
-            VALUES (?, 'queued', ?, ?, ?, NULL)
+            (job_id, user_id, status, submitted_at, payload, client_request_id, expires_at)
+            VALUES (?, ?, 'queued', ?, ?, ?, NULL)
             """,
-            (job_id, submitted_at, _dumps(payload), client_request_id),
+            (job_id, user_id, submitted_at, _dumps(payload), client_request_id),
         )
         conn.commit()
     finally:
         conn.close()
 
 
-def get_job_public(job_id: str) -> Optional[Dict[str, Any]]:
-    """Return public job fields (no payload) or None if not found."""
+def get_job_public(job_id: str, user_id: str) -> Optional[Dict[str, Any]]:
+    """Return public job fields (no payload) or None if not found or foreign."""
     conn = get_connection()
     try:
         row = conn.execute(
@@ -111,9 +70,9 @@ def get_job_public(job_id: str) -> Optional[Dict[str, Any]]:
             SELECT job_id, status, submitted_at, started_at, completed_at,
                    result, error
             FROM async_query_jobs
-            WHERE job_id = ?
+            WHERE job_id = ? AND user_id = ?
             """,
-            (job_id,),
+            (job_id, user_id),
         ).fetchone()
         return _row_to_public(row) if row else None
     finally:
@@ -131,6 +90,7 @@ def get_job_with_payload(job_id: str) -> Optional[Dict[str, Any]]:
             return None
         return {
             **_row_to_public(row),
+            "user_id": row["user_id"],
             "payload": _loads(row["payload"]),
             "client_request_id": row["client_request_id"],
             "expires_at": row["expires_at"],
@@ -140,10 +100,11 @@ def get_job_with_payload(job_id: str) -> Optional[Dict[str, Any]]:
 
 
 def find_active_job_by_client_request_id(
+    user_id: str,
     client_request_id: str,
     now: float,
 ) -> Optional[Dict[str, Any]]:
-    """Return the most recent non-expired job for this idempotency key."""
+    """Return the most recent non-expired job for this user's idempotency key."""
     conn = get_connection()
     try:
         row = conn.execute(
@@ -151,12 +112,13 @@ def find_active_job_by_client_request_id(
             SELECT job_id, status, submitted_at, started_at, completed_at,
                    result, error
             FROM async_query_jobs
-            WHERE client_request_id = ?
+            WHERE user_id = ?
+              AND client_request_id = ?
               AND (expires_at IS NULL OR expires_at > ?)
             ORDER BY submitted_at DESC
             LIMIT 1
             """,
-            (client_request_id, now),
+            (user_id, client_request_id, now),
         ).fetchone()
         return _row_to_public(row) if row else None
     finally:

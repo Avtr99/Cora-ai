@@ -110,13 +110,13 @@ const FullscreenOverlay: React.FC<FullscreenOverlayProps> = ({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={{ duration: 0.15, ease: 'easeOut' }}
-        className="fixed inset-0 z-[55] bg-surface-card flex flex-col"
+        className="fixed inset-0 z-55 bg-surface-card flex flex-col"
         role="dialog"
         aria-modal="true"
         aria-label="Fullscreen project explorer"
       >
         {/* ── Top bar ──────────────────────────────────────────── */}
-        <div className="flex items-center justify-between gap-2 md:gap-3 px-3 md:px-4 h-12 border-b border-border-ui bg-surface-base flex-shrink-0">
+        <div className="flex items-center justify-between gap-2 md:gap-3 px-3 md:px-4 h-12 border-b border-border-ui bg-surface-base shrink-0">
           <div className="flex items-center gap-2 md:gap-3 min-w-0">
             <div
               className="inline-flex items-center bg-surface-card border border-border-ui rounded-full p-0.5 overflow-hidden"
@@ -182,7 +182,7 @@ const FullscreenOverlay: React.FC<FullscreenOverlayProps> = ({
                 value={localSearch}
                 onChange={handleSearchInput}
                 placeholder="Search projects..."
-                className="w-full h-7 3xl:h-9 pl-7 3xl:pl-9 pr-7 font-inter text-[11.5px] 3xl:text-[13px] 4xl:text-sm text-text-primary placeholder:text-text-muted bg-surface-card border border-border-ui rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 transition-shadow"
+                className="w-full h-7 3xl:h-9 pl-7 3xl:pl-9 pr-7 font-inter text-[11.5px] 3xl:text-[13px] 4xl:text-sm text-text-primary placeholder:text-text-muted bg-surface-card border border-border-ui rounded-lg focus:outline-hidden focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 transition-shadow"
                 aria-label="Search projects"
               />
               {localSearch && (
@@ -198,7 +198,7 @@ const FullscreenOverlay: React.FC<FullscreenOverlayProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
             {filters.country && (
               <button
                 type="button"
@@ -220,7 +220,7 @@ const FullscreenOverlay: React.FC<FullscreenOverlayProps> = ({
               type="button"
               ref={fullscreenExitBtnRef}
               onClick={onExitFullscreen}
-              className="inline-flex items-center gap-1.5 h-8 3xl:h-10 px-2.5 md:px-3 3xl:px-4 rounded-full border border-border-ui bg-surface-card text-text-secondary font-inter text-[11.5px] md:text-xs 3xl:text-[13px] 4xl:text-sm font-medium hover:border-brand-500 hover:text-brand-700 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 flex-shrink-0"
+              className="inline-flex items-center gap-1.5 h-8 3xl:h-10 px-2.5 md:px-3 3xl:px-4 rounded-full border border-border-ui bg-surface-card text-text-secondary font-inter text-[11.5px] md:text-xs 3xl:text-[13px] 4xl:text-sm font-medium hover:border-brand-500 hover:text-brand-700 transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 shrink-0"
               aria-label="Exit fullscreen explorer"
             >
               <Minimize2 className="w-3.5 h-3.5" aria-hidden="true" />
@@ -237,7 +237,7 @@ const FullscreenOverlay: React.FC<FullscreenOverlayProps> = ({
             id="fs-panel-list"
             ref={fullscreenListRef}
             onScroll={onFullscreenListScroll}
-            className="hidden md:flex md:w-[280px] lg:w-[340px] 3xl:w-[420px] 4xl:w-[480px] md:flex-shrink-0 w-full flex-col overflow-y-auto divide-y divide-surface-subtle md:border-r border-border-ui"
+            className="hidden md:flex md:w-[280px] lg:w-[340px] 3xl:w-[420px] 4xl:w-[480px] md:shrink-0 w-full flex-col overflow-y-auto divide-y divide-surface-subtle md:border-r border-border-ui"
             role="list"
             aria-label="Project list"
           >
@@ -279,7 +279,7 @@ const FullscreenOverlay: React.FC<FullscreenOverlayProps> = ({
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.2 }}
-                  className="hidden lg:flex w-[360px] xl:w-[420px] 3xl:w-[480px] 4xl:w-[560px] flex-shrink-0 border-r border-border-ui bg-surface-card overflow-hidden z-10 flex-col"
+                  className="hidden lg:flex w-[360px] xl:w-[420px] 3xl:w-[480px] 4xl:w-[560px] shrink-0 border-r border-border-ui bg-surface-card overflow-hidden z-10 flex-col"
                 >
                   <DetailPanelContent activeProject={activeProject} allProjects={allProjects} />
                 </motion.div>

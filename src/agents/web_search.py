@@ -16,16 +16,20 @@ from cachetools import TTLCache
 from .protocols import WebSearchResult, web_result_is_usable
 from .search_providers import SearchProvider
 from .tavily_search import TavilySearchProvider
+from ..citations.check import build_citation_correction, check_citations
+from ..citations.context import KBContext
 
 from ..query_processing.quiz_utils import (
     build_quiz_instruction,
     should_generate_quiz,
     split_answer_and_quiz,
 )
+from ..config import get_settings
 from ..query_processing.fallback_answers import (
     NO_ANSWER_FOUND,
     WEB_TIMEOUT_ANSWER,
     WEB_UNAVAILABLE_ANSWER,
+    scope_refusal_answer,
 )
 from ..query_processing.suggested_prompts import (
     should_generate_suggested_prompts,
@@ -48,9 +52,6 @@ def sanitize_text(text: str, max_length: int = 500) -> str:
 def sanitize_query(query: str) -> str:
     return sanitize_text(query, max_length=500)
 
-def sanitize_kb_context(kb_context: str) -> str:
-    return sanitize_text(kb_context, max_length=2000)
-
 def _kb_sources_to_dicts(kb_sources: List[str]) -> List[Dict[str, Any]]:
     return [{"title": s, "url": "", "snippet": "", "type": "knowledge_base"} for s in kb_sources]
 
@@ -68,12 +69,74 @@ def _hybrid_failure_result(kb_sources: List[str], **flags: Any) -> WebSearchResu
     }
 
 
+_SUSTAINABILITY_SCOPE = (
+    "Sustainability and climate topics, including: carbon markets (voluntary "
+    "and compliance), carbon credits and offsets, registries and standards "
+    "(Verra VCS, Gold Standard, Article 6.4, CORSIA, SBTi), emissions "
+    "accounting (Scopes 1-3, GHG protocols), decarbonization and net-zero "
+    "strategy, climate and energy policy and regulation, ESG and "
+    "sustainability reporting, biodiversity and nature-based solutions, "
+    "renewable energy, sustainable procurement and supply chains, and closely "
+    "related finance, legal, or market questions."
+)
+
+_SCOPE_GATE_PROMPT = """You are the scope gate for Cora, an assistant that only answers questions within its domain.
+
+<in_scope>
+{in_scope}
+</in_scope>
+
+<out_of_scope>
+Anything unrelated to the domain above: recipes, sports, entertainment, general programming help, medical or legal advice, travel, homework on other subjects, and similar general-knowledge questions.
+</out_of_scope>
+
+Classify the <user_query>. If a plausible in-domain reading exists, treat it as in scope.
+
+Return ONLY a JSON object:
+{{"in_scope": true, "reasoning": "brief"}} or {{"in_scope": false, "reasoning": "brief"}}
+
+<user_query>
+{query}
+</user_query>"""
+
+
+def _scope_gate_prompt(query: str) -> str:
+    """Build the scope-classification prompt for the active collection.
+
+    Mirrors get_system_instruction()'s collection override: when a custom
+    collection is configured, its description defines the domain instead of
+    the default sustainability boundary.
+    """
+    settings = get_settings()
+    collection_instruction = (settings.COLLECTION_SYSTEM_INSTRUCTION or "").strip()
+    if collection_instruction:
+        name = (settings.COLLECTION_NAME or "").strip() or "the configured collection"
+        in_scope = f"Questions about {name}: {collection_instruction}"
+    else:
+        in_scope = _SUSTAINABILITY_SCOPE
+    return _SCOPE_GATE_PROMPT.format(in_scope=in_scope, query=query)
+
+
+def _scope_refusal_result(kb_sources: Optional[List[str]] = None) -> WebSearchResult:
+    """Terminal refusal for an out-of-domain query — grounded=False so it is
+    never 'usable' web output and never picked as synthesis context."""
+    kb_sources = kb_sources or []
+    return {
+        "answer": scope_refusal_answer(),
+        "sources": _kb_sources_to_dicts(kb_sources),
+        "kb_sources": kb_sources,
+        "web_sources": [],
+        "grounded": False,
+        "hybrid": False,
+        "truncated": False,
+    }
+
+
 def parse_citations(text: str, valid_source_ids: List[str]) -> str:
     """Validate and normalize web citations to a single [Web, cite: N] format.
 
     Handles:
       - legacy [source_X] / [source_X, source_Y] citations
-      - raw [N] / [N, M] citations
       - bare [Web] markers (removed, as they are not rendered correctly)
       - KB citations [cite_kb: N] normalized to [Knowledge Base, cite: N]
     """
@@ -102,9 +165,10 @@ def parse_citations(text: str, valid_source_ids: List[str]) -> str:
     if valid_source_ids:
         source_index = {sid: str(i + 1) for i, sid in enumerate(valid_source_ids)}
         valid_set = set(valid_source_ids)
-        max_index = len(valid_source_ids)
 
         def _normalize_numbers(parts: List[str]) -> List[str]:
+            # Out-of-range numbers are kept (normalized to digits) so the
+            # citation check downstream can see and report them.
             out: List[str] = []
             for part in parts:
                 part = part.strip()
@@ -112,8 +176,10 @@ def parse_citations(text: str, valid_source_ids: List[str]) -> str:
                     continue
                 if part in valid_set:
                     out.append(source_index[part])
-                elif part.isdigit() and 1 <= int(part) <= max_index:
-                    out.append(part)
+                    continue
+                source_match = re.fullmatch(r"source_(\d+)", part, re.IGNORECASE)
+                if source_match:
+                    out.append(source_match.group(1))
             return out
 
         def _replace_citation(match: re.Match) -> str:
@@ -126,12 +192,11 @@ def parse_citations(text: str, valid_source_ids: List[str]) -> str:
             text,
             flags=re.IGNORECASE,
         )
-        text = re.sub(r"\[(\d+(?:,\s*\d+)*)\]", _replace_citation, text)
 
     # Drop bare [Web] / [Web, ...] markers that carry no valid citation numbers.
     text = re.sub(r"\[Web(?:,\s*[^0-9\]]*)?\]", "", text, flags=re.IGNORECASE)
 
-    # Clean up spacing/punctuation left by removed markers (mirrors citation_verifier).
+    # Clean up spacing/punctuation left by removed markers.
     text = re.sub(r"  +", " ", text).strip()
     text = re.sub(r"\s+([.,;!?])", r"\1", text)
     return text
@@ -178,7 +243,39 @@ class WebSearchAgent:
             return
         if web_result_is_usable(result):
             self._search_cache[key] = copy.deepcopy(result)
-    
+
+    async def _in_scope(self, query: str) -> bool:
+        """Lite-model domain check — the single scope boundary for web paths.
+
+        Web search is the only route that can answer outside the KB corpus,
+        so the domain decision lives here rather than in each route handler:
+        every path (direct web, hybrid retrieval, KB supplement) funnels
+        through search()/search_with_kb_context(). Fails open — a broken
+        classifier must not disable web search for in-scope queries.
+        """
+        try:
+            # Classification is lite-tier work like routing — do not use
+            # self.model_name, which is the answer-generation model.
+            resolved_model = getattr(self.llm, "model_lite", None)
+            text = await self.llm.generate_text(
+                _scope_gate_prompt(query),
+                model=resolved_model,
+                temperature=0.0,
+                json_mode=True,
+            )
+            match = re.search(r"\{.*\}", text or "", flags=re.DOTALL)
+            if match:
+                data = json.loads(match.group(0))
+                if isinstance(data.get("in_scope"), bool):
+                    if not data["in_scope"]:
+                        logger.info("Scope gate refused out-of-domain query: %.80s", query)
+                    return data["in_scope"]
+            logger.warning("Scope gate returned unparseable response; allowing query")
+            return True
+        except Exception as e:
+            logger.warning("Scope gate check failed (%s); allowing query", e)
+            return True
+
     async def search(self, query: str, context: str = "", timeout_ms: int | None = None) -> WebSearchResult:
         cache_key = self._cache_key("web_search", {"query": (query or "").strip().lower(), "context": (context or "").strip().lower()})
 
@@ -186,8 +283,16 @@ class WebSearchAgent:
         if cached is not None:
             return cached
 
+        sanitized_query = sanitize_query(query)
+
+        # Domain gate: refuse out-of-scope queries before spending a provider
+        # call. Cached so repeat off-topic queries don't pay the lite call.
+        if not await self._in_scope(sanitized_query):
+            result: WebSearchResult = _scope_refusal_result()
+            self._search_cache[cache_key] = copy.deepcopy(result)
+            return result
+
         try:
-            sanitized_query = sanitize_query(query)
             sanitized_context = sanitize_query(context) if context else ""
 
             # Fetch search results
@@ -255,7 +360,34 @@ You are a helpful assistant with access to web search results.
             
             # Validate citations
             answer_text = parse_citations(answer_text, valid_source_ids)
-            
+
+            # Marker numbers are the prompt's own source numbers; the only
+            # possible errors are out-of-range or missing markers. Retry once
+            # with a correction prompt, then fail with the non-answer sentinel.
+            valid_web = set(range(1, len(web_sources) + 1))
+            citation_errors = check_citations(answer_text, {"web": valid_web})
+            if citation_errors:
+                logger.info("Citation errors in web answer; retrying once: %s", citation_errors)
+                retry_text = await self.llm.generate_text(
+                    build_citation_correction(prompt, answer_text, citation_errors, web=True),
+                    model=self.model_name,
+                )
+                if retry_text:
+                    retry_split, suggested_prompts = split_answer_and_suggested_prompts(
+                        retry_text, include_suggested_prompts
+                    )
+                    answer_text, quiz_data = split_answer_and_quiz(retry_split, include_quiz)
+                    answer_text = parse_citations(answer_text, valid_source_ids)
+                    citation_errors = check_citations(answer_text, {"web": valid_web})
+                if citation_errors:
+                    logger.info("Citation errors persist after retry: %s", citation_errors)
+                    return {
+                        "answer": NO_ANSWER_FOUND,
+                        "sources": [],
+                        "grounded": False,
+                        "truncated": False,
+                    }
+
             result: WebSearchResult = {
                 "answer": answer_text,
                 "sources": web_sources,
@@ -287,10 +419,21 @@ You are a helpful assistant with access to web search results.
                 "error": str(e),
             }
             
-    async def search_with_kb_context(self, query: str, kb_context: str, kb_sources: List[str], timeout_ms: int | None = None) -> WebSearchResult:
-        """Perform web search with knowledge base context for hybrid answers."""
+    async def search_with_kb_context(self, query: str, kb: KBContext, timeout_ms: int | None = None) -> WebSearchResult:
+        """Perform web search with knowledge base context for hybrid answers.
+
+        ``kb`` is the canonical context built by ``build_kb_context`` for the
+        same ``vector_results`` — its ``<source index="N">`` tags are the
+        numbering ``[cite_kb: N]`` markers reference.
+        """
         sanitized_query = sanitize_query(query)
-        sanitized_kb_context = sanitize_kb_context(kb_context)
+        kb_sources = kb.sources
+        kb_indices = {c.index for c in kb.citations if c.index is not None}
+
+        # Same domain gate as search() — the KB-supplement path reaches this
+        # method directly without passing through search() first.
+        if not await self._in_scope(sanitized_query):
+            return _scope_refusal_result(kb_sources)
 
         try:
             # Fetch search results
@@ -333,7 +476,7 @@ You are an expert VCM assistant with access to web search results.
 {search_results_text}
 
 <reference_data>
-{sanitized_kb_context}
+{kb.text}
 </reference_data>
 
 <user_query>
@@ -346,9 +489,30 @@ You are an expert VCM assistant with access to web search results.
             )
             text_without_prompts, suggested_prompts = split_answer_and_suggested_prompts(raw_text, include_suggested_prompts)
             answer_text, quiz_data = split_answer_and_quiz(text_without_prompts, include_quiz)
-            
+
             answer_text = parse_citations(answer_text, valid_source_ids)
-            
+
+            # Markers must match the prompt's own numbering: KB chunks by
+            # their <source index="N"> tags, web results by source number.
+            valid = {"knowledge_base": kb_indices, "web": set(range(1, len(web_sources) + 1))}
+            citation_errors = check_citations(answer_text, valid)
+            if citation_errors:
+                logger.info("Citation errors in hybrid answer; retrying once: %s", citation_errors)
+                retry_text = await self.llm.generate_text(
+                    build_citation_correction(prompt, answer_text, citation_errors, web=True),
+                    model=self.model_name,
+                )
+                if retry_text:
+                    retry_split, suggested_prompts = split_answer_and_suggested_prompts(
+                        retry_text, include_suggested_prompts
+                    )
+                    answer_text, quiz_data = split_answer_and_quiz(retry_split, include_quiz)
+                    answer_text = parse_citations(answer_text, valid_source_ids)
+                    citation_errors = check_citations(answer_text, valid)
+                if citation_errors:
+                    logger.info("Citation errors persist after retry: %s", citation_errors)
+                    return _hybrid_failure_result(kb_sources)
+
             combined_sources = _kb_sources_to_dicts(kb_sources) + web_sources
             
             return {

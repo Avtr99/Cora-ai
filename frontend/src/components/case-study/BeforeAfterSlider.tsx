@@ -47,12 +47,12 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
   afterLabel = 'After',
   caption,
   attribution,
-  aspectClass = 'aspect-[4/3]',
+  aspectClass = 'aspect-4/3',
 }) => {
   return (
     <figure className="flex h-full w-full flex-col">
       <div
-        className={`relative ${aspectClass} w-full overflow-hidden rounded-xl bg-surface-subtle border border-border-ui shadow-sm`}
+        className={`relative ${aspectClass} w-full overflow-hidden rounded-xl bg-surface-subtle border border-border-ui shadow-xs`}
       >
         <ReactCompareSlider
           itemOne={
@@ -78,12 +78,12 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
           }
           defaultPosition={50}
           keyboardIncrement="5%"
-          className="absolute inset-0 [&_[data-rcs='handle-root']]:focus-visible:ring-2 [&_[data-rcs='handle-root']]:focus-visible:ring-inset [&_[data-rcs='handle-root']]:focus-visible:ring-white"
+          className="absolute inset-0 focus-visible:**:data-[rcs='handle-root']:ring-2 focus-visible:**:data-[rcs='handle-root']:ring-inset focus-visible:**:data-[rcs='handle-root']:ring-white"
         />
-        <span className="absolute top-2 3xl:top-3 left-2 3xl:left-3 z-10 px-2 3xl:px-3 py-1 3xl:py-1.5 rounded-md text-xs 3xl:text-sm 4xl:text-base font-semibold font-inter bg-surface-overlay/60 text-white backdrop-blur-sm pointer-events-none">
+        <span className="absolute top-2 3xl:top-3 left-2 3xl:left-3 z-10 px-2 3xl:px-3 py-1 3xl:py-1.5 rounded-md text-xs 3xl:text-sm 4xl:text-base font-semibold font-inter bg-surface-overlay/60 text-white backdrop-blur-xs pointer-events-none">
           {beforeLabel}
         </span>
-        <span className="absolute top-2 3xl:top-3 right-2 3xl:right-3 z-10 px-2 3xl:px-3 py-1 3xl:py-1.5 rounded-md text-xs 3xl:text-sm 4xl:text-base font-semibold font-inter bg-surface-overlay/60 text-white backdrop-blur-sm pointer-events-none">
+        <span className="absolute top-2 3xl:top-3 right-2 3xl:right-3 z-10 px-2 3xl:px-3 py-1 3xl:py-1.5 rounded-md text-xs 3xl:text-sm 4xl:text-base font-semibold font-inter bg-surface-overlay/60 text-white backdrop-blur-xs pointer-events-none">
           {afterLabel}
         </span>
       </div>

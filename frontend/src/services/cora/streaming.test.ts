@@ -62,7 +62,7 @@ describe('queryCoraStream', () => {
     const onResult = vi.fn();
     const onDone = vi.fn();
 
-    const result = await queryCoraStream('Hello', undefined, undefined, undefined, {
+    const result = await queryCoraStream('Hello', undefined, undefined, {
       onResult,
       onDone,
     });
@@ -84,7 +84,7 @@ describe('queryCoraStream', () => {
     const onError = vi.fn();
 
     await expect(
-      queryCoraStream('Hello', undefined, undefined, undefined, { onError })
+      queryCoraStream('Hello', undefined, undefined, { onError })
     ).rejects.toThrow('API request failed with status 403');
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
@@ -100,7 +100,7 @@ describe('queryCoraStream', () => {
     );
 
     const onError = vi.fn();
-    const result = await queryCoraStream('Hello', undefined, undefined, undefined, { onError });
+    const result = await queryCoraStream('Hello', undefined, undefined, { onError });
 
     expect(result.text).toBe('Authentication failed. Please check your API configuration.');
     expect(onError).toHaveBeenCalledWith('auth', expect.any(String));
@@ -116,7 +116,7 @@ describe('queryCoraStream', () => {
     );
 
     const onError = vi.fn();
-    const result = await queryCoraStream('Hello', undefined, undefined, undefined, { onError });
+    const result = await queryCoraStream('Hello', undefined, undefined, { onError });
 
     expect(result.text).toContain("AI service is busy");
     expect(onError).toHaveBeenCalledWith('rate_limit', expect.any(String));
@@ -142,7 +142,7 @@ describe('queryCoraStream', () => {
     const onResult = vi.fn();
     const onDone = vi.fn();
 
-    const result = await queryCoraStream('Hello', undefined, undefined, undefined, {
+    const result = await queryCoraStream('Hello', undefined, undefined, {
       onStatus,
       onResult,
       onDone,
@@ -202,7 +202,7 @@ describe('queryCoraStream', () => {
     const onStatus = vi.fn();
     const onResult = vi.fn();
 
-    const result = await queryCoraStream('Hello', undefined, undefined, undefined, {
+    const result = await queryCoraStream('Hello', undefined, undefined, {
       onStatus,
       onResult,
     });
@@ -236,10 +236,9 @@ describe('queryCoraStream', () => {
     const controller = new AbortController();
 
     // Start the request then abort immediately
-    // signal goes in QueryCoraOptions (6th param), not callbacks (5th)
+    // signal goes in QueryCoraOptions (5th param), not callbacks (4th)
     const promise = queryCoraStream(
       'Hello',
-      undefined,
       undefined,
       undefined,
       {},
@@ -268,5 +267,34 @@ describe('queryCoraStream', () => {
 
     const result = await queryCoraStream('Hello');
     expect(result.text).toBe('Line 1\nLine 2');
+  });
+
+  it('sends conversation_id and message_id without any client history', async () => {
+    const mockFetch = vi.mocked(globalThis.fetch);
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          answer: 'ok',
+          confidence: 1,
+          sources: [],
+          conversation_id: 'chat-1',
+          message_id: 'msg-9',
+          answer_id: 'msg-9-answer',
+          timestamp: '2024-01-01T00:00:00Z',
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
+
+    const result = await queryCoraStream('Hello', 'chat-1', 'msg-9', {});
+
+    const body = JSON.parse(mockFetch.mock.calls[0][1]?.body as string);
+    expect(body.conversation_id).toBe('chat-1');
+    expect(body.message_id).toBe('msg-9');
+    expect(body).not.toHaveProperty('history');
+    expect(body).not.toHaveProperty('history' + '_signature');
+
+    expect(result.messageId).toBe('msg-9');
+    expect(result.answerId).toBe('msg-9-answer');
   });
 });

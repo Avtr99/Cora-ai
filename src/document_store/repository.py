@@ -10,7 +10,7 @@ same document.
 from __future__ import annotations
 
 import json
-from typing import Optional
+from typing import Mapping, Optional
 
 from ..db.database import get_connection
 from .files import write_metadata_file
@@ -100,17 +100,16 @@ def update_document(
     page_count: Optional[int] = None,
     warnings: Optional[list[str]] = None,
     error: Optional[str] = None,
-    title: Optional[str] = None,
-    registry: Optional[str] = None,
-    category: Optional[str] = None,
-    publisher: Optional[str] = None,
-    document_id: Optional[str] = None,
-    version_number: Optional[str] = None,
 ) -> DocumentRecord:
     """Update a document record.
 
-    ``record_id`` is the primary key (``DocumentRecord.id``). The ``document_id``
-    keyword argument matches the VCM registry document ID field name.
+    ``record_id`` is the primary key (``DocumentRecord.id``).
+
+    Extracted-metadata fields (title, registry, category, publisher,
+    document_id, version_number) are deliberately NOT updatable here: a
+    ``None`` kwarg in this function means "leave the column alone", which made
+    stale metadata impossible to clear. Re-extracted metadata goes through
+    ``set_document_metadata``, which replaces the whole field set verbatim.
     """
     fields: list[str] = []
     values: list[object] = []
@@ -137,24 +136,6 @@ def update_document(
     if not (status == "failed" and error is None):
         fields.append("error = ?")
         values.append(error)
-    if title is not None:
-        fields.append("title = ?")
-        values.append(title)
-    if registry is not None:
-        fields.append("registry = ?")
-        values.append(registry)
-    if category is not None:
-        fields.append("category = ?")
-        values.append(category)
-    if publisher is not None:
-        fields.append("publisher = ?")
-        values.append(publisher)
-    if document_id is not None:
-        fields.append("document_id = ?")
-        values.append(document_id)
-    if version_number is not None:
-        fields.append("version_number = ?")
-        values.append(version_number)
     fields.append("updated_at = CURRENT_TIMESTAMP")
     values.append(record_id)
 
@@ -201,6 +182,40 @@ def try_acquire_document_lock(document_id: str, job_id: str) -> bool:
         return cursor.rowcount == 1
     finally:
         conn.close()
+
+
+def set_document_metadata(record_id: str, metadata: Mapping[str, object]) -> DocumentRecord:
+    """Replace the extracted-metadata fields on a record wholesale.
+
+    Unlike ``update_document`` — where ``None`` means "leave the column
+    alone" — this writes every extracted field verbatim: a value absent from
+    a fresh extraction clears the previous one instead of leaving it stale.
+    This is the single write path for extraction results.
+    """
+    conn = get_connection()
+    try:
+        conn.execute(
+            "UPDATE document_store_documents SET "
+            "title = ?, registry = ?, category = ?, publisher = ?, "
+            "document_id = ?, version_number = ?, "
+            "updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (
+                metadata.get("title"),
+                metadata.get("registry"),
+                metadata.get("category"),
+                metadata.get("publisher"),
+                metadata.get("document_id"),
+                metadata.get("version_number"),
+                record_id,
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    record = get_document(record_id)
+    if record is None:
+        raise ValueError("Document not found")
+    return record
 
 
 def release_document_lock(document_id: str, job_id: str) -> None:
