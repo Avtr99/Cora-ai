@@ -5,10 +5,22 @@ from fastapi.testclient import TestClient
 from unittest.mock import patch, AsyncMock
 
 from src.api.main import app
+from src.db.database import run_migrations
 
 
 @pytest.fixture
-def test_client():
+def db(tmp_path, monkeypatch):
+    """Isolated SQLite DB with migrations applied."""
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'cora.db'}")
+    from src.config import reset_settings_singleton
+
+    reset_settings_singleton()
+    run_migrations()
+    return tmp_path
+
+
+@pytest.fixture
+def test_client(db):
     return TestClient(app)
 
 

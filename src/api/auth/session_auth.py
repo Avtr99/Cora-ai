@@ -68,7 +68,7 @@ def create_session(user_id: str) -> str:
             (
                 _credential_hash(token),
                 user_id,
-                _credential_hash(api_key),
+                _credential_hash(api_key or ""),
                 int(SESSION_TTL.total_seconds()),
             ),
         )
