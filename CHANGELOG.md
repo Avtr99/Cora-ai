@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+# [4.0.0](https://github.com/Avtr99/Cora-ai/compare/v3.1.0...v4.0.0) (2026-10-07)
+
+
+* feat!: consolidate to single-owner auth, retire memory artifacts, harden query boundary ([c7953bb](https://github.com/Avtr99/Cora-ai/commit/c7953bb5432017ccca764dff0b2a29cf87ac5c89))
+
+
+### BREAKING CHANGES
+
+* The JWT/multi-user auth model is replaced by a single-owner
+account with session-cookie login. The conversation-memory feature is removed
+entirely (src/memory/, the cora_memories Qdrant collection, SECRET_KEY
+auto-generation). Upgraded installs migrate automatically; the orphaned
+memory collection is dropped once at startup.
+
 # [3.1.0](https://github.com/Avtr99/Cora-ai/compare/v3.0.0...v3.1.0) (2026-10-04)
 
 
