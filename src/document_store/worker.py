@@ -1,31 +1,18 @@
-"""Ingestion worker entrypoint.
+"""Ingestion worker entrypoint (``python -m src.document_store.worker``).
 
-Runs as a separate process/container from the API. Polls the
-``document_store_jobs`` SQLite table for ``queued`` jobs, atomically claims
-them, and runs up to ``DOCUMENT_INGESTION_CONCURRENCY`` converter/indexer
-jobs concurrently so CPU/RAM-heavy PDF/OCR parsing does not stall query
-latency on the API container.
+Runs as a separate process/container from the API. Polls
+``document_store_jobs`` for ``queued`` rows, claims them atomically
+(``UPDATE ... WHERE status = 'queued'`` + ``rowcount == 1`` check, safe
+under ``--scale ingest-worker=N``), and runs up to
+``DOCUMENT_INGESTION_CONCURRENCY`` jobs at once so CPU/RAM-heavy parsing
+does not stall query latency on the API container.
 
-Run with::
-
-    python -m src.document_store.worker
-
-The worker shares the same ``./data`` volume (SQLite DB + document files) and
-Qdrant instance as the API. Only the worker writes ingestion job rows during
-processing; the API only inserts new ``queued`` rows and reads status.
-
-Reliability:
-  - On startup, jobs left ``processing`` by a previous worker crash are marked
-    ``failed`` (a job interrupted mid-conversion cannot be resumed).
-    ``queued`` jobs are preserved so they are picked up after a restart.
-  - The atomic claim (``UPDATE ... WHERE status = 'queued'`` with a
-    ``rowcount == 1`` check) prevents two workers from picking up the same
-    job when ``--scale ingest-worker=N`` is used.
-  - A heartbeat is written to ``app_settings`` every ~10s by a background
-    task so the API can detect when no worker is running and warn the user,
-    even while the worker is busy with a long document. Stuck ``processing``
-    jobs whose heartbeat is older than the Docling timeout are marked failed
-    on the next worker startup.
+The worker shares the API's SQLite DB, ``./data`` volume, and Qdrant
+instance, and owns all job recovery: ``processing`` rows left by a crash
+are marked ``failed`` on startup (a job interrupted mid-conversion cannot
+resume) while ``queued`` jobs are preserved; a heartbeat in
+``app_settings`` (~10s) lets the API warn when no worker is running; jobs
+stuck past the Docling timeout are swept on the next startup.
 """
 
 from __future__ import annotations

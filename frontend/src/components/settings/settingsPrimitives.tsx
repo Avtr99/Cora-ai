@@ -204,11 +204,11 @@ export function SaveCancel({
 }
 
 /** Green success banner shown after a successful save. */
-export function SavedBanner({ text }: { text: string }): JSX.Element {
+export function SavedBanner({ text, title = "Settings saved" }: { text: string; title?: string }): JSX.Element {
   return (
     <div className="py-6 3xl:py-8 4xl:py-10 text-center">
       <CheckCircle2 className="mx-auto mb-2.5 3xl:mb-3 4xl:mb-4 h-8 w-8 3xl:h-10 3xl:w-10 4xl:h-12 4xl:w-12 text-semantic-success-icon" strokeWidth={2} aria-hidden="true" />
-      <p className="font-poppins text-heading-2 3xl:text-xl 4xl:text-2xl font-semibold text-text-primary">Settings saved</p>
+      <p className="font-poppins text-heading-2 3xl:text-xl 4xl:text-2xl font-semibold text-text-primary">{title}</p>
       <p className="font-inter text-body-sm 3xl:text-base 4xl:text-lg text-text-muted mt-1 3xl:mt-2">{text}</p>
     </div>
   );

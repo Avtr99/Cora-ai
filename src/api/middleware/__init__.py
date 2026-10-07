@@ -1,10 +1,7 @@
 """API middleware modules."""
 from .security import (
     SecurityMiddleware,
-    generate_api_key,
-    AuthenticatedUser,
-    get_authenticated_user,
-    validate_user_access
+    generate_api_key
 )
 from .input_sanitizer import (
     InputSanitizer,
@@ -17,11 +14,7 @@ from .input_sanitizer import (
 from .logging_middleware import (
     LoggingMiddleware,
     configure_logging,
-    get_request_id,
-    get_metrics,
-    record_cache_hit,
-    record_cache_miss,
-    record_response_time
+    get_request_id
 )
 from .circuit_breaker import (
     CircuitBreaker,
@@ -43,9 +36,6 @@ __all__ = [
     # Security
     "SecurityMiddleware",
     "generate_api_key",
-    "AuthenticatedUser",
-    "get_authenticated_user",
-    "validate_user_access",
     # Input/Output Sanitization
     "InputSanitizer",
     "OutputSanitizer",
@@ -57,10 +47,6 @@ __all__ = [
     "LoggingMiddleware",
     "configure_logging",
     "get_request_id",
-    "get_metrics",
-    "record_cache_hit",
-    "record_cache_miss",
-    "record_response_time",
     # Circuit breaker
     "CircuitBreaker",
     "CircuitConfig",

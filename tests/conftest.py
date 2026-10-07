@@ -14,8 +14,6 @@ def pytest_configure(config):
     _ = config
     os.environ["VOYAGE_API_KEY"] = "test-voyage-api-key"
     os.environ["QDRANT_URL"] = "http://localhost:6333"
-    os.environ["SECRET_KEY"] = "test-secret-key-for-ci-testing"
-    os.environ["JWT_SECRET_KEY"] = "test-jwt-secret-key-for-ci-testing"
     # Env vars beat the .env file in pydantic-settings, so forcing protection
     # off here keeps a developer's real .env from 401-ing the whole suite.
     # Tests that exercise protection set the flag back on via monkeypatch.
@@ -30,8 +28,6 @@ def _reset_settings_singleton(monkeypatch):
     """Reset the Settings singleton before each test to avoid stale env values."""
     monkeypatch.setenv("VOYAGE_API_KEY", "test-voyage-api-key")
     monkeypatch.setenv("QDRANT_URL", "http://localhost:6333")
-    monkeypatch.setenv("SECRET_KEY", "test-secret-key-for-ci-testing")
-    monkeypatch.setenv("JWT_SECRET_KEY", "test-jwt-secret-key-for-ci-testing")
     monkeypatch.setenv("ENABLE_API_KEY_PROTECTION", "false")
     monkeypatch.setenv("API_ACCESS_KEY", "")
     reset_settings_singleton()

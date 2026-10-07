@@ -6,12 +6,11 @@ Main FastAPI application entry point. Routes and handlers are organized into:
 - query_routes.py: Query processing endpoints
 - document_routes.py: Document management endpoints
 - health.py: Health check endpoints
-- memory_routes.py: Memory management endpoints
-- auth_routes.py: Authentication endpoints
 - summarize_routes.py: Document summarization endpoints
 """
 from fastapi import FastAPI, HTTPException, Request, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ValidationError
@@ -29,13 +28,10 @@ from .middleware import (
     SecurityMiddleware,
     LoggingMiddleware,
     configure_logging,
-    get_metrics,
     get_all_circuit_stats,
     register_exception_handlers,
 )
 from .health import run_health_checks, liveness_check, readiness_check
-from .memory_routes import router as memory_router
-from .auth_routes import router as auth_router
 from .summarize_routes import router as summarize_router
 from .document_store_routes import router as document_store_router
 from .settings_routes import router as settings_router
@@ -44,6 +40,7 @@ from .async_query_jobs import get_async_query_job_manager
 from .public_routes import router as public_router
 from .session_routes import router as session_router
 from .chat_routes import router as chat_router
+from .account_routes import router as account_router
 from .auth.session_auth import current_user_id
 from ..config import get_settings
 from ..version import __version__
@@ -122,6 +119,10 @@ app.add_middleware(
         "/api/documents",
     ]
 )
+
+# Compress responses >= 1 KB (SPA bundles, JSON payloads). Streaming SSE
+# still flushes per chunk; bodies under the threshold pass through untouched.
+app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 class Document(BaseModel):
     text: str
@@ -218,7 +219,7 @@ get_async_query_job_manager().register_processor(_process_async_query_job)
 
 @app.post("/query/async", response_model=AsyncQueryAcceptedResponse, status_code=202)
 async def enqueue_query_async(query: Query, request: Request):
-    """Phase 3: Queue long-running query execution and return a job ID."""
+    """Queue long-running query execution and return a job ID."""
     manager = get_async_query_job_manager()
     try:
         return await manager.enqueue(
@@ -258,7 +259,7 @@ async def process_query_stream(query: Query, request: Request, tokens: bool = Tr
     """
 
     # Resolve identity + load server-side history before StreamingResponse so a
-    # foreign conversation_id fails as HTTP 404, not an SSE error event (D33).
+    # foreign conversation_id fails as HTTP 404, not an SSE error event.
     ctx = await open_turn(query, request)
 
     async def event_generator():
@@ -354,7 +355,6 @@ async def v1_metrics():
     """Get API v1 performance metrics."""
     return {
         "version": __version__,
-        "performance": get_metrics(),
         "circuit_breakers": get_all_circuit_stats(),
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
@@ -381,23 +381,14 @@ if settings.ENABLE_TEST_ENDPOINT:
         return await test_query(request, test_request)
 
 
-# Include v1 router
-app.include_router(v1_router)
-
-# Include auth router under /v1 for consistent versioning
-v1_router.include_router(auth_router)
-
-# Include public feedback router under /v1
+# Build the v1 router first, then mount it on the app: include_router
+# snapshots the route list, so the order below must stay "assemble, then mount".
 v1_router.include_router(public_router)
-
-# Include memory router under /v1 for consistent versioning
-v1_router.include_router(memory_router)
-
-# Include summarize router under /v1
 v1_router.include_router(summarize_router)
-
-# Include settings router under /v1
 v1_router.include_router(settings_router)
+v1_router.include_router(chat_router)
+v1_router.include_router(account_router)
+app.include_router(v1_router)
 
 # Include document store router under /v1 and /api for the local SPA.
 app.include_router(document_store_router, prefix="/v1")
@@ -412,18 +403,15 @@ app.include_router(public_router, prefix="/api")
 # Include session auth router under /api for the local SPA (frontend calls /api/auth/session)
 app.include_router(session_router, prefix="/api")
 
-# Include chat router under /v1 and /api (server-side chats, Phase 7).
-# Both prefixes are protected paths when API key protection is on.
-v1_router.include_router(chat_router)
+# Chat and account routes are also exposed under /api for the SPA.
+# Both prefixes are protected paths when API key protection is on, so the
+# middleware sets the user and runs the CSRF check before the route's guards.
 app.include_router(chat_router, prefix="/api")
+app.include_router(account_router, prefix="/api")
 
-# -----------------------------------------------------------------------------
-# /api/* aliases for production-served SPA
-#
-# In development, Vite proxies these to the backend. In production, the built
-# SPA is served by FastAPI itself, so we need explicit route aliases to prevent
-# the SPA catch-all from returning index.html (HTML) for API calls.
-# -----------------------------------------------------------------------------
+# /api/* aliases: in production the built SPA is served by FastAPI itself,
+# so these routes must match before the catch-all returns index.html for
+# API calls. In development, Vite proxies them to the backend.
 
 @app.get("/api/cora-health")
 async def api_cora_health():
@@ -450,8 +438,23 @@ public_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file
 os.makedirs(assets_dir, exist_ok=True)
 os.makedirs(public_dir, exist_ok=True)
 
+class ImmutableStaticFiles(StaticFiles):
+    """StaticFiles with long-lived caching for fingerprinted build assets.
+
+    Vite emits content-hashed filenames (index-<hash>.js), so a 200 response
+    for a given URL never changes — safe to cache for a year. index.html is
+    served separately by the catch-all below with no-cache headers.
+    """
+
+    async def get_response(self, path, scope):
+        response = await super().get_response(path, scope)
+        if response.status_code == 200:
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return response
+
+
 # 2. Mount static assets (JS, CSS, images) explicitly at /assets
-app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+app.mount("/assets", ImmutableStaticFiles(directory=assets_dir), name="assets")
 
 # Mount public directory items at the root (like favicon.ico, /data, etc.)
 # We skip mounting the entire dist directory at / to avoid shadowing the API

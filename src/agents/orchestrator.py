@@ -368,12 +368,9 @@ class RAGOrchestrator:
             deadline = start_time + (self.config.max_total_time_ms / 1000)
         
         try:
-            # OPTIMIZATION: Conversational Gate — cheap heuristic first.
-            # Bypass the entire RAG pipeline for clear greetings/conversational
-            # queries using only the regex heuristic (no LLM call). Greetings are
-            # never cached (conversational responses don't go through
-            # persist_to_cache), so checking the cache for them is wasted work —
-            # especially the SQLite call.
+            # Cheap heuristic first: bypass the RAG pipeline for clear
+            # greetings. Conversational responses are never cached, so a
+            # cache lookup for them is wasted work.
             conv_result = await self._try_conversational(
                 query, chat_history, steps, start_time, use_llm_classification=False
             )
@@ -381,25 +378,19 @@ class RAGOrchestrator:
                 logger.debug("Conversational query detected, bypassing RAG pipeline")
                 return conv_result
 
-            # OPTIMIZATION: Early Query Cache Check
-            # Check in-memory and SQLite caches before any rewriting, routing,
-            # or retrieval. This serves previously answered queries instantly.
-            # Runs after the cheap conversational heuristic so greetings skip
-            # the cache, and before the LLM intent classification so cache hits
-            # avoid any LLM cost.
-            # Skipped for follow-up turns: the query-only cache key carries no
-            # conversation scope, so a generic follow-up ("what are the risks")
-            # would serve an unrelated conversation's answer — and would do so
-            # before rewriting, bypassing coreference resolution entirely.
+            # Early cache check: serve previously answered queries before any
+            # rewriting, routing, or retrieval cost. Skipped for follow-up
+            # turns — the query-only cache key has no conversation scope, so a
+            # generic follow-up ("what are the risks") would serve an unrelated
+            # conversation's answer and bypass coreference resolution.
             if not chat_history:
                 cached_result = await self._try_early_cache_hit(query, steps, start_time)
                 if cached_result is not None:
                     return cached_result
 
-            # OPTIMIZATION: Conversational Gate — LLM intent classification.
-            # Only paid on a cache miss, for short ambiguous queries the regex
-            # heuristic missed. Cached per normalized query (in-memory LRU), so
-            # the cost is paid at most once per query per warm instance.
+            # LLM intent classification only on a cache miss, for short
+            # ambiguous queries the heuristic missed. Cached per normalized
+            # query (in-memory LRU).
             conv_result = await self._try_conversational(
                 query, chat_history, steps, start_time, use_llm_classification=True
             )
@@ -407,9 +398,9 @@ class RAGOrchestrator:
                 logger.debug("Conversational query detected after cache miss, bypassing RAG pipeline")
                 return conv_result
 
-            # OPTIMIZATION: Run rewrite and route in parallel
-            # Router works on original query while rewriter runs
-            # Re-route only if query changes substantially
+            # Rewrite and route run in parallel; the router works on the
+            # original query and re-runs only if the rewrite changes it
+            # substantially.
             
             if self.config.enable_rewriting and self.config.enable_routing:
                 # Parallel execution for latency optimization

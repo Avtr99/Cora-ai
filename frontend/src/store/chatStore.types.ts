@@ -29,7 +29,7 @@ export interface Message {
 /**
  * Represents a chat conversation with messages and metadata.
  *
- * Chats persist on the server (Phase 7). The browser holds them in memory
+ * Chats persist on the server. The browser holds them in memory
  * only: `messagesLoaded` is false for server-listed chats until their turns
  * are fetched via the chats API.
  */
@@ -74,7 +74,7 @@ export interface BotResponseOptions {
  */
 export interface ChatActions {
   // Chat management
-  createNewChat: (initialMessage?: string) => Chat | null;
+  createNewChat: (initialMessage?: string) => Chat;
   prepareNewChat: () => void;
   setActiveChat: (chatId: string) => void;
   clearActiveChat: () => void;

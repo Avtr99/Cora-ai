@@ -160,7 +160,7 @@ describe('getChat', () => {
     const chat = await getChat('chat-1');
 
     // Expected = the same shared selection function run over the same texts
-    // in order, which is exactly what the live path does turn by turn (D30).
+    // in order, which is exactly what the live path does turn by turn.
     const shown: string[] = [];
     const expected: string[][] = [];
     for (const text of texts) {

@@ -36,6 +36,7 @@ import {
   type ProviderPreset,
 } from "@/components/onboarding/llmPresets";
 import { markOnboardingComplete } from "@/components/onboarding/onboardingState";
+import { useIsOwner } from "@/store/authStore";
 import WelcomeStep from "@/components/onboarding/WelcomeStep";
 import ProviderStep from "@/components/onboarding/ProviderStep";
 import CredentialsStep from "@/components/onboarding/CredentialsStep";
@@ -54,6 +55,8 @@ interface DetectionResult {
 
 const OnboardingPage = (): JSX.Element => {
   const navigate = useNavigate();
+  // Onboarding writes instance settings — owner-only.
+  const isOwner = useIsOwner();
   const [stepIndex, setStepIndex] = useState(0);
   const [detection, setDetection] = useState<DetectionResult>({
     llm: null,
@@ -231,6 +234,30 @@ const OnboardingPage = (): JSX.Element => {
               <code className="text-text-primary font-mono">python -m src.api.main</code>
             </p>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // No save controls while signed out — every wizard step writes instance
+  // settings, which the backend rejects for non-owners anyway.
+  if (!isOwner) {
+    return (
+      <div className="min-h-screen bg-surface-base flex flex-col items-center justify-center px-6 3xl:px-8 4xl:px-10 py-10 3xl:py-16 4xl:py-20">
+        <div className="w-full max-w-md 3xl:max-w-lg 4xl:max-w-xl text-center">
+          <h1 className="font-poppins text-heading-1 font-semibold text-text-primary mb-2 3xl:mb-3 4xl:mb-4">
+            Setup is owner-only
+          </h1>
+          <p className="font-inter text-body-sm 3xl:text-base 4xl:text-lg text-text-muted mb-6 3xl:mb-8 4xl:mb-10">
+            Ask the owner to finish setup.
+          </p>
+          <button
+            type="button"
+            onClick={() => navigate("/")}
+            className="px-6 3xl:px-8 py-2.5 3xl:py-3 4xl:py-4 rounded-lg bg-brand-700 text-white font-poppins text-body-sm 3xl:text-base 4xl:text-lg font-semibold shadow-card-md transition-colors hover:bg-brand-hover focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-focus"
+          >
+            Back to chat
+          </button>
         </div>
       </div>
     );

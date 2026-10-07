@@ -52,6 +52,7 @@ class SQLiteCache:
         conn = get_connection()
         try:
             cursor = conn.cursor()
+            cursor.execute("DELETE FROM backend_cache WHERE expires_at <= datetime('now')")
             cursor.execute(
                 """
                 INSERT INTO backend_cache (hash_key, handler_type, cached_data, expires_at)

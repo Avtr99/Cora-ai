@@ -116,19 +116,11 @@ def recover_interrupted_documents(
             )
             job_rows = job_cursor.rowcount
         else:
-            # Startup recovery: mark ALL documents in interrupted statuses
-            # as failed (the process was restarted, so no in-flight job will
-            # ever resume). This runs at API startup (in_process mode) and
-            # worker startup.
-            #
-            # In in_process mode (recover_queued_jobs=True) we also flip
-            # documents still at 'queued' -- they were uploaded but never
-            # picked up by a BackgroundTask before the process died. Without
-            # this the job row is marked failed but the document stays
-            # 'queued' forever, leaving the UI stuck with no retry option.
-            # In worker mode (recover_queued_jobs=False) 'queued' documents
-            # are left untouched so the ingest-worker can pick them up after
-            # the API-container restart.
+            # Startup recovery: mark interrupted documents failed — a
+            # restarted process has no in-flight job to resume. in_process
+            # mode also flips 'queued' docs (their BackgroundTask died with
+            # the process, so the document would stay 'queued' forever);
+            # worker mode leaves them for the ingest-worker to pick up.
             doc_statuses = _INTERRUPTED_STATUSES + (("queued",) if recover_queued_jobs else ())
             doc_placeholders = ",".join("?" for _ in doc_statuses)
             cursor = conn.execute(

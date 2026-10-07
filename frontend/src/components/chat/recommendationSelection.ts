@@ -33,7 +33,7 @@ export function scoreRelevance(rec: Recommendation, message: string): number {
  * Cycles through available recommendations to avoid showing the same one twice.
  *
  * The same function drives live turns (useBotResponse) and replay of
- * server-loaded chats (chatsApi), so both paths pick identical cards (D30).
+ * server-loaded chats (chatsApi), so both paths pick identical cards.
  */
 export function getUnseenRecommendations(
   detectedTopics: RecommendationType[],

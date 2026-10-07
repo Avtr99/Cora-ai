@@ -21,7 +21,6 @@ export type FeedbackTag = (typeof FEEDBACK_TAGS)[number];
 export interface SubmitFeedbackPayload {
   messageId: string;
   chatId?: string;
-  userId?: string;
   rating: FeedbackRating;
   tags?: FeedbackTag[];
   comment?: string;

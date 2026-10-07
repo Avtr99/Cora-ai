@@ -1,38 +1,19 @@
 """
 Unified caching module for the RAG system.
 
-Query result caching is backed by SQLite (see src/db/sqlite_cache.py and
-the backend_cache table). Agent-level in-memory caches (TTLCache/LRUCache
-in routing, rewrite, and conversational handlers) provide short-lived
-dedup for rapid-fire requests within a session — they are independent
-dedup layers, not a separate cache tier.
+Query results live in SQLite (``backend_cache``, see src/db/sqlite_cache.py);
+agent-level TTLCache/LRUCache layers provide short-lived dedup within a
+session. Embeddings persist in the ``embedding_cache`` table.
 
-Embedding persistence also lives in SQLite (see embedding_cache table
-in migrations/001_initial.sql).
-
-Cache key material
-------------------
-The query-cache key folds in every input that can change the answer so a
-stale entry is never served after a config or corpus change:
-
-- the normalized query (always present),
-- ``QUERY_CACHE_SCHEMA_VERSION`` — bump when answer/citation post-processing
-  changes so entries produced by an older pipeline are never served,
-- an optional retrieval-context fingerprint,
-- ``config_revision`` — bumped on any embedding/reranker/LLM model change,
-- ``corpus_revision`` — bumped once per ingestion batch,
-- ``config_version`` — bumped on every ``reload_settings()`` call so cached
-  responses do not serve a stale config-version stamp,
-- the embedding provider+model+dim and reranker provider+model (read from
-  the in-memory Settings singleton — no DB hit on the hot path).
-
-``corpus_revision``, ``config_revision`` and ``config_version`` are read from
-the DB on each key build. The extra SELECT is negligible compared to Qdrant + LLM work,
-and it keeps the app process from serving stale keys after a worker
-ingestion bump.
-
-A revision bump changes the key, so stale entries are skipped automatically;
-``clear()`` is still called on config changes to reclaim the space.
+The query-cache key folds in every input that can change the answer, so a
+stale entry is never served after a config or corpus change: the normalized
+query, ``QUERY_CACHE_SCHEMA_VERSION``, an optional retrieval fingerprint,
+``corpus_revision`` / ``config_revision`` / ``config_version`` (see
+src/db/revisions.py), and the embedding/reranker provider+model from the
+Settings singleton. Revisions are read from the DB per key build — the
+extra SELECT is negligible next to Qdrant + LLM work, and it keeps keys
+fresh across worker ingestions. A bump changes the key, so stale entries
+are skipped automatically; ``clear()`` reclaims them on config changes.
 """
 import hashlib
 import json

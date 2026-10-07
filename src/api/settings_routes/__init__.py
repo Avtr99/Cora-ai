@@ -10,15 +10,20 @@ Provides endpoints for:
 - GET  /v1/settings/status        -- Full configuration status with validation warnings
 """
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from ..auth.session_auth import require_owner_for_writes
 from .llm import router as llm_router
 from .embeddings import router as embeddings_router
 from .search import router as search_router
 from .reranker import router as reranker_router
 from .status import router as status_router
 
-router = APIRouter(prefix="/settings", tags=["settings"])
+router = APIRouter(
+    prefix="/settings",
+    tags=["settings"],
+    dependencies=[Depends(require_owner_for_writes)],
+)
 router.include_router(llm_router)
 router.include_router(embeddings_router)
 router.include_router(search_router)

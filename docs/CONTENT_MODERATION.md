@@ -26,7 +26,7 @@ locally on the deployment machine:
 |------|-------------------|----------------|-------------------------------|
 | **Uploaded documents** | Operator uploads via UI or API | Local filesystem + Qdrant (local) | Only if operator configures external LLM/embedding API |
 | **AI-generated responses** | Generated at query time | SQLite cache (24h TTL) | Only the query text is sent to external LLM if configured |
-| **Conversation memory** | Stored during chat sessions | Qdrant `cora_memories` collection (local) | Never — memory stays in local Qdrant |
+| **Chat history** | Stored per turn during chat sessions | SQLite `chats` / `chat_turns` tables (local) | Chat history is sent to the configured LLM provider as prompt context |
 
 **Key point:** No content leaves the machine unless the operator explicitly sets
 `GEMINI_API_KEY`, `OPENAI_API_KEY`, `VOYAGE_API_KEY`, `TAVILY_API_KEY`, or similar
@@ -56,23 +56,17 @@ are available:
   generating content that is illegal, harmful, or offensive. The prompts use
   XML-structured instructions (`<system_role>`, `<instructions>`) with explicit
   refusal directives.
-- **PII redaction:** All conversation memory is filtered through the PII redactor
-  (`src/memory/pii_redactor.py`) before storage, preventing personal information from
-  being persisted or retrieved in future responses.
 - **Input sanitization:** User queries are sanitized
   (`src/api/middleware/input_sanitizer.py`) to prevent prompt injection attacks that
   could manipulate the AI into generating harmful content.
 - **HTML sanitization:** All AI-generated HTML in responses is sanitized via nh3
   (`src/citations/sanitizer.py`) to prevent XSS and malicious content injection.
 
-### 3.3 Conversation Memory
+### 3.3 Chat History
 
-- **PII redaction (automatic):** Enabled by default
-  (`PII_REDACTION_ENABLED=true`). Detects and redacts names, emails, phone numbers,
-  credit card numbers, SSNs, and other common PII patterns before storage.
-- **Memory deletion:** Users can request memory deletion via the
-  `DELETE /v1/memory/delete` API endpoint (requires authorization token). The
-  operator can also clear the entire memory collection from Qdrant.
+- **Chat deletion:** Users can delete their own chats via the
+  `DELETE /v1/chats/{chat_id}` API endpoint or the chat UI. Deleting a chat
+  cascades to its stored turns in SQLite.
 
 ## 4. Processes for Detecting, Moderating, Reporting, and Removing Content
 
@@ -81,7 +75,7 @@ are available:
 | **Detect** | Operator manually reviews uploaded documents via the document store UI. AI responses are safeguarded by prompt-level refusal directives and input sanitization. |
 | **Moderate** | Operator can delete any document via the UI or API. AI responses are ephemeral (24h cache TTL) and not persisted long-term. |
 | **Report** | Users who encounter inappropriate content should report it to the operator of the instance. The project repository's issue tracker can be used for project-level concerns. |
-| **Remove** | Operator deletes the document via `DELETE /v1/documents/{id}`. For bulk removal, `DELETE /v1/documents` clears all documents. Memory entries can be deleted via `DELETE /v1/memory/delete`. |
+| **Remove** | Operator deletes the document via `DELETE /v1/documents/{id}`. For bulk removal, `DELETE /v1/documents` clears all documents. Chat history can be deleted via `DELETE /v1/chats/{chat_id}`. |
 
 ## 5. Operator Responsibilities
 

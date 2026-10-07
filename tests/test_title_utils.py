@@ -419,7 +419,7 @@ class TestDocIdMatching:
         assert "A6.4 STAN METH 001" in title
 
     def test_doc_id_skips_repeated_heading_as_subtitle(self):
-        """Bug A2: doc_id path must use repetition detection — a heading that
+        """The doc_id path must use repetition detection — a heading that
         repeats multiple times is a section label, not a subtitle."""
         markdown = (
             "# Cover\n\n"

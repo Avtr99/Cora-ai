@@ -7,6 +7,7 @@ import {
   switchLLMProvider,
   type AvailableProvider,
 } from "@/services/llmSettingsApi";
+import { useIsOwner } from "@/store/authStore";
 
 /**
  * ProviderToggle — compact badge + dropdown for switching LLM providers.
@@ -25,6 +26,8 @@ export const ProviderToggle: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const shouldReduceMotion = useReducedMotion();
+  // Provider switching writes instance settings — hide until signed in.
+  const isOwner = useIsOwner();
 
   // Fetch available providers via react-query so the toggle re-fetches when
   // settings are saved (SettingsDialog invalidates this query key after save).
@@ -54,8 +57,8 @@ export const ProviderToggle: React.FC = () => {
     return () => document.removeEventListener("mousedown", handler);
   }, [isOpen]);
 
-  // Don't render if only one or zero providers are configured
-  if (providers.length <= 1) return null;
+  // Don't render while signed out, or with one/zero providers configured.
+  if (!isOwner || providers.length <= 1) return null;
 
   const currentProvider = providers.find((p) => p.slug === current);
   const currentLabel = currentProvider?.label ?? "Unknown";

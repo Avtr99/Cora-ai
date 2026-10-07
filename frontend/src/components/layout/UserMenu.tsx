@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { Settings, BookOpen, Info, LogOut } from 'lucide-react';
+import { Settings, BookOpen, Info, LogOut, User } from 'lucide-react';
 import SettingsDialog from '@/components/settings/SettingsDialog';
+import AccountDialog from '@/components/account/AccountDialog';
 import { useSettingsDialogStore } from '@/store/settingsDialogStore';
 import { useAuthStore } from '@/store/authStore';
 import { logout } from '@/services/authApi';
@@ -15,11 +16,13 @@ interface UserMenuProps {
 
 export const UserMenu: React.FC<UserMenuProps> = ({ isCollapsed, isMobile, setMobileOpen }) => {
   const [open, setOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
   const settingsOpen = useSettingsDialogStore((s) => s.open);
   const closeSettings = useSettingsDialogStore((s) => s.closeSettings);
   const openSettings = useSettingsDialogStore((s) => s.openSettings);
   const authStatus = useAuthStore((s) => s.status);
-  const setAuthStatus = useAuthStore((s) => s.setStatus);
+  const authUser = useAuthStore((s) => s.user);
+  const markRequired = useAuthStore((s) => s.markRequired);
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);
@@ -86,6 +89,14 @@ export const UserMenu: React.FC<UserMenuProps> = ({ isCollapsed, isMobile, setMo
     openSettings('llm');
   };
 
+  const handleAccount = () => {
+    setOpen(false);
+    if (isMobile && setMobileOpen) {
+      setMobileOpen(false);
+    }
+    setAccountOpen(true);
+  };
+
   const handleAbout = () => {
     setOpen(false);
     if (isMobile && setMobileOpen) {
@@ -112,7 +123,7 @@ export const UserMenu: React.FC<UserMenuProps> = ({ isCollapsed, isMobile, setMo
     } catch (err) {
       console.error('Sign-out failed:', err);
     }
-    setAuthStatus('required');
+    markRequired();
   };
 
   const menuItemClass =
@@ -120,6 +131,12 @@ export const UserMenu: React.FC<UserMenuProps> = ({ isCollapsed, isMobile, setMo
 
   const menuItems = (
     <>
+      {authStatus === 'authenticated' && (
+        <button type="button" onClick={handleAccount} className={menuItemClass}>
+          <User className="h-4 w-4 text-text-muted" strokeWidth={1.75} />
+          Account
+        </button>
+      )}
       <button type="button" onClick={handleSettings} className={menuItemClass}>
         <Settings className="h-4 w-4 text-text-muted" strokeWidth={1.75} />
         Settings
@@ -132,6 +149,11 @@ export const UserMenu: React.FC<UserMenuProps> = ({ isCollapsed, isMobile, setMo
         <BookOpen className="h-4 w-4 text-text-muted" strokeWidth={1.75} />
         Getting started guide
       </button>
+      {authUser && (
+        <div className="px-2.5 py-2 font-inter text-xs text-text-muted truncate">
+          Signed in as {authUser.username}
+        </div>
+      )}
       {authStatus === 'authenticated' && (
         <button
           type="button"
@@ -165,7 +187,7 @@ export const UserMenu: React.FC<UserMenuProps> = ({ isCollapsed, isMobile, setMo
         >
           <span className="flex h-5 w-5 shrink-0 items-center justify-center">
             <Settings
-              className="h-5 w-5 text-text-muted"
+              className={`${isCollapsed ? 'h-5 w-5' : 'h-4.5 w-4.5'} text-text-muted`}
               strokeWidth={1.75}
               aria-hidden={true}
             />
@@ -180,7 +202,7 @@ export const UserMenu: React.FC<UserMenuProps> = ({ isCollapsed, isMobile, setMo
         {open && !isCollapsed && (
           <div
             role="menu"
-            className="absolute z-50 left-0 bottom-full mb-2 w-full rounded-xl border border-border-ui bg-surface-card p-1.5 shadow-modal"
+            className="absolute z-50 left-0 bottom-full mb-2 w-full rounded-xl border border-border-ui bg-surface-card p-1.5 shadow-modal origin-bottom-left animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-1 duration-150 ease-[cubic-bezier(0.16,1,0.3,1)]"
           >
             {menuItems}
           </div>
@@ -191,7 +213,7 @@ export const UserMenu: React.FC<UserMenuProps> = ({ isCollapsed, isMobile, setMo
             ref={popupRef}
             role="menu"
             style={{ position: 'fixed', left: popupPos.left, bottom: popupPos.bottom }}
-            className="z-50 w-56 rounded-xl border border-border-ui bg-surface-card p-1.5 shadow-modal max-h-[calc(100dvh-16px)] overflow-y-auto"
+            className="z-50 w-56 rounded-xl border border-border-ui bg-surface-card p-1.5 shadow-modal max-h-[calc(100dvh-16px)] overflow-y-auto origin-bottom-left animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-1 duration-150 ease-[cubic-bezier(0.16,1,0.3,1)]"
           >
             {menuItems}
           </div>,
@@ -200,6 +222,7 @@ export const UserMenu: React.FC<UserMenuProps> = ({ isCollapsed, isMobile, setMo
       </div>
 
       <SettingsDialog open={settingsOpen} onOpenChange={closeSettings} />
+      <AccountDialog open={accountOpen} onOpenChange={setAccountOpen} />
     </>
   );
 };

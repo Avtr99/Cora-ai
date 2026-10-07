@@ -1,6 +1,5 @@
 """
-Tests for CitationManager - Phase 1: Source Type Classification
-Phase 2: Source Name Cleaning
+Tests for CitationManager - source type classification and source name cleaning.
 """
 
 import pytest
@@ -503,7 +502,7 @@ class TestFormatCitationsForResponse:
 
 
 class TestCleanSourceName:
-    """Test clean_source_name() function for Phase 2."""
+    """Test clean_source_name() function."""
     
     def setup_method(self):
         self.manager = CitationManager()
@@ -746,7 +745,7 @@ class TestCitationSelection:
 
 
 class TestCitationSuppression:
-    """Test citation suppression for conversational queries - Phase 4."""
+    """Test citation suppression for conversational queries."""
     
     def setup_method(self):
         self.manager = CitationManager()

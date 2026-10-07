@@ -38,7 +38,7 @@ Cora AI allows users to upload documents and generate AI responses based on thos
 
 ## 6. Data Handling
 
-Cora AI follows a local-first data model. Your chat history and conversations are stored on the machine where the instance is deployed, not in any central cloud service. PII is automatically redacted before storage. Each instance has one built-in owner account, and no personal identifiers such as IP addresses are collected by the application.
+Cora AI follows a local-first data model. Your chat history and conversations are stored on the machine where the instance is deployed, not in any central cloud service. PII is automatically redacted before storage. The owner creates user accounts, there is no self-sign-up, and each user sees only their own chats. No personal identifiers such as IP addresses are collected by the application.
 
 If the operator has configured external API providers (e.g. for AI inference or web search), some data may be sent to those providers. See the Privacy Policy for details.
 

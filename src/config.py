@@ -19,8 +19,7 @@ class Settings(BaseSettings):
     # VOYAGE_API_KEY / COHERE_API_KEY / OPENAI_API_KEY are .env-only fallbacks used
     # by env-provider detection and the LLM profile manager. The embeddings and
     # reranker subsystems read their own scoped keys (below) so saving one in the
-    # Settings UI never overwrites the other. See migration 009 and
-    # docs/ROADMAP_FRAGILITY_AUDIT.md (P0 shared-key fix).
+    # Settings UI never overwrites the other. See migration 009.
     VOYAGE_API_KEY: Optional[str] = None  # .env fallback (LLM env detection)
     COHERE_API_KEY: Optional[str] = None  # .env fallback (LLM env detection)
     OPENAI_API_KEY: Optional[str] = None  # .env fallback (LLM env detection)
@@ -154,7 +153,7 @@ class Settings(BaseSettings):
     PORT: int = 8000
     RAG_TIMEOUT_MS: int = 45000  # End-to-end orchestrator timeout
 
-    # --- Async query jobs (Phase 3) ---
+    # --- Async query jobs ---
     ASYNC_QUERY_WORKERS: int = 1
     ASYNC_QUERY_QUEUE_MAX_SIZE: int = 100
     ASYNC_QUERY_JOB_TTL_SECONDS: int = 3600
@@ -162,25 +161,14 @@ class Settings(BaseSettings):
     # --- Security ---
     API_ACCESS_KEY: Optional[str] = None  # Optional key for protected endpoints
     CORS_ORIGINS: str = "http://localhost:3000,http://localhost:8080,http://localhost:8000,http://localhost:5000,http://localhost:5001"
-    SECRET_KEY: Optional[str] = None  # Fallback for memory anonymization (MEMORY_SECRET_KEY preferred); auto-generated on first run
-    MEMORY_SECRET_KEY: Optional[str] = None  # Preferred for memory anonymization; falls back to SECRET_KEY
-    PII_REDACTION_ENABLED: bool = True  # GDPR compliance before memory storage
     ENABLE_API_KEY_PROTECTION: bool = False
     AUTH_COOKIE_SECURE: bool = True  # Set false only for plain-HTTP testing (Safari on http://localhost, LAN IPs)
     ENABLE_TEST_ENDPOINT: bool = False  # Dev-only test query endpoint
     MAX_REQUEST_BODY_SIZE_BYTES: int = 5 * 1024 * 1024
 
-    # --- JWT auth ---
-    JWT_SECRET_KEY: Optional[str] = None  # Required for auth, validated on use
-    JWT_ALGORITHM: Literal["HS256"] = "HS256"
-    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
-
     # --- Logging ---
     LOG_LEVEL: str = "INFO"
     LOG_JSON_FORMAT: bool = False  # Set True for production log aggregators
-
-    # --- Auth controls ---
-    ENABLE_INSECURE_TOKEN_ENDPOINT: bool = False  # Dev-only token issuance
 
     # --- Conversational handler ---
     CONVERSATIONAL_INTENT_CACHE_SIZE: int = 512

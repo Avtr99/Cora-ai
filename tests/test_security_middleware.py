@@ -217,7 +217,8 @@ class TestSessionCookieAuth:
         self, protected_client: TestClient, api_key: str
     ):
         """A valid session cookie authenticates a GET on a protected path."""
-        from src.api.auth.session_auth import OWNER_USER_ID, SESSION_COOKIE, create_session
+        from src.api.auth.session_auth import SESSION_COOKIE, create_session
+        from src.db.users import OWNER_USER_ID
 
         protected_client.cookies.set(SESSION_COOKIE, create_session(OWNER_USER_ID))
         response = protected_client.get("/v1/private")
@@ -227,7 +228,8 @@ class TestSessionCookieAuth:
         self, protected_client: TestClient, api_key: str
     ):
         """Cookie-authenticated unsafe method with cross-site fetch is forbidden."""
-        from src.api.auth.session_auth import OWNER_USER_ID, SESSION_COOKIE, create_session
+        from src.api.auth.session_auth import SESSION_COOKIE, create_session
+        from src.db.users import OWNER_USER_ID
 
         protected_client.cookies.set(SESSION_COOKIE, create_session(OWNER_USER_ID))
         response = protected_client.post(
@@ -239,7 +241,8 @@ class TestSessionCookieAuth:
     def test_session_cookie_post_same_origin_allowed(
         self, protected_client: TestClient, api_key: str
     ):
-        from src.api.auth.session_auth import OWNER_USER_ID, SESSION_COOKIE, create_session
+        from src.api.auth.session_auth import SESSION_COOKIE, create_session
+        from src.db.users import OWNER_USER_ID
 
         protected_client.cookies.set(SESSION_COOKIE, create_session(OWNER_USER_ID))
         response = protected_client.post(
@@ -251,7 +254,8 @@ class TestSessionCookieAuth:
         self, protected_client: TestClient, api_key: str
     ):
         """Requests without Sec-Fetch-Site (non-browser clients) are allowed."""
-        from src.api.auth.session_auth import OWNER_USER_ID, SESSION_COOKIE, create_session
+        from src.api.auth.session_auth import SESSION_COOKIE, create_session
+        from src.db.users import OWNER_USER_ID
 
         protected_client.cookies.set(SESSION_COOKIE, create_session(OWNER_USER_ID))
         response = protected_client.post("/v1/query")
@@ -271,7 +275,8 @@ class TestSessionCookieAuth:
         self, protected_client: TestClient, api_key: str
     ):
         """Cookie auth marks the request state with the session row's user_id."""
-        from src.api.auth.session_auth import OWNER_USER_ID, SESSION_COOKIE, create_session
+        from src.api.auth.session_auth import SESSION_COOKIE, create_session
+        from src.db.users import OWNER_USER_ID
 
         protected_client.cookies.set(SESSION_COOKIE, create_session(OWNER_USER_ID))
         response = protected_client.get("/v1/whoami")

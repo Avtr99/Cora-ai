@@ -33,7 +33,6 @@ def mock_checks():
         "check_qdrant_health": AsyncMock(return_value=_healthy("qdrant")),
         "check_llm_health": AsyncMock(return_value=_healthy("llm")),
         "check_embeddings_health": AsyncMock(return_value=_healthy("embeddings")),
-        "check_cache_health": AsyncMock(return_value=_healthy("cache")),
         "check_sqlite_cache_health": AsyncMock(return_value=_healthy("sqlite_cache")),
     }
     with patch.multiple(

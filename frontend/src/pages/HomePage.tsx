@@ -7,7 +7,6 @@ const ReactQueryDevtools = import.meta.env.DEV
   : () => null;
 import { SidebarProvider } from "@/contexts/useSidebar";
 import { ChatProvider } from "@/contexts/ChatContext";
-import { UserProvider } from "@/contexts/UserContext";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import Index from "@/pages/Index";
 
@@ -43,13 +42,11 @@ const HomePage: React.FC = () => {
           console.error('HomePage error:', error, info.componentStack);
         }}
       >
-        <UserProvider>
-          <SidebarProvider>
-            <ChatProvider>
-              <Index />
-            </ChatProvider>
-          </SidebarProvider>
-        </UserProvider>
+        <SidebarProvider>
+          <ChatProvider>
+            <Index />
+          </ChatProvider>
+        </SidebarProvider>
       </ErrorBoundary>
     </>
   );

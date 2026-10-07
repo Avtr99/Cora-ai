@@ -193,8 +193,9 @@ class GeminiClient(BaseRAGClient):
         (length checks, sanitization, or injection detection) because it
         is intended only for internally-constructed prompts where the
         caller controls the content. External/user-facing inputs MUST go
-        through ``search_and_process`` which enforces MAX_QUERY_LENGTH
-        and ``_sanitize_query`` checks. Do NOT pass raw user input here.
+        through ``search_and_process`` which enforces MAX_QUERY_LENGTH,
+        and through the API-layer input sanitizer. Do NOT pass raw user
+        input here.
 
         Args:
             prompt: The prompt string to send to the model.
@@ -475,9 +476,9 @@ class GeminiClient(BaseRAGClient):
 
         return fallback_text
 
-    # _build_context_fingerprint, _should_cache_answer,
-    # _calculate_coverage_score, and _sanitize_query are inherited from
-    # BaseRAGClient (provider-agnostic implementations).
+    # _build_context_fingerprint, _should_cache_answer, and
+    # _calculate_coverage_score are inherited from BaseRAGClient
+    # (provider-agnostic implementations).
 
     def get_status(self) -> Dict[str, Any]:
         """

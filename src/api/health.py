@@ -209,21 +209,6 @@ async def check_embeddings_health() -> ComponentHealth:
         )
 
 
-async def check_cache_health() -> ComponentHealth:
-    """Check cache system status."""
-    from .middleware.logging_middleware import get_metrics
-    from ..utils.patterns import check_component_health
-    
-    return await check_component_health(
-        name="cache",
-        check_fn=get_metrics,
-        details_fn=lambda metrics: {
-            "cache_hit_rate": metrics.get("cache_hit_rate", 0),
-            "request_count": metrics.get("request_count", 0)
-        }
-    )
-
-
 async def check_sqlite_cache_health() -> ComponentHealth:
     """Check SQLite query cache connectivity."""
     from ..db.sqlite_cache import get_sqlite_cache
@@ -269,7 +254,6 @@ async def run_health_checks() -> Dict[str, Any]:
         ("qdrant", check_qdrant_health()),
         ("llm", check_llm_health()),
         ("embeddings", check_embeddings_health()),
-        ("cache", check_cache_health()),
         ("sqlite_cache", check_sqlite_cache_health()),
     ]
 

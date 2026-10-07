@@ -5,13 +5,15 @@ from pathlib import Path
 
 import pytest
 
-from src.api.auth.session_auth import OWNER_USER_ID, create_session
+from src.api.auth.session_auth import create_session
+from src.db.users import OWNER_USER_ID
 from src.api.middleware.security import generate_api_key
 from src.config import reset_settings_singleton
 from src.db.database import get_connection, run_migrations
 
 _MIGRATIONS_DIR = Path(__file__).parent.parent / "migrations"
 _MIGRATION_011 = "011_users_and_chats.sql"
+_MIGRATION_012 = "012_single_owner.sql"
 
 
 @pytest.fixture
@@ -64,7 +66,7 @@ class TestUsersTable:
         ]
 
     def test_second_owner_rejected(self, tmp_db):
-        """The partial unique index allows exactly one owner row (D31)."""
+        """The partial unique index allows exactly one owner row."""
         run_migrations()
         conn = get_connection()
         try:
@@ -85,7 +87,7 @@ class TestUsersTable:
 
 class TestUpgradeFrom010:
     def test_011_rebuilds_auth_sessions_with_user_id(self, tmp_db):
-        """A DB at migration 010 keeps no session rows after 011 (D27)."""
+        """A DB at migration 010 keeps no session rows after 011."""
         _apply_migrations_before(_MIGRATION_011)
 
         conn = get_connection()
@@ -132,6 +134,57 @@ class TestUpgradeFrom010:
         assert "user_id" in job_cols
         assert session_rows == []
         assert job_rows == []
+
+
+class TestSingleOwnerMigration:
+    def test_012_retires_member_rows(self, tmp_db):
+        """Upgrading an 011 DB with members: their chats and jobs move to the
+        owner, their sessions end, and the member rows are removed."""
+        _apply_migrations_before(_MIGRATION_012)
+
+        conn = get_connection()
+        try:
+            conn.execute(
+                "INSERT INTO users (id, username, role, password_hash) "
+                "VALUES ('m1', 'alice', 'member', 'hash')"
+            )
+            conn.execute(
+                "INSERT INTO auth_sessions (token_hash, user_id, key_fingerprint, expires_at) "
+                "VALUES ('t1', 'm1', 'fp', datetime('now', '+1 day'))"
+            )
+            conn.execute(
+                "INSERT INTO chats (id, user_id, title) VALUES ('c1', 'm1', 'member chat')"
+            )
+            conn.execute(
+                "INSERT INTO async_query_jobs "
+                "(job_id, user_id, status, submitted_at, payload) "
+                "VALUES ('j1', 'm1', 'queued', '2026-01-01', '{}')"
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        run_migrations()
+
+        conn = get_connection()
+        try:
+            users = conn.execute("SELECT id, role FROM users").fetchall()
+            chat_owner = conn.execute(
+                "SELECT user_id FROM chats WHERE id = 'c1'"
+            ).fetchone()[0]
+            job_owner = conn.execute(
+                "SELECT user_id FROM async_query_jobs WHERE job_id = 'j1'"
+            ).fetchone()[0]
+            sessions = conn.execute("SELECT * FROM auth_sessions").fetchall()
+        finally:
+            conn.close()
+
+        assert [dict(row) for row in users] == [
+            {"id": OWNER_USER_ID, "role": "owner"}
+        ]
+        assert chat_owner == OWNER_USER_ID
+        assert job_owner == OWNER_USER_ID
+        assert sessions == []
 
 
 class TestUserCascade:

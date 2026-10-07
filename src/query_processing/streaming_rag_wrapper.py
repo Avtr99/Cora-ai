@@ -7,7 +7,6 @@ orchestrator path.
 
 from typing import Any, Dict, Optional, AsyncGenerator
 import asyncio
-import hashlib
 
 from loguru import logger
 
@@ -84,12 +83,6 @@ class StreamingRAGWrapper:
             raise ValueError(f"Query exceeds maximum length of {MAX_QUERY_LENGTH} characters")
         if not isinstance(vector_results, dict):
             raise ValueError("vector_results must be a dictionary")
-
-        sanitized_query, injection_detected = self._base._sanitize_query(query)
-        if injection_detected:
-            query_hash = hashlib.sha256(query.encode("utf-8")).hexdigest()[:16]
-            logger.warning(f"Potential prompt injection detected. Query hash: {query_hash}")
-            query = sanitized_query
 
         from .post_processor import postprocess_answer
         from ..citations.check import check_citations, drop_markers

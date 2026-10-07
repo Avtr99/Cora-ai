@@ -59,6 +59,7 @@ import {
   inputClass,
   type TestState,
 } from "@/components/settings/settingsPrimitives";
+import { useAuthStore } from "@/store/authStore";
 
 interface SettingsDialogProps {
   open: boolean;
@@ -68,7 +69,7 @@ interface SettingsDialogProps {
 
 type Tab = "llm" | "embeddings" | "search";
 
-const TAB_ORDER: Tab[] = ["llm", "embeddings", "search"];
+const TABS: Tab[] = ["llm", "embeddings", "search"];
 const TAB_LABELS: Record<Tab, string> = {
   llm: "AI Model",
   embeddings: "Embeddings",
@@ -79,6 +80,9 @@ const SettingsDialog = ({ open, onOpenChange, onSaved }: SettingsDialogProps): J
   const queryClient = useQueryClient();
   const tab = useSettingsDialogStore((s) => s.tab);
   const setTab = useSettingsDialogStore((s) => s.setTab);
+  const authStatus = useAuthStore((s) => s.status);
+
+  const activeTab: Tab = TABS.includes(tab) ? tab : TABS[0];
 
   const refreshChatReadiness = useCallback(async () => {
     // Invalidate the chat readiness config status so the banner/composer update
@@ -180,7 +184,7 @@ const SettingsDialog = ({ open, onOpenChange, onSaved }: SettingsDialogProps): J
       if (!cancelled) setLoading(false);
     });
     return () => { cancelled = true; };
-  }, [open]);
+  }, [open, authStatus]);
 
   // Update base_url and model when LLM preset changes. Resetting the model
   // prevents a stale model name from the previous provider (e.g. an OpenRouter
@@ -331,8 +335,8 @@ const SettingsDialog = ({ open, onOpenChange, onSaved }: SettingsDialogProps): J
   // matching the tablist convention used by PricingFactorTabs/FilterPanel.
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const selectTabAt = (index: number): void => {
-    const normalized = (index + TAB_ORDER.length) % TAB_ORDER.length;
-    setTab(TAB_ORDER[normalized]);
+    const normalized = (index + TABS.length) % TABS.length;
+    setTab(TABS[normalized]);
     tabRefs.current[normalized]?.focus();
   };
   const onTabKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>, index: number): void => {
@@ -347,7 +351,7 @@ const SettingsDialog = ({ open, onOpenChange, onSaved }: SettingsDialogProps): J
       selectTabAt(0);
     } else if (e.key === "End") {
       e.preventDefault();
-      selectTabAt(TAB_ORDER.length - 1);
+      selectTabAt(TABS.length - 1);
     }
   };
 
@@ -357,7 +361,7 @@ const SettingsDialog = ({ open, onOpenChange, onSaved }: SettingsDialogProps): J
         <DialogHeader>
           <DialogTitle className="font-poppins text-heading-2 3xl:text-heading-2 4xl:text-heading-2 font-semibold text-text-primary">Settings</DialogTitle>
           <DialogDescription className="font-inter text-body-sm text-text-muted">
-            Configure Cora&apos;s AI providers and test connections before saving.
+            Configure Cora's AI providers and test connections before saving.
           </DialogDescription>
         </DialogHeader>
 
@@ -369,7 +373,7 @@ const SettingsDialog = ({ open, onOpenChange, onSaved }: SettingsDialogProps): J
           <div className="space-y-3 3xl:space-y-4">
             {/* Tabs */}
             <div className="flex gap-1 border-b border-border-ui" role="tablist" aria-label="Settings sections">
-              {TAB_ORDER.map((t, i) => (
+              {TABS.map((t, i) => (
                 <button
                   key={t}
                   ref={(el) => {
@@ -378,13 +382,13 @@ const SettingsDialog = ({ open, onOpenChange, onSaved }: SettingsDialogProps): J
                   id={`settings-tab-${t}`}
                   type="button"
                   role="tab"
-                  aria-selected={tab === t}
+                  aria-selected={activeTab === t}
                   aria-controls={`settings-panel-${t}`}
-                  tabIndex={tab === t ? 0 : -1}
+                  tabIndex={activeTab === t ? 0 : -1}
                   onClick={() => setTab(t)}
                   onKeyDown={(e) => onTabKeyDown(e, i)}
                   className={`px-4 3xl:px-5 py-1.5 3xl:py-2 text-body-sm 3xl:text-base 4xl:text-lg font-poppins font-medium transition-colors border-b-2 -mb-px focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-inset ${
-                    tab === t
+                    activeTab === t
                       ? "border-text-primary text-text-primary"
                       : "border-transparent text-text-muted hover:text-text-primary"
                   }`}
@@ -395,12 +399,13 @@ const SettingsDialog = ({ open, onOpenChange, onSaved }: SettingsDialogProps): J
             </div>
 
             {/* LLM Tab */}
-            {tab === "llm" && (
+            {activeTab === "llm" && (
               <div className="min-h-[240px] 3xl:min-h-[280px] space-y-2.5 3xl:space-y-3" role="tabpanel" id="settings-panel-llm" aria-labelledby="settings-tab-llm">
                 {llmSaved ? (
                   <SavedBanner text="LLM settings saved. The new model is active immediately." />
                 ) : (
                   <>
+                    <fieldset className="min-w-0 border-0 p-0 m-0 space-y-2.5 3xl:space-y-3">
                     <ProviderGrid
                       presets={PRESETS}
                       selected={llmForm.preset}
@@ -461,18 +466,20 @@ const SettingsDialog = ({ open, onOpenChange, onSaved }: SettingsDialogProps): J
                       Note: changes take effect immediately — no restart needed. Use the provider
                       toggle in the search bar to switch between configured providers.
                     </p>
+                    </fieldset>
                   </>
                 )}
               </div>
             )}
 
             {/* Embeddings Tab */}
-            {tab === "embeddings" && (
+            {activeTab === "embeddings" && (
               <div className="min-h-[240px] 3xl:min-h-[280px] space-y-2.5 3xl:space-y-3" role="tabpanel" id="settings-panel-embeddings" aria-labelledby="settings-tab-embeddings">
                 {embSaved ? (
                   <SavedBanner text="Embedding settings saved. Re-ingest documents if you changed the dimension." />
                 ) : (
                   <>
+                    <fieldset className="min-w-0 border-0 p-0 m-0 space-y-2.5 3xl:space-y-3">
                     <ProviderGrid
                       presets={EMBEDDING_PRESETS}
                       selected={embProvider}
@@ -531,18 +538,20 @@ const SettingsDialog = ({ open, onOpenChange, onSaved }: SettingsDialogProps): J
                       onCancel={() => onOpenChange(false)}
                       saving={embSaving}
                     />
+                    </fieldset>
                   </>
                 )}
               </div>
             )}
 
             {/* Search Tab */}
-            {tab === "search" && (
+            {activeTab === "search" && (
               <div className="min-h-[240px] 3xl:min-h-[280px] space-y-2.5 3xl:space-y-3" role="tabpanel" id="settings-panel-search" aria-labelledby="settings-tab-search">
                 {searchSaved ? (
                   <SavedBanner text="Search settings saved." />
                 ) : (
                   <>
+                    <fieldset className="min-w-0 border-0 p-0 m-0 space-y-2.5 3xl:space-y-3">
                     <ProviderGrid
                       presets={SEARCH_PROVIDER_PRESETS}
                       selected={searchProvider}
@@ -589,6 +598,7 @@ const SettingsDialog = ({ open, onOpenChange, onSaved }: SettingsDialogProps): J
                       onCancel={() => onOpenChange(false)}
                       saving={searchSaving}
                     />
+                    </fieldset>
                   </>
                 )}
               </div>

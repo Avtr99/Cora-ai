@@ -33,16 +33,8 @@ import re
 from collections import Counter
 from typing import Any, Optional
 
-# ---------------------------------------------------------------------------
 # Universal front-matter / section headings that are not document titles.
-#
-# This list is intentionally SMALL and domain-agnostic. It contains only words
-# that are universal across ALL document types (academic papers, policy docs,
-# technical standards, market reports, etc.). Domain-specific terms like
-# "additionality", "EU ETS", "biochar" are NOT listed here — they are handled
-# by the heading-repetition detection in _extract_content_title, which is
-# adaptive and requires no maintenance.
-# ---------------------------------------------------------------------------
+# Domain-specific terms stay out — heading repetition handles them.
 _UNIVERSAL_GENERIC_WORDS = {
     # Front matter
     "abstract", "acknowledgements", "acknowledgments", "foreword",

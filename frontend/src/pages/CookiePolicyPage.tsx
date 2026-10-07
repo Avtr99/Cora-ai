@@ -41,9 +41,6 @@ const CookiePolicyPage: React.FC = () => {
             shown again.</li>
           <li><strong>Visit flag:</strong> A flag (<code>cora_has_visited</code>) indicating the
             user has visited before, used to avoid unnecessary redirects on subsequent visits.</li>
-          <li><strong>User profile:</strong> A generated profile record (<code>userProfile</code>)
-            that holds a local user ID. The ID is sent to the server only when you rate a message
-            with thumbs up or down.</li>
         </ul>
         <p>
           Local storage holds no chat content. These keys persist on your device until you clear

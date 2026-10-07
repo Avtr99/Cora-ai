@@ -1,17 +1,19 @@
-"""Tests for session-auth helpers and the /api/auth/session routes (P3-T2/T3, P6-T1, P7-T1)."""
+"""Tests for session-auth helpers and the /api/auth routes."""
 import hashlib
 
 import pytest
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.testclient import TestClient
 from loguru import logger
 
+from src.api.auth import login_limiter
+from src.api.auth.credentials import hash_password
 from src.api.auth.session_auth import (
-    OWNER_USER_ID,
     SESSION_COOKIE,
     create_session,
     current_user_id,
     delete_session,
+    delete_sessions,
     key_matches,
     session_user_id,
 )
@@ -20,6 +22,16 @@ from src.api.middleware.security import SecurityMiddleware, generate_api_key
 from src.api.session_routes import router as session_router
 from src.config import get_settings, reset_settings_singleton
 from src.db.database import get_connection, run_migrations
+from src.db.users import OWNER_USER_ID
+
+OWNER_USERNAME = "boss"
+OWNER_PASSWORD = "owner-password-15"
+
+
+@pytest.fixture(autouse=True)
+def _reset_login_limiter():
+    """Every test starts with an empty rate-limiter window."""
+    login_limiter.reset()
 
 
 @pytest.fixture
@@ -67,6 +79,38 @@ def protected_app() -> FastAPI:
         exclude_paths=API_KEY_EXCLUDED_PATHS,
     )
     return app
+
+
+@pytest.fixture
+def claimed_owner(protected_app, protection_on) -> TestClient:
+    """Protection on + a claimed owner; returns a client holding the owner cookie."""
+    client = TestClient(protected_app, base_url="https://testserver")
+    response = client.post(
+        "/api/auth/owner",
+        json={
+            "api_key": protection_on,
+            "username": OWNER_USERNAME,
+            "password": OWNER_PASSWORD,
+        },
+    )
+    assert response.status_code == 204
+    return client
+
+
+def _insert_non_owner(username: str) -> str:
+    """Insert a non-owner row directly — no API creates one any more, but a
+    stale row exercises the owner-only guards."""
+    conn = get_connection()
+    try:
+        conn.execute(
+            "INSERT INTO users (id, username, role, password_hash) "
+            "VALUES (?, ?, 'member', ?)",
+            (f"u-{username}", username, hash_password("stale-password-15")),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    return f"u-{username}"
 
 
 class TestKeyMatches:
@@ -141,6 +185,23 @@ class TestSessionRows:
         assert token not in dict(rows[0]).values()
 
 
+class TestDeleteSessions:
+    def test_keep_token_survives(self, api_key):
+        uid = OWNER_USER_ID
+        other_uid = _insert_non_owner("frank")
+        t1 = create_session(uid)
+        t2 = create_session(uid)
+        other = create_session(other_uid)
+
+        delete_sessions(uid, keep_token=t1)
+        assert session_user_id(t1) == uid
+        assert session_user_id(t2) is None
+        assert session_user_id(other) == other_uid
+
+        delete_sessions(uid)
+        assert session_user_id(t1) is None
+
+
 class TestCurrentUserId:
     def test_protection_off_returns_owner(self, api_key, monkeypatch):
         monkeypatch.setattr(get_settings(), "ENABLE_API_KEY_PROTECTION", False)
@@ -164,35 +225,70 @@ class TestCurrentUserId:
 class TestSessionRoutesProtectionOff:
     """With protection off, the session routes report/return early."""
 
-    def test_get_session_reports_not_required(self, protected_app, monkeypatch):
+    def test_get_session_reports_owner(self, protected_app, api_key, monkeypatch):
         monkeypatch.setattr(get_settings(), "ENABLE_API_KEY_PROTECTION", False)
         client = TestClient(protected_app)
         response = client.get("/api/auth/session")
         assert response.status_code == 200
-        assert response.json() == {"required": False, "authenticated": True}
+        assert response.json() == {
+            "required": False,
+            "authenticated": True,
+            "owner_claim_required": False,
+            "user": {"id": OWNER_USER_ID, "username": "owner", "role": "owner"},
+        }
 
-    def test_post_session_not_available(self, protected_app, monkeypatch):
+    @pytest.mark.parametrize(
+        "path,body",
+        [
+            ("/api/auth/session", {"username": "alice", "password": "x"}),
+            (
+                "/api/auth/owner",
+                {"api_key": "k", "username": "alice", "password": "a" * 15},
+            ),
+        ],
+    )
+    def test_post_not_available(self, protected_app, monkeypatch, path, body):
         monkeypatch.setattr(get_settings(), "ENABLE_API_KEY_PROTECTION", False)
         client = TestClient(protected_app)
-        response = client.post("/api/auth/session", json={"api_key": "any"})
+        response = client.post(path, json=body)
         assert response.status_code == 404
 
 
 class TestSessionRoutesProtectionOn:
     """With protection on, /api/auth is public but everything else needs auth."""
 
-    def test_get_session_unauthenticated(self, protected_app, protection_on):
+    def test_get_session_unauthenticated_unclaimed(self, protected_app, protection_on):
+        """Unclaimed owner: the SPA must show the claim form."""
         client = TestClient(protected_app)
         response = client.get("/api/auth/session")
         assert response.status_code == 200
-        assert response.json() == {"required": True, "authenticated": False}
+        assert response.json() == {
+            "required": True,
+            "authenticated": False,
+            "owner_claim_required": True,
+            "user": None,
+        }
 
-    def test_get_session_with_cookie(self, protected_app, protection_on):
-        client = TestClient(protected_app)
-        client.cookies.set(SESSION_COOKIE, create_session(OWNER_USER_ID))
+    def test_get_session_unauthenticated_claimed(self, claimed_owner):
+        client = TestClient(claimed_owner.app)
         response = client.get("/api/auth/session")
         assert response.status_code == 200
-        assert response.json() == {"required": True, "authenticated": True}
+        assert response.json() == {
+            "required": True,
+            "authenticated": False,
+            "owner_claim_required": False,
+            "user": None,
+        }
+
+    def test_get_session_with_cookie(self, claimed_owner):
+        response = claimed_owner.get("/api/auth/session")
+        assert response.status_code == 200
+        assert response.json() == {
+            "required": True,
+            "authenticated": True,
+            "owner_claim_required": False,
+            "user": {"id": OWNER_USER_ID, "username": OWNER_USERNAME, "role": "owner"},
+        }
 
     def test_get_session_with_api_key(self, protected_app, protection_on):
         client = TestClient(protected_app)
@@ -200,10 +296,15 @@ class TestSessionRoutesProtectionOn:
             "/api/auth/session", headers={"X-API-Key": protection_on}
         )
         assert response.status_code == 200
-        assert response.json() == {"required": True, "authenticated": True}
+        assert response.json() == {
+            "required": True,
+            "authenticated": True,
+            "owner_claim_required": True,
+            "user": {"id": OWNER_USER_ID, "username": "owner", "role": "owner"},
+        }
 
     def test_api_key_sets_owner_identity(self, protected_app, protection_on):
-        """X-API-Key auth marks the request as the built-in owner (D15/D31)."""
+        """X-API-Key auth marks the request as the built-in owner."""
         client = TestClient(protected_app)
         response = client.get(
             "/v1/whoami", headers={"X-API-Key": protection_on}
@@ -224,40 +325,154 @@ class TestSessionRoutesProtectionOn:
         client = TestClient(protected_app)
         assert client.get("/api/cora-health").status_code == 401
 
-    def test_login_wrong_key(self, protected_app, protection_on):
-        client = TestClient(protected_app)
-        response = client.post("/api/auth/session", json={"api_key": "wrong"})
-        assert response.status_code == 401
-        assert "set-cookie" not in response.headers
 
-    @pytest.mark.parametrize("fetch_site", ["cross-site", "same-site"])
-    def test_login_cross_site_rejected(
-        self, protected_app, protection_on, fetch_site
-    ):
-        """Login CSRF: a cross-site POST must not plant a session cookie, even
-        with the correct access key."""
+class TestOwnerClaim:
+    """POST /api/auth/owner — one-time owner account setup."""
+
+    def test_unclaimed_owner_login_fails(self, protected_app, protection_on):
+        """Before the claim, the owner row has no password — any login → 401."""
         client = TestClient(protected_app)
         response = client.post(
             "/api/auth/session",
-            json={"api_key": protection_on},
+            json={"username": "owner", "password": "any-password-1"},
+        )
+        assert response.status_code == 401
+        assert "set-cookie" not in response.headers
+
+    def test_claim_wrong_key(self, protected_app, protection_on):
+        client = TestClient(protected_app)
+        response = client.post(
+            "/api/auth/owner",
+            json={
+                "api_key": "wrong-key",
+                "username": OWNER_USERNAME,
+                "password": OWNER_PASSWORD,
+            },
+        )
+        assert response.status_code == 401
+        assert "set-cookie" not in response.headers
+
+    def test_claim_success_sets_cookie_and_username(
+        self, protected_app, protection_on
+    ):
+        client = TestClient(protected_app, base_url="https://testserver")
+        response = client.post(
+            "/api/auth/owner",
+            json={
+                "api_key": protection_on,
+                "username": OWNER_USERNAME,
+                "password": OWNER_PASSWORD,
+            },
+        )
+        assert response.status_code == 204
+        assert "set-cookie" in response.headers
+        # The claim cookie authenticates protected routes and reports the new username.
+        assert client.get("/v1/health").status_code == 200
+        session = client.get("/api/auth/session").json()
+        assert session["user"]["username"] == OWNER_USERNAME
+        assert session["user"]["role"] == "owner"
+        assert session["owner_claim_required"] is False
+
+    def test_second_claim_conflict(self, claimed_owner, protection_on):
+        response = claimed_owner.post(
+            "/api/auth/owner",
+            json={
+                "api_key": protection_on,
+                "username": "someoneelse",
+                "password": OWNER_PASSWORD,
+            },
+        )
+        assert response.status_code == 409
+
+    def test_claim_username_taken_by_stale_row(
+        self, protected_app, protection_on
+    ):
+        _insert_non_owner("member1")
+        client = TestClient(protected_app)
+        response = client.post(
+            "/api/auth/owner",
+            json={
+                "api_key": protection_on,
+                "username": "member1",
+                "password": OWNER_PASSWORD,
+            },
+        )
+        assert response.status_code == 409
+
+
+class TestLogin:
+    """POST /api/auth/session — username/password login."""
+
+    def test_wrong_password(self, claimed_owner):
+        response = claimed_owner.post(
+            "/api/auth/session",
+            json={"username": OWNER_USERNAME, "password": "wrong-password!!"},
+        )
+        assert response.status_code == 401
+        assert "set-cookie" not in response.headers
+
+    def test_unknown_user_same_401_body(self, claimed_owner):
+        client = TestClient(claimed_owner.app)
+        unknown = client.post(
+            "/api/auth/session",
+            json={"username": "nosuchuser", "password": "whatever-pass!"},
+        )
+        wrong = client.post(
+            "/api/auth/session",
+            json={"username": OWNER_USERNAME, "password": "wrong-password!!"},
+        )
+        assert unknown.status_code == 401
+        assert wrong.status_code == 401
+        assert unknown.json() == wrong.json()
+
+    def test_old_api_key_body_rejected(self, claimed_owner):
+        """The old {api_key} body shape is gone (breaking change)."""
+        response = claimed_owner.post("/api/auth/session", json={"api_key": "x"})
+        assert response.status_code == 422
+
+    @pytest.mark.parametrize("fetch_site", ["cross-site", "same-site"])
+    def test_login_cross_site_rejected(
+        self, claimed_owner, fetch_site
+    ):
+        """Login CSRF: a cross-site POST must not plant a session cookie."""
+        response = claimed_owner.post(
+            "/api/auth/session",
+            json={"username": OWNER_USERNAME, "password": OWNER_PASSWORD},
             headers={"Sec-Fetch-Site": fetch_site},
         )
         assert response.status_code == 403
         assert "set-cookie" not in response.headers
 
-    def test_login_same_origin_allowed(self, protected_app, protection_on):
+    @pytest.mark.parametrize("fetch_site", ["cross-site", "same-site"])
+    def test_claim_cross_site_rejected(
+        self, protected_app, protection_on, fetch_site
+    ):
         client = TestClient(protected_app)
         response = client.post(
+            "/api/auth/owner",
+            json={
+                "api_key": protection_on,
+                "username": OWNER_USERNAME,
+                "password": OWNER_PASSWORD,
+            },
+            headers={"Sec-Fetch-Site": fetch_site},
+        )
+        assert response.status_code == 403
+        assert "set-cookie" not in response.headers
+
+    def test_login_same_origin_allowed(self, claimed_owner):
+        response = claimed_owner.post(
             "/api/auth/session",
-            json={"api_key": protection_on},
+            json={"username": OWNER_USERNAME, "password": OWNER_PASSWORD},
             headers={"Sec-Fetch-Site": "same-origin"},
         )
         assert response.status_code == 204
 
-    def test_login_success_sets_cookie(self, protected_app, protection_on):
-        client = TestClient(protected_app)
+    def test_login_success_sets_cookie(self, claimed_owner):
+        client = TestClient(claimed_owner.app)
         response = client.post(
-            "/api/auth/session", json={"api_key": protection_on}
+            "/api/auth/session",
+            json={"username": OWNER_USERNAME, "password": OWNER_PASSWORD},
         )
         assert response.status_code == 204
         cookie = response.headers["set-cookie"]
@@ -269,144 +484,263 @@ class TestSessionRoutesProtectionOn:
         assert "; Secure" in cookie
 
     def test_login_cookie_secure_flag_toggle(
-        self, protected_app, protection_on, monkeypatch
+        self, claimed_owner, monkeypatch
     ):
         """AUTH_COOKIE_SECURE=False omits the Secure attribute."""
         monkeypatch.setattr(get_settings(), "AUTH_COOKIE_SECURE", False)
-        client = TestClient(protected_app)
+        client = TestClient(claimed_owner.app)
         response = client.post(
-            "/api/auth/session", json={"api_key": protection_on}
+            "/api/auth/session",
+            json={"username": OWNER_USERNAME, "password": OWNER_PASSWORD},
         )
         assert response.status_code == 204
         assert "; Secure" not in response.headers["set-cookie"]
 
-    def test_session_cookie_opens_protected_route(self, protected_app, protection_on):
-        """The cookie from POST /auth/session authenticates /v1 requests."""
-        client = TestClient(protected_app, base_url="https://testserver")
-        assert client.post(
-            "/api/auth/session", json={"api_key": protection_on}
+    def test_login_replaces_previous_cookie(self, claimed_owner):
+        """A second sign-in rotates the session: the old token is dead."""
+        first_token = claimed_owner.cookies.get(SESSION_COOKIE)
+
+        assert claimed_owner.post(
+            "/api/auth/session",
+            json={"username": OWNER_USERNAME, "password": OWNER_PASSWORD},
         ).status_code == 204
-        assert client.get("/v1/health").status_code == 200
+
+        replay = TestClient(claimed_owner.app, base_url="https://testserver")
+        replay.cookies.set(SESSION_COOKIE, first_token)
+        assert replay.get("/v1/health").status_code == 401
+        # The new session still authenticates.
+        assert claimed_owner.get("/v1/health").status_code == 200
+
+
+class TestLoginLimiter:
+    """5 attempts/minute per (client IP, lowercased username)."""
+
+    def test_other_ip_not_limited(self):
+        """An attacker's budget is theirs alone: 5 fails from one IP leave
+        the same username open from another."""
+        for _ in range(5):
+            login_limiter.require_attempt("login", "1.2.3.4:akra")
+        with pytest.raises(HTTPException) as exc:
+            login_limiter.require_attempt("login", "1.2.3.4:akra")
+        assert exc.value.status_code == 429
+        login_limiter.require_attempt("login", "5.6.7.8:akra")
+
+    def test_sixth_attempt_429(self, protected_app, protection_on):
+        client = TestClient(protected_app)
+        statuses = [
+            client.post(
+                "/api/auth/session",
+                json={"username": "alice", "password": "wrong-password!!"},
+            ).status_code
+            for _ in range(5)
+        ]
+        assert statuses == [401] * 5
+        # Attempt 6 is rejected before the password is even checked.
+        response = client.post(
+            "/api/auth/session",
+            json={"username": "alice", "password": "any-password-15!"},
+        )
+        assert response.status_code == 429
+        assert response.headers["Retry-After"] == "60"
+
+    def test_other_username_not_limited(self, protected_app, protection_on):
+        """The limiter is per-username: 5 fails on one name leave others open."""
+        client = TestClient(protected_app)
+        for _ in range(5):
+            client.post(
+                "/api/auth/session",
+                json={"username": "alice", "password": "wrong-password!!"},
+            )
+        # A different username gets a normal 401, not the 429.
+        response = client.post(
+            "/api/auth/session",
+            json={"username": "otheruser", "password": "other-password-15"},
+        )
+        assert response.status_code == 401
+
+    def test_case_shares_one_counter(self, protected_app, protection_on):
+        """`Alice` and `alice` are the same account — one shared counter."""
+        client = TestClient(protected_app)
+        for _ in range(5):
+            client.post(
+                "/api/auth/session",
+                json={"username": "Alice", "password": "wrong-password!!"},
+            )
+        response = client.post(
+            "/api/auth/session",
+            json={"username": "alice", "password": "any-password-15!"},
+        )
+        assert response.status_code == 429
+
+
+class TestSessionCookies:
+    """Cookie lifecycle against a signed-in owner."""
+
+    def test_session_cookie_opens_protected_route(self, claimed_owner):
+        assert claimed_owner.get("/v1/health").status_code == 200
 
     def test_cookie_rejected_after_key_rotation(
-        self, protected_app, protection_on, monkeypatch
+        self, claimed_owner, monkeypatch
     ):
-        client = TestClient(protected_app, base_url="https://testserver")
-        client.post("/api/auth/session", json={"api_key": protection_on})
-        assert client.get("/v1/health").status_code == 200
-
         monkeypatch.setattr(get_settings(), "API_ACCESS_KEY", generate_api_key())
-        assert client.get("/v1/health").status_code == 401
+        assert claimed_owner.get("/v1/health").status_code == 401
 
-    def test_delete_session_expires_cookie(self, protected_app, protection_on):
-        client = TestClient(protected_app, base_url="https://testserver")
-        client.post("/api/auth/session", json={"api_key": protection_on})
-        assert client.get("/v1/health").status_code == 200
-
-        response = client.delete("/api/auth/session")
+    def test_delete_session_expires_cookie(self, claimed_owner):
+        response = claimed_owner.delete("/api/auth/session")
         assert response.status_code == 204
         cookie = response.headers["set-cookie"]
         assert cookie.startswith(f"{SESSION_COOKIE}=")
         assert "Max-Age=0" in cookie or "Expires=Thu, 01 Jan 1970" in cookie
-        assert client.get("/v1/health").status_code == 401
+        assert claimed_owner.get("/v1/health").status_code == 401
 
-    def test_saved_cookie_value_rejected_after_delete(
-        self, protected_app, protection_on
-    ):
+    def test_saved_cookie_value_rejected_after_delete(self, claimed_owner):
         """DELETE removes the server-side row: a saved cookie no longer works."""
-        client = TestClient(protected_app, base_url="https://testserver")
-        client.post("/api/auth/session", json={"api_key": protection_on})
-        token = client.cookies.get(SESSION_COOKIE)
-        assert client.get("/v1/health").status_code == 200
+        token = claimed_owner.cookies.get(SESSION_COOKIE)
+        assert claimed_owner.get("/v1/health").status_code == 200
 
-        client.delete("/api/auth/session")
-        client.cookies.set(SESSION_COOKIE, token)
-        assert client.get("/v1/health").status_code == 401
+        claimed_owner.delete("/api/auth/session")
+        claimed_owner.cookies.set(SESSION_COOKIE, token)
+        assert claimed_owner.get("/v1/health").status_code == 401
 
-    def test_login_does_not_log_submitted_key(self, protection_on):
-        """A submitted key never reaches the logs, for any login outcome.
+
+class TestHasherPool:
+    """argon2 runs on a dedicated executor — a login flood gets 503s instead
+    of starving the shared asyncio.to_thread pool."""
+
+    def test_login_503_when_hasher_queue_full(
+        self, protected_app, protection_on, monkeypatch
+    ):
+        from src.api.auth import credentials
+
+        calls = []
+        monkeypatch.setattr(
+            credentials, "verify_password", lambda *a: calls.append(a)
+        )
+        for _ in range(credentials._HASH_QUEUE_LIMIT):
+            assert credentials._hash_slots.acquire(blocking=False)
+        try:
+            response = TestClient(protected_app).post(
+                "/api/auth/session",
+                json={"username": "nobody", "password": "x" * 15},
+            )
+        finally:
+            for _ in range(credentials._HASH_QUEUE_LIMIT):
+                credentials._hash_slots.release()
+
+        assert response.status_code == 503
+        assert response.headers["Retry-After"] == "5"
+        assert calls == []
+
+
+class TestErrorHandlerHeaders:
+    def test_custom_http_exception_headers_pass_through(self):
+        """The exception handler must forward exc.headers to the response."""
+        app = FastAPI()
+        register_exception_handlers(app)
+
+        @app.get("/boom")
+        def boom():
+            raise HTTPException(
+                status_code=418, detail="teapot", headers={"X-Why": "tea"}
+            )
+
+        response = TestClient(app).get("/boom")
+        assert response.status_code == 418
+        assert response.headers["X-Why"] == "tea"
+
+
+class TestLoginLogging:
+    def test_failed_sign_in_logs_username_and_ip(self, protection_on):
+        """Operators need a log line to point fail2ban at."""
+        from src.api.main import app
+
+        captured: list[str] = []
+        sink_id = logger.add(
+            captured.append, format="{message}", level="WARNING"
+        )
+        try:
+            client = TestClient(app)
+            for _ in range(5):
+                client.post(
+                    "/api/auth/session",
+                    json={
+                        "username": "nosuchuser",
+                        "password": "never-logged-password",
+                    },
+                )
+            assert client.post(
+                "/api/auth/session",
+                json={
+                    "username": "nosuchuser",
+                    "password": "never-logged-password",
+                },
+            ).status_code == 429
+        finally:
+            logger.remove(sink_id)
+
+        logs = "".join(captured)
+        assert "Failed sign-in for nosuchuser from testclient" in logs
+        assert "Sign-in rate limited for nosuchuser from testclient" in logs
+        assert "never-logged-password" not in logs
+
+    def test_login_does_not_log_credentials(self, protection_on):
+        """Submitted passwords and keys never reach the logs — 401, 422, 429.
 
         Runs against the real app so LoggingMiddleware and the production
         exception handlers are exercised.
         """
         from src.api.main import app
 
+        password = "attempted-password-that-must-not-be-logged"
         wrong_key = "attempted-key-that-must-not-be-logged"
-        oversized_key = "o" * 600
         captured: list[str] = []
         sink_id = logger.add(captured.append, format="{message}", level="DEBUG")
         try:
             client = TestClient(app)
             assert client.post(
-                "/api/auth/session", json={"api_key": wrong_key}
+                "/api/auth/session",
+                json={"username": "nobody", "password": password},
             ).status_code == 401
             assert client.post(
-                "/api/auth/session", json={"api_key": oversized_key}
+                "/api/auth/session",
+                json={"username": "!!", "password": password},
             ).status_code == 422
+            for _ in range(5):
+                client.post(
+                    "/api/auth/session",
+                    json={"username": "nobody", "password": password},
+                )
             assert client.post(
-                "/api/auth/session", json={"api_key": protection_on}
-            ).status_code == 204
+                "/api/auth/session",
+                json={"username": "nobody", "password": password},
+            ).status_code == 429
+            assert client.post(
+                "/api/auth/owner",
+                json={
+                    "api_key": wrong_key,
+                    "username": "boss",
+                    "password": password + "!!",
+                },
+            ).status_code == 401
         finally:
             logger.remove(sink_id)
 
         logs = "".join(captured)
+        assert password not in logs
         assert wrong_key not in logs
-        assert oversized_key not in logs
         assert protection_on not in logs
 
 
-class TestInsecureTokenEndpoint:
-    """POST /v1/auth/token issues JWTs for arbitrary user_ids — it must only
-    exist when instance authentication gates the path first."""
-
-    @pytest.fixture
-    def token_app(self) -> FastAPI:
-        from src.api.auth_routes import router as auth_router
-
-        app = FastAPI()
-        register_exception_handlers(app)
-        app.include_router(auth_router, prefix="/v1")
-        return app
-
-    def test_flag_on_protection_off_returns_404(self, token_app, monkeypatch):
-        """The dangerous combo: flag on but no instance auth — any caller could
-        mint a JWT for any user_id, so the endpoint refuses to exist."""
-        settings = get_settings()
-        monkeypatch.setattr(settings, "ENABLE_INSECURE_TOKEN_ENDPOINT", True)
-        monkeypatch.setattr(settings, "ENABLE_API_KEY_PROTECTION", False)
-        response = TestClient(token_app).post(
-            "/v1/auth/token", json={"user_id": "victim"}
-        )
-        assert response.status_code == 404
-
-    def test_flag_on_protection_on_issues_token(self, token_app, monkeypatch):
-        """With protection on, only instance-credential holders reach the
-        endpoint (enforced by SecurityMiddleware upstream); it then issues."""
-        settings = get_settings()
-        monkeypatch.setattr(settings, "ENABLE_INSECURE_TOKEN_ENDPOINT", True)
-        monkeypatch.setattr(settings, "ENABLE_API_KEY_PROTECTION", True)
-        monkeypatch.setattr(settings, "JWT_SECRET_KEY", "x" * 48)
-        response = TestClient(token_app).post(
-            "/v1/auth/token", json={"user_id": "u1"}
-        )
-        assert response.status_code == 200
-        assert response.json()["access_token"]
-
-    def test_flag_off_returns_404(self, token_app, monkeypatch):
-        settings = get_settings()
-        monkeypatch.setattr(settings, "ENABLE_INSECURE_TOKEN_ENDPOINT", False)
-        monkeypatch.setattr(settings, "ENABLE_API_KEY_PROTECTION", True)
-        response = TestClient(token_app).post(
-            "/v1/auth/token", json={"user_id": "u1"}
-        )
-        assert response.status_code == 404
-
-
 class TestRealAppRouting:
-    def test_session_route_beats_spa_catch_all(self):
+    def test_session_route_beats_spa_catch_all(self, api_key):
         """GET /api/auth/session resolves to the router, not the SPA 404."""
         from src.api.main import app
 
         response = TestClient(app).get("/api/auth/session")
         assert response.status_code == 200
-        assert set(response.json()) == {"required", "authenticated"}
+        assert set(response.json()) == {
+            "required",
+            "authenticated",
+            "owner_claim_required",
+            "user",
+        }

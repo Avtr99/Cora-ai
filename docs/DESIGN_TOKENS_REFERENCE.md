@@ -470,7 +470,7 @@ import ChatIcon from '@/assets/icons/chat.svg?react';
 ### Layout Components
 
 #### Sidebar
-- Width: 208px (expanded), 60px (collapsed) at the base tier (264px/68px at 3xl, 336px/80px at 4xl)
+- Width: 224px (expanded), 60px (collapsed) at the base tier (272px/68px at 3xl, 336px/80px at 4xl)
 - Background: `bg-surface-base` (#FAFAFA)
 - Animation: 200ms easeOut
 - Search input with filter functionality

@@ -32,7 +32,8 @@ const PrivacyPolicyPage: React.FC = () => {
       <LegalSection title="Information Collected and Stored" number={2}>
         <p className="font-semibold text-brand-primary">Local-First Data Storage</p>
         <p>
-          Each Cora AI instance has one built-in owner account. There is no sign-up. All data is
+          Each Cora AI instance has a single owner account. There is no
+          self-sign-up. All data is
           stored locally on the machine where the instance is deployed, using SQLite (for chats,
           caches, and metadata) and Qdrant (for vector embeddings). No data leaves the machine
           unless an external API provider is explicitly configured.
@@ -41,8 +42,9 @@ const PrivacyPolicyPage: React.FC = () => {
         <p className="font-semibold text-brand-primary pt-2">Conversation History</p>
         <ul>
           <li><strong>Chat messages:</strong> Your conversations are stored on the server in the
-            instance SQLite database under the owner account. They sync across the owner's devices.
-            Deleting a chat in the sidebar removes it from the server.</li>
+            instance SQLite database under your account and are visible only to
+            the signed-in owner. They sync across the devices you sign
+            in from. Deleting a chat in the sidebar removes it from the server.</li>
           <li><strong>Session data:</strong> When access-key protection is enabled, the server sets
             one essential session cookie (<code>cora_session</code>). Sign-out deletes the session
             on the server. The browser holds no chat data.</li>
@@ -65,15 +67,6 @@ const PrivacyPolicyPage: React.FC = () => {
           <li><strong>Document metadata:</strong> Metadata such as filename, file type, registry,
             and document ID is extracted and stored in SQLite and Qdrant payloads.</li>
         </ul>
-
-        <p className="font-semibold text-brand-primary pt-2">PII Redaction</p>
-        <p>
-          Personally identifiable information (PII) is automatically detected and redacted before
-          being stored in conversation memory. This feature is enabled by default
-          (<code>PII_REDACTION_ENABLED=true</code>) and covers names, emails, phone numbers, credit
-          card numbers, and other common PII patterns. Redacted content is replaced with
-          type-tagged placeholders (e.g. <code>[NAME]</code>, <code>[EMAIL]</code>).
-        </p>
 
         <p className="text-xs 3xl:text-sm 4xl:text-base text-text-muted pt-1">
           <strong>Note:</strong> Cora AI does not collect IP addresses, browser fingerprints, or
@@ -132,10 +125,6 @@ const PrivacyPolicyPage: React.FC = () => {
         <ul>
           <li><strong>Local storage:</strong> All data remains on the operator's machine by default.
             No external databases or cloud services are required.</li>
-          <li><strong>PII redaction:</strong> Automatic detection and redaction of personal
-            identifiers before storage in conversation memory.</li>
-          <li><strong>HMAC-hashed user IDs:</strong> User identifiers are hashed before being stored
-            in the memory collection, preventing direct association with individuals.</li>
           <li><strong>API key isolation:</strong> All API keys are stored in a local
             <code>.env</code> file that is gitignored and never committed to version control.</li>
           <li><strong>Optional API authentication:</strong> The operator can enable API key
@@ -161,13 +150,12 @@ const PrivacyPolicyPage: React.FC = () => {
           <li><strong>Right to Rectification:</strong> Request correction of inaccurate data stored
             in the system.</li>
           <li><strong>Right to Erasure (Right to be Forgotten):</strong> You can delete chats in
-            the sidebar, which removes them from the server. The operator can delete conversation
-            memories via the <code>DELETE /v1/memory/delete</code> API endpoint or by clearing the
-            Qdrant <code>cora_memories</code> collection.</li>
+            the sidebar, which removes them from the server. The operator can also delete
+            documents, or clear the SQLite database and Qdrant collections entirely.</li>
           <li><strong>Right to Data Portability:</strong> Data can be exported from SQLite (standard
             SQL dumps) and Qdrant (via the Qdrant API) in machine-readable formats.</li>
           <li><strong>Right to Object:</strong> Object to processing by disabling the relevant
-            features (e.g. disable conversation memory via configuration).</li>
+            features (e.g. external providers via configuration).</li>
         </ul>
         <p>
           To exercise these rights, contact the operator of the Cora AI instance you are using.
@@ -181,7 +169,7 @@ const PrivacyPolicyPage: React.FC = () => {
         <ul>
           <li><strong>Chat history:</strong> Stored in the instance SQLite database until you
             delete the chat or the operator removes the data. Chats are included in the operator's
-            SQLite backup. Conversation memory in Qdrant persists until explicitly deleted.</li>
+            SQLite backup.</li>
           <li><strong>Query cache:</strong> Automatically expires after 24 hours.</li>
           <li><strong>Embedding cache:</strong> Persists until the corresponding documents are
             deleted or the database is cleared.</li>

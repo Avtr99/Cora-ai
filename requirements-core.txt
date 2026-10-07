@@ -48,7 +48,9 @@ python-magic==0.4.27
 python-multipart>=0.0.20,<0.1
 
 # Authentication
-PyJWT[crypto]>=2.15.0,<3.0
+# Password hashing (argon2) and login rate limiting
+pwdlib[argon2]>=0.3.1,<0.4
+limits>=5.8,<6
 
 # Utilities
 python-dotenv==1.2.2

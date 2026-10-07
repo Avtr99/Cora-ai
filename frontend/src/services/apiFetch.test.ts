@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { apiFetch } from './apiFetch';
+import { apiFetch, readErrorMessage } from './apiFetch';
 import { useAuthStore } from '@/store/authStore';
 
 describe('apiFetch', () => {
@@ -37,5 +37,35 @@ describe('apiFetch', () => {
 
     await expect(apiFetch('/api/cora-health')).rejects.toThrow('network down');
     expect(useAuthStore.getState().status).toBe('open');
+  });
+});
+
+describe('readErrorMessage', () => {
+  it('returns field details from a validation error body', async () => {
+    const response = new Response(
+      JSON.stringify({
+        error: 'validation_error',
+        message: 'Request validation failed',
+        details: {
+          validation_errors: { username: "String should match pattern 'x'" },
+        },
+      }),
+      { status: 422 }
+    );
+
+    await expect(readErrorMessage(response)).resolves.toBe(
+      "username: String should match pattern 'x'"
+    );
+  });
+
+  it('falls back to the message field and then to undefined', async () => {
+    await expect(
+      readErrorMessage(
+        new Response(JSON.stringify({ message: 'Nope' }), { status: 400 })
+      )
+    ).resolves.toBe('Nope');
+    await expect(
+      readErrorMessage(new Response('oops', { status: 500 }))
+    ).resolves.toBeUndefined();
   });
 });

@@ -39,7 +39,8 @@ class ErrorResponse(BaseModel):
 def create_error_response(
     status_code: int,
     message: str,
-    details: Optional[Dict[str, Any]] = None
+    details: Optional[Dict[str, Any]] = None,
+    headers: Optional[Dict[str, str]] = None,
 ) -> JSONResponse:
     """Create standardized error response."""
     request_id = get_request_id()
@@ -57,7 +58,8 @@ def create_error_response(
 
     return JSONResponse(
         status_code=status_code,
-        content=content
+        content=content,
+        headers=headers,
     )
 
 
@@ -65,7 +67,8 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
     """Handle FastAPI HTTP exceptions."""
     return create_error_response(
         status_code=exc.status_code,
-        message=str(exc.detail)
+        message=str(exc.detail),
+        headers=dict(exc.headers) if exc.headers else None,
     )
 
 

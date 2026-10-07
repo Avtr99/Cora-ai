@@ -102,7 +102,7 @@ describe('requestBotResponse', () => {
     useChatStore.setState({ chats: [seedChat()] });
     mockStream.mockResolvedValue(coraResult());
 
-    // First attempt fails server-side, retry reuses the same user message ID (A9)
+    // First attempt fails server-side, retry reuses the same user message ID
     await runRequest();
     await runRequest();
 

@@ -1,8 +1,9 @@
 """Shared API-key and browser-session helpers.
 
-When ``ENABLE_API_KEY_PROTECTION`` is on, a browser logs in once with the
-instance access key and gets an opaque session token in an HttpOnly cookie.
-Scripts keep using ``X-API-Key``. Sessions are rows in the ``auth_sessions``
+When ``ENABLE_API_KEY_PROTECTION`` is on, a browser signs in with a username
+and password and gets an opaque session token in an HttpOnly cookie. The
+instance access key claims the owner account once and stays for scripts via
+``X-API-Key``. Sessions are rows in the ``auth_sessions``
 table: sign-out deletes the row on the server, and key rotation invalidates
 every session because each row is pinned to the key's SHA-256 fingerprint.
 """
@@ -10,17 +11,14 @@ import hashlib
 import secrets
 from datetime import timedelta
 
-from fastapi import Request
+from fastapi import HTTPException, Request
 
 from ...config import get_settings
 from ...db.database import get_connection
+from ...db.users import OWNER_USER_ID
 
 SESSION_COOKIE = "cora_session"
 SESSION_TTL = timedelta(days=7)
-
-# The single built-in user every request acts as in Phase 7 (D15/D31). A
-# partial unique index in migration 011 keeps this the only owner row.
-OWNER_USER_ID = "owner"
 
 
 def _credential_hash(value: str) -> str:
@@ -128,7 +126,7 @@ def is_cross_site_request(request: Request) -> bool:
 def current_user_id(request: Request) -> str:
     """Return the request's user identity.
 
-    With protection off, every request acts as the built-in owner (D15). With
+    With protection off, every request acts as the built-in owner. With
     protection on, ``SecurityMiddleware.dispatch`` has already set
     ``request.state.user_id``; a missing attribute means the middleware never
     ran, so the ``AttributeError`` propagates — fail closed, never fall back
@@ -137,6 +135,67 @@ def current_user_id(request: Request) -> str:
     if not get_settings().ENABLE_API_KEY_PROTECTION:
         return OWNER_USER_ID
     return request.state.user_id
+
+
+def require_owner(request: Request) -> str:
+    """FastAPI dependency: return the request's user ID when it is the owner.
+
+    403 otherwise. No DB read — the owner ID is the constant
+    ``OWNER_USER_ID``.
+    """
+    user_id = current_user_id(request)
+    if user_id != OWNER_USER_ID:
+        raise HTTPException(status_code=403, detail="Owner only")
+    return user_id
+
+
+def require_owner_for_writes(request: Request) -> None:
+    """FastAPI dependency: owner check for non-read methods on a router.
+
+    Reads (GET/HEAD/OPTIONS) pass for every authenticated user; writes must
+    come from the owner.
+    """
+    if request.method in ("GET", "HEAD", "OPTIONS"):
+        return
+    require_owner(request)
+
+
+def reject_cross_site(request: Request) -> None:
+    """FastAPI dependency: 403 when a browser flagged this request cross-site.
+
+    For auth-excluded routes (login, owner claim) the middleware's CSRF guard
+    never runs — without this check a cross-site POST could plant a session
+    cookie in a victim's browser (login CSRF).
+    """
+    if is_cross_site_request(request):
+        raise HTTPException(status_code=403, detail="Cross-origin request rejected")
+
+
+def require_protection() -> None:
+    """FastAPI dependency: 404 when API-key protection is off.
+
+    With no login there is no account, so the account routes do not exist.
+    """
+    if not get_settings().ENABLE_API_KEY_PROTECTION:
+        raise HTTPException(status_code=404, detail="Endpoint not available")
+
+
+def delete_sessions(user_id: str, keep_token: str | None = None) -> None:
+    """Delete all of ``user_id``'s sessions, except ``keep_token``'s when given."""
+    conn = get_connection()
+    try:
+        if keep_token is None:
+            conn.execute(
+                "DELETE FROM auth_sessions WHERE user_id = ?", (user_id,)
+            )
+        else:
+            conn.execute(
+                "DELETE FROM auth_sessions WHERE user_id = ? AND token_hash != ?",
+                (user_id, _credential_hash(keep_token)),
+            )
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def delete_session(token: str | None) -> None:

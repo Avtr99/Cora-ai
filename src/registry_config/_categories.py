@@ -1,32 +1,16 @@
-"""
-Topic category patterns (``is_registry=False``).
+"""Topic category patterns (``is_registry=False``).
 
-These are thematic classifiers — not registries or governance bodies.
-They identify *what a document is about* (REDD+, blue carbon, CDR,
-compliance markets, etc.) rather than *who issued it*.  The metadata
-extractor stores the pattern name under the ``category`` field.
+Thematic classifiers — what a document is *about* (REDD+, blue carbon,
+CDR), not who issued it. The metadata extractor stores the match under
+``category``.
 
-Marker safety notes
--------------------
-Content markers are matched via case-insensitive **substring** test
-(``marker in text.lower()``).  The same markers also seed the router's KB
-keyword set, so removing a broad marker changes both document classification
-and heuristic routing. Keep broad domain terms out of category classifiers,
-but add them to a routing-only list when they are useful as general KB signals.
-Short acronyms that appear inside common English words are false-positive risks
-and have been removed or made more specific:
-
-  - bare ``"arr"``  → removed (matches "array", "narrative", "arrow")
-  - bare ``"alm"``  → removed (matches "calm", "palm")
-  - bare ``"ods"``  → removed (matches "methods", "models", "goods")
-  - bare ``"saf"``  → removed (matches "safety", "safeguard")
-  - bare ``"monitoring"`` / ``"verification"`` → removed (too generic)
-  - bare ``"ghg protocol"`` → removed (has own governance pattern)
-  - bare ``"vcmi"`` / ``"claims code"`` → removed (has own governance pattern)
-  - bare ``"compliance market"`` → removed (has own category)
-  - bare ``"rating"`` → removed (matches "rating" in any context)
-  - bare ``"retirement"`` → removed (matches pension/HR contexts)
-  - bare ``"transportation"`` → removed (too generic)
+Markers match by case-insensitive substring and also seed the router's KB
+keyword set — keep broad domain terms out. Short acronyms embedded in
+common words were removed as false-positive risks (``arr``, ``alm``,
+``ods``, ``saf``, ``rating``, ``retirement``), as were terms owned by more
+specific patterns (``ghg protocol``, ``vcmi``, ``compliance market``) or
+too generic to classify (``monitoring``, ``verification``,
+``transportation``).
 """
 
 from typing import List

@@ -62,21 +62,24 @@ class InputSanitizer:
         r"forget\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions?|prompts?|rules?)",
         r"override\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions?|prompts?|rules?)",
         
-        # System prompt extraction
-        r"(what|show|reveal|display|print|output)\s+(is\s+)?(your|the)\s+(system\s+)?(prompt|instructions?|rules?)",
-        r"repeat\s+(your\s+)?(system\s+)?(prompt|instructions?|initial\s+message)",
+        # System prompt extraction — must target the model's own prompt.
+        # Bare "show the rules" / "display the prompt" are legitimate domain
+        # questions, not extraction attempts.
+        r"(what|show|reveal|display|print|output|repeat)\s+(is\s+)?your\s+(original\s+|system\s+)?(prompt|instructions?|rules?)",
+        r"(what|show|reveal|display|print|output|repeat|leak)\s+(is\s+|me\s+)?(the\s+|your\s+)?system\s+(prompt|instructions?)",
         r"(tell|show)\s+me\s+(your|the)\s+(original|initial|system)\s+(prompt|instructions?)",
         
-        # Role manipulation
+        # Role manipulation — imperative forms targeting agent/privileged
+        # roles only; "can a project act as a verifier" is normal VCM prose
         r"you\s+are\s+now\s+(a|an|the)\s+",
         r"pretend\s+(to\s+be|you\s+are)\s+",
-        r"act\s+as\s+(if\s+you\s+are\s+)?(a|an|the)\s+",
+        r"act\s+as\s+(if\s+you\s+(are|were)\s+)?(a\s+|an\s+|the\s+)?(new\s+|different\s+)?(ai|assistant|chatbot|bot|system|administrator|admin|root|sudo|developer|dan)\b",
         r"from\s+now\s+on\s+(you\s+are|act\s+as|pretend)",
         r"new\s+persona:\s*",
-        r"switch\s+to\s+.+\s+mode",
-        
-        # Developer/admin mode attempts
-        r"(enter|enable|activate)\s+(developer|admin|debug|sudo|root|god)\s+mode",
+
+        # Developer/admin mode attempts — privileged mode names only; a bare
+        # "switch to ... mode" matches legitimate config questions
+        r"(enter|enable|activate|switch\s+to|turn\s+on)\s+(developer|admin|debug|sudo|root|god|unrestricted|jailbreak|dan)\s+mode",
         r"developer\s+mode\s+(enabled|on|activated)",
         r"admin\s+override",
         r"\[system\]",
@@ -89,7 +92,7 @@ class InputSanitizer:
         r"jailbreak",
         r"bypass\s+(safety|security|filters?|restrictions?)",
         r"remove\s+(all\s+)?(safety|security|filters?|restrictions?|limitations?)",
-        r"without\s+(any\s+)?(restrictions?|limitations?|filters?)",
+        r"(answer|respond|reply|behave|act)\s+without\s+(any\s+)?(restrictions?|limitations?|filters?|safety)",
         
         # Delimiter injection
         r"```system",
@@ -291,15 +294,10 @@ class OutputSanitizer:
         r"sk-[a-zA-Z0-9]{20,}",  # OpenAI API key pattern
         r"AIza[a-zA-Z0-9_-]{35}",  # Google API key pattern
         
-        # Internal paths
-        r"/app/[a-zA-Z0-9_/]+",
-        r"[A-Z]:\\[a-zA-Z0-9_\\]+",
-        
-        # Environment variables
+        # Environment variables (secret-shaped)
         r"\$\{[A-Z_][A-Z0-9_]*\}|\$[A-Z_][A-Z0-9_]*_[A-Z0-9_]*",
-        
-        # System prompt markers
-        r"system\s*prompt\s*[:=]",
+
+        # Model-internal delimiter leakage
         r"<<SYS>>.*<</SYS>>",
     ]
     

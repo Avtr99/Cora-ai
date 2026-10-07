@@ -27,7 +27,6 @@ from .suggested_prompts import (
     should_generate_suggested_prompts,
     split_answer_and_suggested_prompts,
 )
-from .prompt_guard import get_prompt_guard, PromptInjectionError
 from .fallback_answers import NO_ANSWER_FOUND, is_cacheable_answer
 
 
@@ -208,13 +207,6 @@ class BaseRAGClient:
             raise ValueError(f"Query exceeds maximum length of {MAX_QUERY_LENGTH} characters")
         if not isinstance(vector_results, dict):
             raise ValueError("vector_results must be a dictionary")
-
-        # Prompt injection detection
-        sanitized_query, injection_detected = self._sanitize_query(query)
-        if injection_detected:
-            query_hash = hashlib.sha256(query.encode("utf-8")).hexdigest()[:16]
-            logger.warning(f"Potential prompt injection detected. Query hash: {query_hash}")
-            query = sanitized_query
 
         from ..citations.check import build_citation_correction, check_citations
         from ..citations.context import build_kb_context
@@ -431,16 +423,3 @@ class BaseRAGClient:
 
         score = 0.5 * context_factor + 0.3 * summary_factor + 0.2 * answer_factor
         return round(min(score, 1.0), 2)
-
-    def _sanitize_query(self, query: str) -> tuple[str, bool]:
-        """Detect and sanitize potential prompt injection attempts."""
-        prompt_guard = get_prompt_guard()
-        try:
-            sanitized_query = prompt_guard.sanitize_query(query)
-            return sanitized_query, False
-        except PromptInjectionError as e:
-            logger.warning(
-                f"Prompt injection detected by guard: hash={e.query_hash}, "
-                f"confidence={e.confidence}, method={e.method}"
-            )
-            return query, True

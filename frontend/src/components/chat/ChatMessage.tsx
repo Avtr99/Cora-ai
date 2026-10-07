@@ -7,7 +7,6 @@ import { RecommendationCard, RecommendationType, Recommendation } from './Recomm
 import { RECOMMENDATION_BY_ID } from './recommendations';
 import './markdown-styles.css';
 import { useChatContext } from '@/contexts/useChatContext';
-import { useUserContext } from '@/contexts/useUserContext';
 import { ChatMarkdownContent } from './ChatMarkdownContent';
 import { parseCitationSources, buildCitationNumberMap } from './chatMessageCitations.utils';
 import type { CitationNumberMap } from './ChatMarkdownContent';
@@ -40,7 +39,6 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAgentReas
   const isUser = message.sender === 'user';
   const [copied, setCopied] = useState(false);
   const { retryLastUserMessage, retryErrorMessage, activeChat } = useChatContext();
-  const { userProfile } = useUserContext();
   const [isRetrying, setIsRetrying] = useState(false);
   const bubbleRef = useRef<HTMLDivElement | null>(null);
   const [mounted, setMounted] = useState(false);
@@ -199,7 +197,6 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAgentReas
                 <MessageFeedback
                   messageId={message.id}
                   chatId={activeChat?.id}
-                  userId={userProfile?.id}
                   userQuery={userQuery}
                   botAnswer={botAnswer}
                 />

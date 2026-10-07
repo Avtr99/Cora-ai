@@ -1,5 +1,4 @@
 import React, { useState, ReactNode, useCallback, useEffect, useRef, useMemo } from 'react';
-import { useUserContext } from './useUserContext';
 import { ChatContext } from './useChatContext';
 import type { ChatContextType } from './useChatContext';
 import { useChatStore, useActiveChat } from '@/store/chatStore.simple';
@@ -14,7 +13,7 @@ interface ChatProviderProps {
 /**
  * ChatProvider - Simplified using Zustand for state management
  *
- * Chats live on the server (Phase 7): on mount the chat list is fetched and
+ * Chats live on the server: on mount the chat list is fetched and
  * each chat's messages are loaded on demand when it becomes active. The
  * store is memory-only — sign-out unmounts this provider and clears it.
  */
@@ -66,9 +65,6 @@ export function ChatProvider({ children }: ChatProviderProps) {
   // Computed properties
   const isTyping = activeChat ? typingChatIds.has(activeChat.id) : false;
   const isLoadingMessages = activeChat ? loadingChatIds.includes(activeChat.id) : false;
-
-  // External dependencies
-  const { userProfile } = useUserContext();
 
   // ==========================================
   // HELPER FUNCTIONS
@@ -126,7 +122,6 @@ export function ChatProvider({ children }: ChatProviderProps) {
     deleteChat: handleDeleteChat,
   } = useChatActions({
     activeChat,
-    userProfile,
     setTypingChatIds,
     getCurrentChat,
     cancelPendingRequest,

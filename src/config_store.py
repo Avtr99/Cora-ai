@@ -8,7 +8,7 @@ relevance threshold overrides.
 
 import json
 import logging
-import secrets
+import sqlite3
 from threading import Lock
 from typing import Any, Dict, Optional
 
@@ -33,7 +33,7 @@ _settings_lock = Lock()
 # voyage_api_key / cohere_api_key / openai_api_key names are .env-only
 # fallbacks (read by env-provider detection in llm_profile_manager) and are
 # intentionally NOT in this map — the DB must not write back to them. See
-# docs/ROADMAP_FRAGILITY_AUDIT.md (P0 shared-key fix) and migration 009.
+# migration 009.
 DB_SETTING_KEYS = {
     "embedding_provider": "EMBEDDING_PROVIDER",
     "embedding_model": "EMBEDDING_MODEL",
@@ -58,14 +58,9 @@ def _apply_db_overlay(settings: Settings) -> Settings:
     Settings attributes.  This lets users change embedding/search/reranker
     config from the UI without editing .env.
 
-    Also auto-generates and persists a ``SECRET_KEY`` on first run if none is
-    configured in ``.env`` or the DB. The generated key is stable across
-    restarts (stored in ``app_settings``) so memory user-ID anonymization
-    stays consistent. An explicit ``SECRET_KEY`` in ``.env`` always
-    takes precedence and is never overwritten.
-
-    Silently skips if the DB or table is unavailable (e.g. on first run
-    before migrations have applied).
+    If the ``app_settings`` table does not exist yet (first run, before
+    migrations), the overlay is skipped quietly. Real database errors are
+    logged at warning level rather than silently falling back to .env.
     """
     try:
         from .db.database import get_connection
@@ -92,36 +87,13 @@ def _apply_db_overlay(settings: Settings) -> Settings:
                         continue
                 # Override the attribute on the pydantic model
                 object.__setattr__(settings, attr_name, value)
-
-            # Auto-generate SECRET_KEY if not configured anywhere.
-            # An explicit .env value takes precedence (already on settings).
-            # A previously generated DB value is reused (stable across restarts).
-            if not getattr(settings, "SECRET_KEY", None):
-                cursor.execute(
-                    "SELECT value FROM app_settings WHERE key = 'secret_key'"
-                )
-                row = cursor.fetchone()
-                if row:
-                    object.__setattr__(settings, "SECRET_KEY", row["value"])
-                else:
-                    generated = secrets.token_hex(32)
-                    cursor.execute(
-                        "INSERT INTO app_settings (key, value, updated_at) "
-                        "VALUES ('secret_key', ?, CURRENT_TIMESTAMP)",
-                        (generated,),
-                    )
-                    conn.commit()
-                    object.__setattr__(settings, "SECRET_KEY", generated)
-                    logger.info(
-                        "Auto-generated SECRET_KEY and persisted to app_settings — "
-                        "set SECRET_KEY in .env to use your own key instead."
-                    )
         finally:
             conn.close()
-    except Exception:
-        # DB not ready yet (first run, migrations not applied, etc.)
-        # — silently fall back to .env values
-        pass
+    except sqlite3.Error as e:
+        if "no such table" in str(e):
+            logger.debug("app_settings table not ready; using .env values")
+        else:
+            logger.warning("Failed to load settings overlay from DB: %s", e)
     return settings
 
 

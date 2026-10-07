@@ -27,7 +27,7 @@ export interface BotRequestDeps {
  * chat store.
  *
  * The request sends `chat.id` as `conversation_id` and `userMessageId` as
- * `message_id` (A9/A10): the server loads the chat's stored history itself,
+ * `message_id`: the server loads the chat's stored history itself,
  * and retries resend the same `message_id` so the stored turn is upserted.
  * The finished bot message takes the server's `answerId` via buildBotMessage.
  */

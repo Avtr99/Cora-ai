@@ -83,7 +83,8 @@ const TermsOfServicePage: React.FC = () => {
       <LegalSection title="Data Handling" number={6}>
         <p>
           Cora AI stores chats on the machine where the instance is deployed, not in any central
-          cloud service. Each instance has one built-in owner account. There is no sign-up. The
+          cloud service. Each instance has a single owner account; there is no self-sign-up, and
+          users do not have separate accounts or private chats. The
           application does not collect personal identifiers such as IP addresses.
         </p>
         <p>

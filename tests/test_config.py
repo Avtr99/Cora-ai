@@ -149,14 +149,6 @@ class TestReloadSettings:
         bump_version.assert_not_called()
 
 
-class TestJWTAlgorithm:
-    def test_only_hs256_is_accepted(self):
-        assert Settings(JWT_ALGORITHM="HS256").JWT_ALGORITHM == "HS256"
-
-        with pytest.raises(ValidationError):
-            Settings(JWT_ALGORITHM="none")
-
-
 class TestValidatePositiveInt:
     def test_positive_passes(self):
         settings = Settings(ASYNC_QUERY_WORKERS=4)
@@ -224,7 +216,7 @@ class TestUvicornHost:
 
 
 class TestApiAccessKeyRequirement:
-    """P3-T1: ENABLE_API_KEY_PROTECTION requires a >=32-char API_ACCESS_KEY."""
+    """ENABLE_API_KEY_PROTECTION requires a >=32-char API_ACCESS_KEY."""
 
     def test_protection_off_without_key_is_valid(self, monkeypatch):
         monkeypatch.delenv("ENABLE_API_KEY_PROTECTION", raising=False)

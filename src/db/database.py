@@ -10,16 +10,11 @@ logger = logging.getLogger(__name__)
 
 _MIGRATION_FILENAME_RE = re.compile(r"^\d{3}_[a-zA-Z0-9_]+\.sql$")
 
-# Matches simple ``ALTER TABLE <table> ADD COLUMN <column> ...;`` statements.
-# Used to make ADD COLUMN migrations idempotent when another code path already
-# created the schema (e.g. ``ensure_document_store_tables`` running before
-# ``run_migrations``).
-#
-# Limitation: this regex only handles unquoted table/column identifiers.
-# Quoted identifiers (double quotes, backticks, square brackets), schema
-# prefixes, or multi-line statements may not match. Migration scripts in
-# this project should stick to simple one-line ``ALTER TABLE table ADD COLUMN col TYPE;``
-# statements for safety.
+# Makes ``ADD COLUMN`` migrations idempotent when another path already
+# created the schema (e.g. ``ensure_document_store_tables``). Matches only
+# simple one-line ``ALTER TABLE t ADD COLUMN c ...;`` statements — keep
+# migrations in that form (no quoted identifiers, schema prefixes, or
+# multi-line clauses).
 _ADD_COLUMN_RE = re.compile(
     r"^\s*ALTER\s+TABLE\s+(?P<table>\w+)\s+ADD\s+COLUMN\s+(?P<column>\w+)[^;]*;",
     re.IGNORECASE | re.MULTILINE,

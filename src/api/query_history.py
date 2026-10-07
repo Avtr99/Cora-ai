@@ -1,8 +1,8 @@
-"""Server-side chat history helpers shared by all query paths (Phase 7).
+"""Server-side chat history helpers shared by all query paths.
 
 ``open_turn`` resolves the caller's identity, owns the ``conversation_id``
-ownership check (a foreign chat 404s, D33), and loads server-side history.
-``close_turn`` stores the turn when the result is worth keeping (A8). The
+ownership check (a foreign chat 404s), and loads server-side history.
+``close_turn`` stores the turn when the result is worth keeping. The
 client no longer sends history — it is read from the ``chat_turns`` table.
 """
 
@@ -34,7 +34,7 @@ class TurnContext:
 async def open_turn(query: Query, request: Request) -> TurnContext:
     """Resolve the turn's identity and load its server-side history.
 
-    A ``conversation_id`` owned by another user raises HTTP 404 (D33). A new
+    A ``conversation_id`` owned by another user raises HTTP 404. A new
     conversation starts with empty history; an existing one replays the last
     ``HISTORY_CONTEXT_MAX_MESSAGES // 2`` turns, minus the in-flight
     ``message_id`` (a retry sees the chat without its own row).
@@ -65,7 +65,7 @@ async def open_turn(query: Query, request: Request) -> TurnContext:
 
 
 def is_storable(raw_result: Dict[str, Any]) -> bool:
-    """Decide from the raw orchestrator result whether the turn is kept (A8).
+    """Decide from the raw orchestrator result whether the turn is kept.
 
     Reads the raw result, not the sanitized response: ``query_service`` fills
     empty ``sources`` with ``["knowledge_base"]`` and ``timeout_exceeded`` is

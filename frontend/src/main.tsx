@@ -5,7 +5,7 @@ import App from './App.tsx'
 import { removeLegacyChatHistory } from './store/chatStore.simple'
 
 // Chats now persist on the server. Drop any chat data the old localStorage
-// store left behind before React renders (D18).
+// store left behind before React renders.
 removeLegacyChatHistory();
 
 const root = createRoot(document.getElementById("root")!);

@@ -193,8 +193,6 @@ AI Studio or use openrouter or switch to a local Ollama LLM for a no-cost, no-ra
 - **Document ingestion.** Upload PDFs, Markdown, TXT, CSV, or JSON through the UI or API.
   Two conversion modes: `standard` (local Docling pipeline, free, CPU) or `llm_api` (AI
   service, higher accuracy on complex layouts).
-- **Conversation memory.** Stores chat history as vectors in Qdrant, with HMAC-hashed user
-  IDs and optional PII redaction for GDPR compliance.
 - **Streaming & async answers.** Real-time token streaming via SSE, or queued async jobs for
   long-running queries.
 - **Citations & provenance.** Every KB answer links back to the source chunk; an HTML
@@ -227,8 +225,6 @@ Edit `.env` and set at least:
 GEMINI_API_KEY=your_gemini_api_key
 VOYAGE_API_KEY=your_voyage_api_key      # default embedding + rerank provider
 TAVILY_API_KEY=your_tavily_api_key      # default web search provider
-# SECRET_KEY is auto-generated on first run and persisted to SQLite.
-# Set it here only if you want to use your own key.
 ```
 
 ### 2. Start the stack
@@ -376,12 +372,12 @@ CitationManager + optional Validator (post-generation relevance check)
 
 **Backend:** FastAPI (`src/api`), agents (`src/agents`), retrieval (`src/retrieval`),
 LLM clients (`src/query_processing`), embeddings factory (`src/embeddings`),
-SQLite cache (`src/db`), conversation memory (`src/memory`), citations (`src/citations`).
+SQLite cache (`src/db`), citations (`src/citations`).
 
 **Frontend:** Vite + React 18 + TypeScript + TanStack Query + Zustand + Tailwind CSS.
 
 **Stores:** SQLite (`data/cora.db`) for cache, feedback, embeddings, and app settings;
-Qdrant for vectors and conversation memory.
+Qdrant for vectors.
 
 ### Route decision flow
 
@@ -434,8 +430,8 @@ Qdrant for vectors and conversation memory.
   `OPENAI_BASE_URL` — a config change, not a code mode.
 
 > **Large batches slow?** PDF conversion is CPU- and memory-bound. If your host
-> has more resources, you can convert more documents in parallel — see
-> [Scaling Ingestion Throughput](docs/SCALING_INGESTION.md).
+> has more resources, raise `DOCUMENT_INGESTION_CONCURRENCY` — see
+> [the ingestion section](docs/ARCHITECTURE.md#9-ingestion-via-running-server).
 
 ---
 
@@ -457,11 +453,12 @@ Qdrant for vectors and conversation memory.
 | POST | `/v1/summarize` | Document summarization |
 | POST | `/v1/documents` | Upload document |
 | GET | `/v1/documents` | List documents |
-| GET/POST | `/v1/memory/*` | Conversation memory CRUD |
 | GET/POST | `/api/v1/settings/*` | LLM / app settings + setup wizard |
-| GET | `/api/auth/session` | Login status for the SPA (`required`, `authenticated`) |
-| POST | `/api/auth/session` | Log in with the access key. Sets the `cora_session` cookie |
+| GET | `/api/auth/session` | Login status for the SPA (`required`, `authenticated`, `owner_claim_required`, `user`) |
+| POST | `/api/auth/session` | Log in with `{username, password}`. Sets the `cora_session` cookie |
 | DELETE | `/api/auth/session` | Log out. Ends the session on the server and clears the `cora_session` cookie |
+| POST | `/api/auth/owner` | One-time owner setup with the access key (`{api_key, username, password}`) |
+| PUT | `/v1/account/password` | Change the owner password (`{current_password, new_password}`) |
 | GET | `/docs` | OpenAPI Swagger UI |
 
 Full interactive docs are available at `/docs` once the server is running.
@@ -484,7 +481,6 @@ every option. The most important ones:
 | `DATABASE_URL` | SQLite database path. `sqlite:///data/cora.db` for local dev, `sqlite:////app/db/cora.db` in Docker (named volume). |
 | `SQLITE_JOURNAL_MODE` | `WAL` (default) for both local dev and Docker. The Docker named volume supports WAL's shared-memory requirement. |
 | `QDRANT_COLLECTION_NAME` | Name of the Qdrant collection. Default is `cora_dense_only`. |
-| `SECRET_KEY` | Anonymizes memory user IDs (fallback for `MEMORY_SECRET_KEY`). **Auto-generated on first run** and persisted to SQLite — no setup needed. Set it in `.env` only if you want your own key. |
 
 ### KB relevance thresholds (tunable, with per-collection overrides)
 

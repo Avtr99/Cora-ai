@@ -4,7 +4,6 @@ import { SearchBar } from "@/components/ui/SearchBar";
 import { ChatScrollButton } from "@/components/chat/ChatScrollButton";
 import { useSidebar } from "@/contexts/useSidebar";
 import { useChatContext } from "@/contexts/useChatContext";
-import { useUserContext } from "@/contexts/useUserContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useChatReadiness } from "@/hooks/useChatReadiness";
 import { motion, AnimatePresence } from "framer-motion";
@@ -38,11 +37,9 @@ const PROMPT_CARDS = [
 const Index: React.FC = () => {
   const { isCollapsed } = useSidebar();
   const { activeChat, isTyping, sendMessage, createNewChat, isLoadingMessages } = useChatContext();
-  const { userProfile } = useUserContext();
   const isMobile = useIsMobile();
   const { chatReady } = useChatReadiness();
   const [isUserTyping, setIsUserTyping] = useState(false);
-  const [isReady, setIsReady] = useState(false);
 
   const handlePromptClick = (text: string, tag: string) => {
     if (!chatReady) return;
@@ -50,23 +47,13 @@ const Index: React.FC = () => {
     if (sanitized.trim()) {
       // If no active chat or active chat has messages, create a new one
       if (!activeChat || activeChat.messages.length > 0) {
-        const newChat = createNewChat(sanitized);
-        // createNewChat returns null if userProfile is not ready
-        if (!newChat) {
-          console.error('Cannot create chat: user profile not loaded');
-        }
+        createNewChat(sanitized);
       } else {
         // Use existing empty chat
         sendMessage(sanitized);
       }
     }
   };
-
-  // Check if UserContext is ready by monitoring userProfile.
-  // The chat itself is additionally gated by backend readiness (KB / web search).
-  useEffect(() => {
-    setIsReady(!!userProfile);
-  }, [userProfile]);
 
   const [scrollbarWidth, setScrollbarWidth] = useState(0);
   const [isOverflowing, setIsOverflowing] = useState(false);
@@ -139,7 +126,7 @@ const Index: React.FC = () => {
     // document body becomes scrollable and the sidebar (inside main) scrolls
     // off-screen alongside the chat content. h-dvh eliminates that whole-page
     // scroll bug. Desktop is unaffected because dvh === vh without UA chrome.
-    <main className="bg-surface-base h-dvh flex flex-col overflow-hidden [--sidebar-width:208px] [--sidebar-collapsed-width:60px] [--composer-bottom:1rem] 3xl:[--sidebar-width:264px] 3xl:[--sidebar-collapsed-width:68px] 3xl:[--composer-bottom:1.5rem] 4xl:[--sidebar-width:336px] 4xl:[--sidebar-collapsed-width:80px] 4xl:[--composer-bottom:2rem]">
+    <main className="bg-surface-base h-dvh flex flex-col overflow-hidden [--sidebar-width:224px] [--sidebar-collapsed-width:60px] [--composer-bottom:1rem] 3xl:[--sidebar-width:272px] 3xl:[--sidebar-collapsed-width:68px] 3xl:[--composer-bottom:1.5rem] 4xl:[--sidebar-width:336px] 4xl:[--sidebar-collapsed-width:80px] 4xl:[--composer-bottom:2rem]">
       {/* Main Page Heading - Visually Hidden but accessible to screen readers */}
       <h1 className="sr-only">Cora - Voluntary Carbon Market AI Assistant</h1>
 
@@ -247,7 +234,7 @@ const Index: React.FC = () => {
                             }}
                           >
                             {PROMPT_CARDS.map(({ tag, text }) => {
-                              const promptEnabled = isReady && chatReady;
+                              const promptEnabled = chatReady;
                               return (
                                 <motion.button
                                   key={tag}

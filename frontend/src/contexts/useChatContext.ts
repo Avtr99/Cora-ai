@@ -10,11 +10,9 @@ export interface ChatContextType {
   /**
    * Creates a new chat with an optional initial message.
    * @param initialMessage - Optional first message to send in the new chat
-   * @returns The created Chat object, or null if userProfile is not yet loaded.
-   *          Callers must handle null by checking the return value or ensuring
-   *          userProfile is ready before calling (e.g., via isReady state).
+   * @returns The created Chat object.
    */
-  createNewChat: (initialMessage?: string) => Chat | null;
+  createNewChat: (initialMessage?: string) => Chat;
   /**
    * Initializes UI state for composing a new chat.
    */

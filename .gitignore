@@ -180,5 +180,9 @@ frontend/.screenshots/
 
 docs/SCALING_INGESTION.md
 docs/plans/self-hosting-hardening.md
+docs/plans/identity-consolidation.md
+docs/plans/revert-hybrid-retrieval.md
 documentation.md
 docs/plans/table-aware-chunking.md
+docs/plans/chat-ux-followups.md
+docs/plans/grounding-hardening-tickets.md

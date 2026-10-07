@@ -7,6 +7,7 @@ import { PageLoader } from "@/components/PageLoader";
 import NotFound from "@/pages/NotFound";
 import { getLLMSettings } from "@/services/llmSettingsApi";
 import { ONBOARDING_COMPLETE_KEY } from "@/components/onboarding/onboardingState";
+import { useIsOwner } from "@/store/authStore";
 
 // Lazy-load heavy pages to reduce initial bundle size
 const HomePage = lazy(() => import("@/pages/HomePage"));
@@ -52,9 +53,12 @@ const VISITED_KEY = "cora_has_visited";
 function FirstRunRedirect(): null {
   const location = useLocation();
   const navigate = useNavigate();
+  const isOwner = useIsOwner();
 
   useEffect(() => {
     if (location.pathname !== "/") return;
+    // Only a signed-in owner runs setup — never redirect while signed out.
+    if (!isOwner) return;
 
     let onboardingDone = false;
     let hasVisited = false;
@@ -93,7 +97,7 @@ function FirstRunRedirect(): null {
     return () => {
       cancelled = true;
     };
-  }, [location.pathname, navigate]);
+  }, [location.pathname, navigate, isOwner]);
 
   return null;
 }

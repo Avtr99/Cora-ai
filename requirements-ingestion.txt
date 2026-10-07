@@ -35,6 +35,12 @@ pymupdf>=1.24.0,<2.0
 # Cap it here so both lockfiles agree.
 websockets>=14,<16
 
+# Auth deps, repeated from requirements-core.txt so the standalone
+# ingestion lockfile carries the same pins (it installs on top of
+# requirements-core.lock in the same image).
+pwdlib[argon2]>=0.3.1,<0.4
+limits>=5.8,<6
+
 # Optional: FastEmbed local CPU embeddings
 # FastEmbed is NOT wired into the current provider factory (only voyage/cohere/ollama/openai
 # are supported). If you add a FastEmbed provider in src/embeddings/provider_factory.py,

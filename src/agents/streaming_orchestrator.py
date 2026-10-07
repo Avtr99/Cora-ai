@@ -209,10 +209,9 @@ class StreamingRAGOrchestrator(RAGOrchestrator):
                     yield ev
 
         try:
-            # OPTIMIZATION: Conversational Gate — cheap heuristic first.
-            # Bypass the entire RAG pipeline for clear greetings using only the
-            # regex heuristic (no LLM call). Greetings are never cached, so a
-            # cache lookup for them is wasted work (esp. the SQLite call).
+            # Cheap heuristic first: bypass the RAG pipeline for clear
+            # greetings. Conversational responses are never cached, so a
+            # cache lookup for them is wasted work.
             conv_result = await self._try_conversational(
                 query, chat_history, steps, start_time, use_llm_classification=False
             )
@@ -224,15 +223,11 @@ class StreamingRAGOrchestrator(RAGOrchestrator):
                 yield {"type": "final", "result": conv_result}
                 return
 
-            # OPTIMIZATION: Early Query Cache Check
-            # Check in-memory and SQLite caches before any rewriting, routing, or retrieval.
-            # Runs after the cheap heuristic (so greetings skip the cache) and
-            # before the LLM intent classification (so cache hits are served
-            # with zero LLM cost).
-            # Skipped for follow-up turns: the query-only cache key carries no
-            # conversation scope, so a generic follow-up ("what are the risks")
-            # would serve an unrelated conversation's answer — and would do so
-            # before rewriting, bypassing coreference resolution entirely.
+            # Early cache check: serve previously answered queries before any
+            # rewriting, routing, or retrieval cost. Skipped for follow-up
+            # turns — the query-only cache key has no conversation scope, so a
+            # generic follow-up ("what are the risks") would serve an unrelated
+            # conversation's answer and bypass coreference resolution.
             cached_result = None
             if not chat_history:
                 cached_result = await self._try_early_cache_hit(query, steps, start_time)
@@ -245,9 +240,9 @@ class StreamingRAGOrchestrator(RAGOrchestrator):
                 yield {"type": "final", "result": cached_result}
                 return
 
-            # OPTIMIZATION: Conversational Gate — LLM intent classification.
-            # Only paid on a cache miss, for short ambiguous queries the regex
-            # missed. Cached per normalized query (in-memory LRU).
+            # LLM intent classification only on a cache miss, for short
+            # ambiguous queries the heuristic missed. Cached per normalized
+            # query (in-memory LRU).
             conv_result = await self._try_conversational(
                 query, chat_history, steps, start_time, use_llm_classification=True
             )

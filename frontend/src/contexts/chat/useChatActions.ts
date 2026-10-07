@@ -7,7 +7,6 @@ import { useBotResponse } from './useBotResponse';
 
 interface UseChatActionsParams {
   activeChat: Chat | null;
-  userProfile: { id: string } | null;
   setTypingChatIds: React.Dispatch<React.SetStateAction<Set<string>>>;
   getCurrentChat: (chatId: string) => Chat | null;
   cancelPendingRequest: (chatId: string, markCancelled?: boolean, removePending?: boolean) => void;
@@ -21,7 +20,6 @@ interface UseChatActionsParams {
 
 export function useChatActions({
   activeChat,
-  userProfile,
   setTypingChatIds,
   getCurrentChat,
   cancelPendingRequest,
@@ -43,12 +41,7 @@ export function useChatActions({
   /**
    * Creates a new chat session with an optional initial message.
    */
-  const createNewChat = useCallback((initialMessage?: string): Chat | null => {
-    if (!userProfile) {
-      console.warn('[ChatContext] UserContext not ready yet, cannot create chat');
-      return null;
-    }
-
+  const createNewChat = useCallback((initialMessage?: string): Chat => {
     const newChatId = generateId();
     const newChat: Chat = {
       id: newChatId,
@@ -91,7 +84,7 @@ export function useChatActions({
     }
 
     return newChat;
-  }, [addChat, setActiveChatId, updateChat, userProfile, getBotResponse]);
+  }, [addChat, setActiveChatId, updateChat, getBotResponse]);
 
   const prepareNewChat = useCallback(() => {
     const newChatId = generateId();
@@ -162,11 +155,6 @@ export function useChatActions({
   const sendMessage = useCallback((content: string) => {
     if (!content.trim()) return;
 
-    if (!userProfile) {
-      console.warn('[ChatContext] UserContext not ready yet, skipping message');
-      return;
-    }
-
     const sanitizedContent = sanitizeInput(content);
     const userMessageId = generateId();
 
@@ -215,7 +203,7 @@ export function useChatActions({
     });
 
     void getBotResponse(targetChatId, userMessageId, placeholderId);
-  }, [activeChat, userProfile, addChat, updateChat, setActiveChatId, getBotResponse]);
+  }, [activeChat, addChat, updateChat, setActiveChatId, getBotResponse]);
 
   const retryLastUserMessage = useCallback(async () => {
     if (!activeChat) return;

@@ -2,7 +2,7 @@ import { useChatStore } from '@/store/chatStore.simple';
 import { ChatsApiError, getChat, listChats } from '@/services/chatsApi';
 
 /**
- * Server chat synchronization (Phase 7). Chats persist on the server; these
+ * Server chat synchronization. Chats persist on the server; these
  * helpers fill the in-memory store from the chats API.
  */
 

@@ -7,6 +7,7 @@ routes (saving embedding/search/reranker config). Consolidates the duplicate
 
 import logging
 import re
+import sqlite3
 from typing import Dict, Optional
 
 from .database import get_connection
@@ -21,8 +22,7 @@ _SETTING_KEY_PATTERN = re.compile(r"^[a-zA-Z0-9_.-]+$")
 _KNOWN_SETTING_KEYS = frozenset(
     {
         # Embedding / reranker / search — scoped API keys per subsystem so the
-        # embeddings and reranker routes never share a DB row. See
-        # docs/ROADMAP_FRAGILITY_AUDIT.md (P0 shared-key fix).
+        # embeddings and reranker routes never share a DB row.
         "embedding_provider",
         "embedding_model",
         "embedding_dim",
@@ -51,7 +51,6 @@ _KNOWN_SETTING_KEYS = frozenset(
         "llm_model_relevance",
         "llm_organization",
         # Misc
-        "secret_key",
         "ingest_worker_heartbeat",
         "config_version",
         "config_version_updated_at",
@@ -112,9 +111,12 @@ def get_app_setting(key: str) -> Optional[str]:
             "SELECT value FROM app_settings WHERE key = ?", (key,)
         ).fetchone()
         return row["value"] if row is not None else None
-    except Exception:
-        # DB not ready yet (first run, migrations not applied, etc.).
-        logger.debug("Failed to read app_setting %r", key, exc_info=True)
+    except sqlite3.Error as e:
+        if "no such table" in str(e):
+            # DB not initialized yet (first run, migrations pending)
+            logger.debug("app_settings table not ready for key %r", key)
+        else:
+            logger.warning("Failed to read app_setting %r: %s", key, e)
         return None
     finally:
         conn.close()

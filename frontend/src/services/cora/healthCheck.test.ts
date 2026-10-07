@@ -24,7 +24,7 @@ describe('checkHealth', () => {
     vi.restoreAllMocks();
   });
 
-  it('reports reachable when the backend is unhealthy (H5 regression)', async () => {
+  it('reports reachable when the backend is unhealthy', async () => {
     // A 200 with status "unhealthy" means the backend answered — it is
     // reachable. Component health is not the reachability gate.
     vi.mocked(globalThis.fetch).mockResolvedValueOnce(

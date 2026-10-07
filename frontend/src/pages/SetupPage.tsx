@@ -14,9 +14,12 @@ import {
  saveLlmForm,
  type ProviderPreset,
 } from "@/components/onboarding/llmPresets";
+import { useIsOwner } from "@/store/authStore";
 
 const SetupPage = (): JSX.Element => {
  const navigate = useNavigate();
+ // Only the signed-in owner can change instance settings.
+ const isOwner = useIsOwner();
  const [settings, setSettings] = useState<LLMSettings | null>(null);
  const [loading, setLoading] = useState(true);
  const [saving, setSaving] = useState(false);
@@ -256,6 +259,7 @@ const SetupPage = (): JSX.Element => {
  )}
 
  {/* Actions */}
+ {isOwner ? (
  <div className="flex gap-3 3xl:gap-4 4xl:gap-5">
  <button
  type="button"
@@ -275,6 +279,11 @@ const SetupPage = (): JSX.Element => {
  </button>
  )}
  </div>
+ ) : (
+ <p className="font-inter text-sm 3xl:text-base 4xl:text-lg text-text-muted">
+ Ask the owner to finish setup.
+ </p>
+ )}
 
  {/* Note about restart */}
  <p className="mt-6 3xl:mt-8 4xl:mt-10 text-xs 3xl:text-sm 4xl:text-base text-text-muted font-inter">

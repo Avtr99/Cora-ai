@@ -1,8 +1,8 @@
 """SQLite persistence for server-side chats.
 
-Chats are stored on the server under a user's ``user_id`` (Phase 7): one row
+Chats are stored on the server under a user's ``user_id``: one row
 per turn in ``chat_turns``, upserted by message ID so a retry keeps its
-position (A5/A9). All functions are synchronous and run inside
+position. All functions are synchronous and run inside
 ``asyncio.to_thread`` from the API layer. The tables are created by migration
 ``011_users_and_chats.sql``.
 """
@@ -14,16 +14,16 @@ from .database import get_connection
 
 
 class ChatNotFound(Exception):
-    """The chat does not exist, or belongs to another user (D33)."""
+    """The chat does not exist, or belongs to another user."""
 
 
 def answer_id(message_id: str) -> str:
-    """Answer ID derived from the user message ID (A10). Only place this rule lives."""
+    """Answer ID derived from the user message ID. Only place this rule lives."""
     return f"{message_id}-answer"
 
 
 def chat_title(text: str) -> str:
-    """Chat title from the first user text: first 30 chars plus '...' (B3)."""
+    """Chat title from the first user text: first 30 chars plus '...'."""
     return text if len(text) <= 30 else text[:30] + "..."
 
 
@@ -80,7 +80,7 @@ def record_turn(
 
     Creates the chat on first turn (title from the first user text) and bumps
     ``updated_at`` on later turns. A turn whose ``message_id`` already exists
-    is updated in place and keeps its ``seq`` — this is the retry path (A9).
+    is updated in place and keeps its ``seq`` — this is the retry path.
     Raises ``ChatNotFound`` when the chat is owned by another user.
     """
     conn = get_connection()

@@ -39,13 +39,13 @@ const NavItem: React.FC<NavItemProps> = ({ to, label, Icon, isActive, isCollapse
     <span className="flex h-5 w-5 shrink-0 items-center justify-center">
       <IconWrapper
         Icon={Icon}
-        size={20}
+        size={isCollapsed ? 20 : 18}
         state={isActive ? 'active' : 'default'}
         aria-hidden={true}
       />
     </span>
     {!isCollapsed && (
-      <span className={`font-inter text-ui 3xl:text-base 4xl:text-[19px] ${isActive ? 'text-brand-secondary font-semibold' : 'text-text-muted font-medium'}`}>
+      <span className={`font-inter text-ui 3xl:text-base 4xl:text-[19px] min-w-0 flex-1 truncate ${isActive ? 'text-brand-secondary font-semibold' : 'text-text-muted font-medium'}`}>
         {label}
       </span>
     )}
@@ -60,7 +60,7 @@ export const Sidebar: React.FC = () => {
   const wideBreakpoint = useWideBreakpoint();
   // Sidebar widths match the --sidebar-width / --sidebar-collapsed-width CSS
   // vars declared in Index.tsx so the composer stays aligned at every tier.
-  const expandedWidth = wideBreakpoint === '4xl' ? 336 : wideBreakpoint === '3xl' ? 264 : 208;
+  const expandedWidth = wideBreakpoint === '4xl' ? 336 : wideBreakpoint === '3xl' ? 272 : 224;
   const collapsedWidth = wideBreakpoint === '4xl' ? 80 : wideBreakpoint === '3xl' ? 68 : 60;
   const [focusedChatIndex, setFocusedChatIndex] = React.useState<number>(-1);
   const [isHamburgerVisible, setIsHamburgerVisible] = React.useState(true);
@@ -244,7 +244,7 @@ export const Sidebar: React.FC = () => {
               whileTap={shouldReduceMotion ? undefined : { scale: 0.97 }}
               transition={shouldReduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 500, damping: 22 }}
             >
-              <IconWrapper Icon={PlusCircleIcon} size={20} aria-hidden={true} />
+              <IconWrapper Icon={PlusCircleIcon} size={18} aria-hidden={true} />
               <span className="text-foreground">New chat</span>
             </motion.button>
           )}

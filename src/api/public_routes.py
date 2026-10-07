@@ -17,7 +17,6 @@ router = APIRouter(tags=["public"])
 class FeedbackPayload(BaseModel):
     messageId: str = Field(..., max_length=128)
     chatId: Optional[str] = Field(None, max_length=128)
-    userId: Optional[str] = Field(None, max_length=128)
     rating: Literal["positive", "negative"]
     tags: Optional[List[str]] = Field(None, max_length=10)
     comment: Optional[str] = Field(None, max_length=2000)

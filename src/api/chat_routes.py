@@ -1,7 +1,7 @@
-"""Server-side chat endpoints (Phase 7).
+"""Server-side chat endpoints.
 
 Chats live in the instance SQLite database under the request's ``user_id`` —
-the chat id is the conversation id (B2), so the path parameter uses the same
+the chat id is the conversation id, so the path parameter uses the same
 constraints as ``Query.conversation_id``. The router is mounted under ``/v1``
 and ``/api``; both are protected path prefixes, so ``SecurityMiddleware`` has
 already set ``request.state.user_id`` when protection is on.
@@ -17,7 +17,7 @@ from .auth.session_auth import current_user_id
 
 router = APIRouter(prefix="/chats", tags=["Chats"])
 
-# Same constraints as Query.conversation_id in query_models.py (B2).
+# Same constraints as Query.conversation_id in query_models.py.
 _CHAT_ID = Path(max_length=64, pattern=r"^[a-zA-Z0-9\-]+$")
 
 
@@ -56,7 +56,7 @@ async def list_chats(user_id: str = Depends(current_user_id)):
 
 @router.get("/{chat_id}", response_model=ChatDetailResponse)
 async def get_chat(chat_id: str = _CHAT_ID, user_id: str = Depends(current_user_id)):
-    """Return one chat with all its turns. Other users' chats 404 (D33)."""
+    """Return one chat with all its turns. Other users' chats 404."""
     chat = await asyncio.to_thread(chat_store.get_chat, user_id, chat_id)
     if chat is None:
         raise HTTPException(status_code=404, detail="Chat not found")
@@ -65,7 +65,7 @@ async def get_chat(chat_id: str = _CHAT_ID, user_id: str = Depends(current_user_
 
 @router.delete("/{chat_id}", status_code=204)
 async def delete_chat(chat_id: str = _CHAT_ID, user_id: str = Depends(current_user_id)):
-    """Delete one chat and its turns. Other users' chats 404 (D33)."""
+    """Delete one chat and its turns. Other users' chats 404."""
     deleted = await asyncio.to_thread(chat_store.delete_chat, user_id, chat_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Chat not found")

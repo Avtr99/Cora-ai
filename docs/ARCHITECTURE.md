@@ -29,7 +29,7 @@
 │   │  (FastAPI + React SPA)   │      │  qdrant/qdrant:v1.18.2      │  │
 │   │                          │      │                             │  │
 │   │  :8000  HTTP + SPA       │─────▶│  :6333  HTTP/gRPC           │  │
-│   │   ├─ /v1/*  API routes   │      │  (vector + memory store)    │  │
+│   │   ├─ /v1/*  API routes   │      │  (vector store)             │  │
 │   │   ├─ /api/* SPA aliases  │      │  no host port (internal)    │  │
 │   │   └─ /*     static SPA   │      │  Volume: qdrant_data        │  │
 │   │                          │      └─────────────────────────────┘  │
@@ -90,6 +90,48 @@ The `app` process hosts:
 3. **The async query job queue** (in-process workers, not a separate Celery/Redis broker)
 4. **The lifespan initializer** that lazily builds all singletons
 
+Component wiring inside the `app` process:
+
+```
+   browser SPA (same origin)          scripts / API clients
+   session cookie                     X-API-Key
+            └──────────────┬─────────────────┘
+                           ▼
+                 uvicorn :8000 — single process
+                           ▼
+   middleware: GZip (≥1 KB) → RequestSizeLimit (5 MB) → Logging → Security (auth + headers) → CORS
+                           ▼
+        owner identity resolved (session row or API-key check)
+                           ▼
+ ┌─────────┬──────────┬─────────┬──────────┬────────────┬────────────┐
+ │ /auth   │ /query   │ /chats  │ /account │ /settings  │ /documents │
+ │ login   │ sync     │ server- │ password │ providers, │ upload,    │
+ │ claim   │ stream   │ side    │ + claim  │ API keys,  │ status,    │
+ │ logout  │ async    │ history │          │ models     │ delete     │
+ └────┬────┴────┬─────┴────┬────┴────┬─────┴─────┬──────┴─────┬──────┘
+      ▼         ▼          ▼         ▼           ▼            ▼
+  session_  open_turn  db/chats  db/users  config_store  document_store
+  auth      close_turn chats +            app_settings  document_jobs +
+  cookies +             chat_turns        (secrets in   processing_jobs
+  rate limits                             SQLite)     │
+                                                      ▼
+                                              ingest-worker or
+                                              in-process task
+                      │
+                      ▼
+           StreamingRAGOrchestrator
+             rewrite → route → KB │ Web │ Hybrid │ Conversational
+                      │
+       ┌──────────────┼───────────────┬────────────────┐
+       ▼              ▼               ▼                ▼
+    SQLite        Qdrant         LLM provider      external APIs
+    cache         dense vectors  (Gemini / OAI /   embeddings,
+    24h TTL                      OpenRouter /      reranker,
+                                 Ollama / vLLM)    Tavily
+```
+
+Every route family is mounted under both `/v1` and `/api` (the SPA uses the `/api` aliases; `/api/auth` is session-only). `/live`, `/ready`, and `/health` stay unauthenticated for probes — see section 4 for the query pipeline internals.
+
 ### 3.1 Singleton lifecycle (`src/api/lifespan.py`)
 
 All heavy components are constructed **after** the server starts accepting connections, so the liveness probe (`/live`) responds immediately even if a provider is unreachable. The Docker `HEALTHCHECK` uses `/live`. The `/ready` endpoint returns `503` until `initialization_complete == True`, then `200`. Its `status` field is `ready`, `setup_required` (no LLM configured), `failed` (initialization errors), or `initializing`. It never returns error text.
@@ -101,6 +143,7 @@ startup (lifespan)
   ├─ run_migrations() + reload_settings()   ← SQLite schema (synchronous)
   ├─ ensure_document_store_tables()         ← + recovery sweep (in_process dispatch only)
   └─ initialize_components()                ← async background task
+       ├─ drop retired cora_memories        ← one-time upgrade cleanup, fail-soft
        ├─ LangChainRetriever                ← connects to Qdrant
        ├─ create_llm_client()               ← skipped in setup mode (setup_required = True)
        ├─ _attach_sqlite_cache(client)      ← FallbackLLMClient passes it to both inner clients
@@ -128,8 +171,9 @@ Access in request handlers is via the module-level globals `retriever`, `llm_cli
 Client
   │  POST /v1/query  { text, conversation_id?, message_id?, include_debug? }
   ▼
-FastAPI middleware stack:
-  CORS → SecurityHeaders → Logging → RequestSizeLimit (5 MB)
+FastAPI middleware stack (outermost first — add_middleware wraps last-added
+outermost):
+  GZip (≥1 KB) → RequestSizeLimit (5 MB) → Logging → Security (auth + headers) → CORS
   │
   ▼
 open_turn (src/api/query_history.py)
@@ -184,7 +228,7 @@ locking needed).
 | `feedback` | User thumbs up/down on answers | `POST /v1/feedback` | Operator-only (manual SQLite query) |
 | `backend_cache` | Persistent query cache (24h TTL) | `process_query_core` on cache miss | `process_query_core` on every query |
 | `embedding_cache` | Durable embedding cache (avoids re-paying for embeddings on restart) | Ingestion + retriever | Retriever |
-| `users` | Instance accounts. One built-in `owner` row in Phase 7 | Migration `011_users_and_chats.sql` | `current_user_id`, `auth_sessions.user_id` foreign key |
+| `users` | Instance account. Exactly one `owner` row (member accounts were retired by migration `012_single_owner.sql`) | Migration `011_users_and_chats.sql` | `current_user_id`, `auth_sessions.user_id` foreign key |
 | `chats` | Server-side chat list, scoped by `user_id` | `record_turn` on each stored turn | `list_chats`, `get_chat`, `get_chat_owner` |
 | `chat_turns` | One row per user/assistant turn (`message_id` + `response_json`) | `record_turn` (upsert by `message_id`) | `load_history`, `GET /v1/chats/{id}` |
 
@@ -192,15 +236,14 @@ locking needed).
 
 ### 5.2 Qdrant (local container, no API key)
 
-Three collections, all on the same Qdrant instance:
+Two collections, all on the same Qdrant instance:
 
 | Collection | Purpose | Dimension | Written by |
 |---|---|---|---|
 | `cora_dense_only` (default name) | Document vectors for RAG retrieval | `EMBEDDING_DIM` (1024 default) | **Ingestion only** (offline) |
-| `cora_memories` | Conversation memory vectors | `EMBEDDING_DIM` | Memory API at runtime |
 | `vcm_doc_registry` | Document metadata registry | — | Ingestion |
 
-The running `app` container is **read-only** for `cora_dense_only` — it never upserts document vectors during query serving. Only `cora_memories` is written at runtime (via the memory API).
+The running `app` container is **read-only** for `cora_dense_only` — it never upserts document vectors during query serving.
 
 ### 5.3 Filesystem (`data/documents/`)
 
@@ -255,8 +298,6 @@ All external dependencies are swappable via env vars. The default stack uses hos
 | `VOYAGE_API_KEY` | Only if `EMBEDDING_PROVIDER=voyage` or `RERANK_PROVIDER=voyage` | Default stack |
 | `TAVILY_API_KEY` | Required when `ENABLE_WEB_SEARCH=true` and `SEARCH_PROVIDER=tavily` or `SEARCH_PROVIDER=none` (the `none` setting falls back to Tavily when web search is enabled) | Default stack |
 | `COHERE_API_KEY` | Only if using Cohere for embed/rerank | Optional |
-| `SECRET_KEY` | **Auto-generated** | Fallback key for memory user-ID anonymization (`MEMORY_SECRET_KEY` is preferred). Auto-generated on first run and persisted to SQLite. Set in `.env` only to use your own key. |
-| `JWT_SECRET_KEY` | Only if auth endpoints are used | Optional |
 
 The app **starts successfully with no keys configured**. `/live` returns 200, `/ready` returns 503 `setup_required`, and providers fail lazily on first use. This is by design, so the container health probe does not depend on external services.
 
@@ -370,17 +411,16 @@ stateDiagram-v2
 
 | Concern | Mechanism |
 |---|---|
-| **PII redaction** | Enabled by default (`PII_REDACTION_ENABLED=True` in `config.py`). Applied before memory storage. |
-| **User ID anonymization** | Memory store hashes user IDs via HMAC with `MEMORY_SECRET_KEY` (falls back to `SECRET_KEY`). |
 | **Chat ownership** | Chats live in the server-side `chats`/`chat_turns` tables under a `user_id`. Every chat read and delete filters by `user_id`. A `conversation_id` owned by another user returns 404. |
 | **Request size** | Hard limit `MAX_REQUEST_BODY_SIZE_BYTES=5 MB`. |
-| **Rate limiting** | **None.** Users bring their own API keys; rate limiting the operator is an anti-feature in a local-first tool. |
+| **Rate limiting** | Login and password-change attempts only: 5 per minute per IP+username or user ID, in memory (`MovingWindowRateLimiter` in `src/api/auth/login_limiter.py`), resets on restart. No limiter on other routes; users bring their own API keys. |
 | **Path traversal** | Document access is constrained to `ALLOWED_DOCUMENT_DIRS`. |
 | **Container user** | The `app` container runs as non-root UID 1000. |
-| **API key protection** | When `ENABLE_API_KEY_PROTECTION=true`, `SecurityMiddleware` requires a credential on protected paths (`/v1`, `/api`, `/query`). Two auth modes work: the `X-API-Key` header, or the `cora_session` cookie that `POST /api/auth/session` issues after a login with the access key. The cookie holds an opaque token backed by a server-side row in the `auth_sessions` table (7-day lifetime). The row carries the session `user_id`, and sign-out deletes it. `API_ACCESS_KEY` must have 32 characters or more, enforced by `Settings.validate_api_access_key` at startup. |
+| **API key protection** | When `ENABLE_API_KEY_PROTECTION=true`, `SecurityMiddleware` requires a credential on protected paths (`/v1`, `/api`, `/query`). Two auth modes work: the `X-API-Key` header (acts as the owner), or the `cora_session` cookie that `POST /api/auth/session` issues after a `{username, password}` login. The cookie holds an opaque token backed by a server-side row in the `auth_sessions` table (7-day lifetime). The row carries the session `user_id`, and sign-out deletes it. `POST /api/auth/owner` claims the owner account once with the access key. `API_ACCESS_KEY` must have 32 characters or more, enforced by `Settings.validate_api_access_key` at startup. |
+| **Roles** | Single-owner model: the `users` table holds exactly one `owner` row. `require_owner` (403 "Owner only") guards the six settings-write routes; `require_protection` (404) hides the account routes when protection is off. |
 | **CSRF guard** | Cookie-authenticated requests with a method other than GET/HEAD/OPTIONS and a `Sec-Fetch-Site` value other than `same-origin` or `none` get a 403 `forbidden`. Requests without the header pass. `X-API-Key` auth is exempt. |
 
-> **Local-only caveat:** `CORS_ORIGINS` defaults to a localhost list, and CORS runs with `allow_credentials=False`. CORS does not grant access: the SPA is same-origin, and when `ENABLE_API_KEY_PROTECTION=true` every protected request needs a credential. Exposing Cora beyond localhost needs `ENABLE_API_KEY_PROTECTION` and HTTPS (see [Self-hosting Cora](SELF_HOSTING.md)). `SECRET_KEY` is auto-generated per instance. Set it in `.env` only to use your own key.
+> **Local-only caveat:** `CORS_ORIGINS` defaults to a localhost list, and CORS runs with `allow_credentials=False`. CORS does not grant access: the SPA is same-origin, and when `ENABLE_API_KEY_PROTECTION=true` every protected request needs a credential. Exposing Cora beyond localhost needs `ENABLE_API_KEY_PROTECTION` and HTTPS (see [Self-hosting Cora](SELF_HOSTING.md)).
 
 ---
 
@@ -429,7 +469,6 @@ All runtime configuration lives in `src/config.py` as a pydantic-settings `Setti
 # 1. Configure environment
 copy .env.example .env
 #    Fill in: GEMINI_API_KEY (required), VOYAGE_API_KEY, TAVILY_API_KEY
-#    (SECRET_KEY is auto-generated on first run — no need to set it)
 
 # 2. Start the split stack (app + ingest-worker + qdrant)
 docker compose up -d --build

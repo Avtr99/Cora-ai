@@ -21,12 +21,12 @@ Because Cora AI is open-source and self-hosted, the operator (the person or orga
 
 ### Local-First Data Storage
 
-Each Cora AI instance has one built-in owner account. There is no sign-up. If the operator enables access protection, users sign in with the instance key and Cora AI sets an essential session cookie. All data is stored locally on the machine where the instance is deployed, using SQLite (for chats, caches, and metadata) and Qdrant (for vector embeddings and conversation memory). No data leaves the machine unless an external API provider is explicitly configured.
+Each Cora AI instance has a single owner account. There is no self-sign-up. If the operator enables access protection, the owner signs in with a username and password and Cora AI sets an essential session cookie. All data is stored locally on the machine where the instance is deployed, using SQLite (for chats, caches, and metadata) and Qdrant (for vector embeddings). No data leaves the machine unless an external API provider is explicitly configured.
 
 ### Conversation History
 
-- **Chat messages:** Your conversations are stored in the local Qdrant instance under the `cora_memories` collection. User identifiers are HMAC-hashed before storage, pseudonymizing them and reducing the direct linkability of conversation history.
-- **Session data:** Chats are stored in the instance's SQLite database under the owner account and sync across the devices you sign in from. When access protection is enabled, the browser holds one HttpOnly session cookie (`cora_session`); signing out deletes the session on the server. The browser's local storage holds only a locally generated profile ID and onboarding flags, never chat content.
+- **Chat messages:** Your conversations are stored in the instance's SQLite database under the owner account. Deleting a chat in the sidebar removes it from the server.
+- **Session data:** When access protection is enabled, the browser holds one HttpOnly session cookie (`cora_session`); signing out deletes the session on the server. The browser's local storage holds only onboarding flags, never chat content.
 
 ### Query and Cache Data
 
@@ -37,10 +37,6 @@ Each Cora AI instance has one built-in owner account. There is no sign-up. If th
 
 - **Document content:** Files you upload are processed locally, chunked, and stored as vector embeddings in the local Qdrant instance. The original files and extracted text are stored on the local filesystem.
 - **Document metadata:** Metadata such as filename, file type, registry, and document ID is extracted and stored in SQLite and Qdrant payloads.
-
-### PII Redaction
-
-Personally identifiable information (PII) is automatically detected and redacted before being stored in conversation memory. This feature is enabled by default (`PII_REDACTION_ENABLED=true`) and covers names, emails, phone numbers, credit card numbers, and other common PII patterns. Redacted content is replaced with type-tagged placeholders (e.g. `[NAME]`, `[EMAIL]`).
 
 **Note:** Cora AI does not collect IP addresses, browser fingerprints, or location data. No analytics or tracking are included in the default deployment.
 
@@ -80,8 +76,6 @@ The operator may add additional processing purposes and legal bases:
 Cora AI implements the following security measures:
 
 - **Local storage:** All data remains on the operator's machine by default. No external databases or cloud services are required.
-- **PII redaction:** Automatic detection and redaction of personal identifiers before storage in conversation memory.
-- **HMAC-hashed user IDs:** User identifiers are hashed before being stored in the memory collection, pseudonymizing them and reducing direct linkability to individuals.
 - **API key isolation:** API keys are stored either in the gitignored local `.env` file or in the SQLite database used by the setup wizard. In both cases, operators should protect the file and any backups, and keys are never committed to version control.
 - **Optional API authentication:** The operator can enable API key authentication to restrict access to the service.
 - **Input sanitization:** HTML content in responses is sanitized via `nh3`. This does not protect against SQL, command, prompt, or other input-injection types.
@@ -94,9 +88,9 @@ Under GDPR and similar regulations, you have the following rights regarding data
 
 - **Right to Access:** Request information about data stored in the local databases. The operator can query SQLite and Qdrant directly.
 - **Right to Rectification:** Request correction of inaccurate data stored in the system.
-- **Right to Erasure (Right to be Forgotten):** You can delete a chat from the sidebar at any time, which removes it from the server database. The operator can delete conversation memories via the `DELETE /v1/memory/delete` API endpoint or by clearing the Qdrant `cora_memories` collection.
+- **Right to Erasure (Right to be Forgotten):** You can delete a chat from the sidebar at any time, which removes it from the server database. The operator can also delete documents, or clear the SQLite database and Qdrant collections entirely.
 - **Right to Data Portability:** Data can be exported from SQLite (standard SQL dumps) and Qdrant (via the Qdrant API) in machine-readable formats.
-- **Right to Object:** Object to processing by disabling the relevant features (e.g. disable conversation memory via configuration).
+- **Right to Object:** Object to processing by disabling the relevant features (e.g. external providers via configuration).
 
 To exercise these rights, contact the operator of the Cora AI instance you are using.
 
@@ -104,7 +98,7 @@ To exercise these rights, contact the operator of the Cora AI instance you are u
 
 Data retention is controlled by the operator. The default behaviour is:
 
-- **Chat history:** Stored in the instance's SQLite database until deleted by the user (sidebar delete) or the operator. Conversation memory in Qdrant persists until explicitly deleted.
+- **Chat history:** Stored in the instance's SQLite database until deleted by the user (sidebar delete) or the operator.
 - **Query cache:** Automatically expires after 24 hours.
 - **Embedding cache:** Persists until the corresponding documents are deleted or the database is cleared.
 - **Uploaded documents:** Persist until explicitly deleted by the operator via the document store UI or API.

@@ -5,7 +5,7 @@ import { PageLoader } from '@/components/PageLoader';
 import LoginPage from '@/pages/LoginPage';
 
 /**
- * Gates the SPA on the instance access-key session. On mount it asks the
+ * Gates the SPA on the username/password session. On mount it asks the
  * backend whether auth is required; while unknown it shows the page loader,
  * while required it shows the login page on every route. A rejected
  * getSession (backend down, or an older backend without the route) maps to
@@ -20,9 +20,7 @@ export function AuthGate({ children }: { children: ReactNode }): JSX.Element {
     getSession()
       .then((session) => {
         if (cancelled) return;
-        useAuthStore.getState().setStatus(
-          !session.required ? 'open' : session.authenticated ? 'authenticated' : 'required'
-        );
+        useAuthStore.getState().applySession(session);
       })
       .catch(() => {
         if (cancelled) return;

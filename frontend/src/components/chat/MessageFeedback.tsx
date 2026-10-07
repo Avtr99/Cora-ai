@@ -11,7 +11,6 @@ import {
 interface MessageFeedbackProps {
   messageId: string;
   chatId?: string;
-  userId?: string;
   userQuery?: string;
   botAnswer?: string;
 }
@@ -29,7 +28,6 @@ interface FeedbackStatus {
 export const MessageFeedback: React.FC<MessageFeedbackProps> = ({
   messageId,
   chatId,
-  userId,
   userQuery,
   botAnswer,
 }) => {
@@ -78,7 +76,7 @@ export const MessageFeedback: React.FC<MessageFeedbackProps> = ({
       const controller = new AbortController();
       abortRef.current = controller;
 
-      await submitFeedback({ messageId, chatId, userId, rating: 'positive', userQuery, botAnswer }, controller.signal);
+      await submitFeedback({ messageId, chatId, rating: 'positive', userQuery, botAnswer }, controller.signal);
 
       setIsSubmitted(true);
       setStatus({ type: 'success', text: 'Thanks for the feedback.' });
@@ -137,7 +135,6 @@ export const MessageFeedback: React.FC<MessageFeedbackProps> = ({
         {
           messageId,
           chatId,
-          userId,
           rating: 'negative',
           tags: Array.from(selectedTags),
           comment: comment.trim(),

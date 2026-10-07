@@ -1,34 +1,18 @@
-"""
-Registry Patterns Configuration
-================================
+"""Registry pattern configuration.
 
-Defines carbon registry patterns used by:
-- Router: to know what's in the knowledge base
-- Document loaders: to extract metadata during ingestion
-- Query rewriter: to expand acronyms
-- Structured query detector: to know each registry's row entity
+Carbon-registry patterns used by the router (KB keywords), document loaders
+(metadata extraction), the query rewriter (acronym expansion), and the
+structured-query detector (row entities). Thin aggregation layer
+re-exporting ``RegistryPattern`` and ``REGISTRY_PATTERNS`` — definitions
+live in:
 
-This module is a thin **aggregation layer** — it re-exports
-``RegistryPattern`` and ``REGISTRY_PATTERNS`` so that existing imports
-(``from ..registry_config.registry_patterns import RegistryPattern,
-REGISTRY_PATTERNS``) continue to work without changes.
+  ``_registries``  — credit-issuing registries (``is_registry=True``)
+  ``_governance``  — governance / standard bodies
+  ``_categories``  — topic classifiers
 
-The actual pattern definitions live in three focused modules:
-
-  ``_registries``   — 27 credit-issuing registries (``is_registry=True``)
-  ``_governance``   —  7 governance / standard bodies (``is_registry=False``)
-  ``_categories``   — 14 topic classifiers (``is_registry=False``)
-
-This split keeps each file under 400 lines and groups patterns by
-semantic role, making it easier to find and update a specific registry
-or category without scrolling through 800 lines of config.
-
-Adding a new registry:
-  1. Add a ``RegistryPattern`` to ``_registries.py`` (if it issues credits)
-     or ``_governance.py`` (if it's a standard/governance body).
-  2. Set ``is_registry=True`` for registries, ``False`` for everything else.
-  3. Set ``row_entity`` if the default ``project``/``projects`` is wrong.
-  4. Run ``pytest tests/test_metadata_extractor.py`` to verify detection.
+To add one: append a pattern to ``_registries.py`` (credit-issuing) or
+``_governance.py``, set ``row_entity`` when the default is wrong, and run
+``pytest tests/test_metadata_extractor.py``.
 """
 
 import json

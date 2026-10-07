@@ -1,4 +1,4 @@
-"""Tests for src/db/chats.py and the /chats routes (P7-T2)."""
+"""Tests for src/db/chats.py and the /chats routes."""
 import concurrent.futures
 import json
 
@@ -67,7 +67,7 @@ def _turn_rows(chat_id: str):
 
 class TestRecordTurn:
     def test_same_message_id_upserts_and_keeps_seq(self, db):
-        """A retry writes one row, keeps its seq, and updates the response (A9)."""
+        """A retry writes one row, keeps its seq, and updates the response."""
         chats.record_turn(OWNER, "c1", "m1", "hello", _response("a1"))
         chats.record_turn(OWNER, "c1", "m1", "hello edited", _response("a2"))
 
@@ -122,7 +122,7 @@ class TestChatTitle:
         assert chats.chat_title("y" * 31) == "y" * 30 + "..."
 
     def test_title_set_on_insert_only(self, db):
-        """A later turn must not rewrite the title (B3)."""
+        """A later turn must not rewrite the title."""
         chats.record_turn(OWNER, "c1", "m1", "a" * 40, _response("a1"))
         chats.record_turn(OWNER, "c1", "m2", "something else", _response("a2"))
         assert chats.get_chat(OWNER, "c1")["title"] == "a" * 30 + "..."

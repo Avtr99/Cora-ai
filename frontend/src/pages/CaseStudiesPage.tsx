@@ -45,14 +45,15 @@ const CaseStudyCard: React.FC<CaseStudyCardProps> = ({
   return (
     <article className="rounded-xl 3xl:rounded-2xl 4xl:rounded-2xl border border-border-ui bg-surface-card overflow-hidden">
       <div className="flex flex-col md:flex-row">
-        {/* Image */}
-        <div className="w-full md:w-[42%] relative bg-surface-subtle aspect-16/10 md:aspect-16/10 md:min-h-[300px] 3xl:min-h-[360px] 4xl:min-h-[420px]">
+        {/* Image — fills the full card height; card height is bounded by
+            clamped text, so this can neither stretch runaway nor leave a void */}
+        <div className="w-full md:w-[42%] md:shrink-0 relative bg-surface-subtle aspect-16/10 md:aspect-auto md:min-h-[280px]">
           <img
             src={mainImage}
             srcSet={mainImageSrcSet}
             sizes="(max-width: 767px) calc(100vw - 48px), 42vw"
             alt={title}
-            className="w-full h-full object-cover"
+            className="absolute inset-0 h-full w-full object-cover"
             loading="lazy"
             decoding="async"
           />
@@ -71,8 +72,8 @@ const CaseStudyCard: React.FC<CaseStudyCardProps> = ({
             </span>
           </div>
 
-          {/* Title — dominant */}
-          <h2 className="font-inter text-heading-3 md:text-heading-2 3xl:text-2xl 4xl:text-3xl font-semibold text-text-primary leading-tight mb-3 3xl:mb-4 4xl:mb-5">
+          {/* Title — dominant, clamped so card height stays bounded */}
+          <h2 className="font-inter text-heading-3 md:text-heading-2 3xl:text-2xl 4xl:text-3xl font-semibold text-text-primary leading-tight mb-3 3xl:mb-4 4xl:mb-5 line-clamp-3">
             {title}
           </h2>
 
@@ -96,8 +97,8 @@ const CaseStudyCard: React.FC<CaseStudyCardProps> = ({
             {projectType}
           </span>
 
-          {/* Summary — readable body text */}
-          <p className="text-sm 3xl:text-[17px] 4xl:text-[22px] text-text-secondary font-inter leading-[1.7] 3xl:leading-[1.6] mb-6 3xl:mb-8 4xl:mb-10" style={{ textWrap: 'pretty' }}>
+          {/* Summary — readable body text, clamped to bound card height */}
+          <p className="text-sm 3xl:text-[17px] 4xl:text-[22px] text-text-secondary font-inter leading-[1.7] 3xl:leading-[1.6] mb-6 3xl:mb-8 4xl:mb-10 line-clamp-3" style={{ textWrap: 'pretty' }}>
             {summary}
           </p>
 

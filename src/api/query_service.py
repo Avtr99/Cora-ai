@@ -64,9 +64,6 @@ async def process_query_core(
     # a settings save happens mid-request.
     config_version = get_revisions().get("config_version", 0)
 
-    # NOTE: Filter extraction moved to specific pipelines (Orchestrator vs Legacy)
-    # to avoid duplication and precedence issues.
-
     retriever = get_retriever()
     gemini_client = get_gemini_client()
     rag_orchestrator = get_rag_orchestrator()
@@ -215,7 +212,7 @@ async def process_query_core(
         config_version=config_version,
     )
 
-    # Store the turn from the raw result's failure shape (A8), not the
+    # Store the turn from the raw result's failure shape, not the
     # sanitized response. ChatNotFound propagates.
     await close_turn(ctx, query.text, response, processed_results)
 

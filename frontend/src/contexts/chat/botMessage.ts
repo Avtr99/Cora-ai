@@ -9,7 +9,7 @@ import { generateId } from '@/store/chatStore.utils';
  * The backend sets `metadata.kb_empty` when the KB route retrieved zero
  * documents and web search was disabled. In that case the model returns an
  * empty or non-answer fallback, so we replace it with a friendly, actionable
- * message (B8).
+ * message.
  */
 export function getEmptyKbAnswerText(response: CoraResponse): string | null {
   if (response.metadata?.kb_empty !== true) return null;
@@ -33,7 +33,7 @@ export interface BotMessageOptions {
  * Build the completed bot `Message` for a successful response.
  *
  * Shared by the live query path (useBotResponse) and the server-chat loader
- * (chatsApi). The message ID is the server's `answerId` (A10) so a chat loads
+ * (chatsApi). The message ID is the server's `answerId` so a chat loads
  * identically on every device; `generateId()` is only a fallback for a
  * malformed response.
  */

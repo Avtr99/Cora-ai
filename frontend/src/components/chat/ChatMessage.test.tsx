@@ -21,12 +21,15 @@ import { describe, it, expect } from 'vitest';
  */
 describe('ChatMessage structural checks', () => {
   it('ChatMessage module can be imported', async () => {
+    // Cold-importing the chat component pulls in the markdown stack; under a
+    // parallel vitest run this has exceeded the 5s default.
+
     const { ChatMessage, TypingIndicator } = await import('./ChatMessage');
     expect(ChatMessage).toBeDefined();
     expect(typeof ChatMessage).toBe('function');
     expect(TypingIndicator).toBeDefined();
     expect(typeof TypingIndicator).toBe('function');
-  });
+  }, 15_000);
 
   it('ChatMessage accepts expected prop types at the type level', async () => {
     const mod = await import('./ChatMessage');

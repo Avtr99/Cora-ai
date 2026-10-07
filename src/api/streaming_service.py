@@ -256,7 +256,7 @@ async def process_query_core_stream(
         config_version=config_version,
     )
 
-    # Store the turn just before the result event (B6): a client that leaves
+    # Store the turn just before the result event: a client that leaves
     # earlier stores nothing; one that leaves after still gets a stored turn.
     await close_turn(ctx, query.text, response, final_result)
 

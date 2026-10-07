@@ -104,27 +104,23 @@ async def initialize_components():
     from ..citations import CitationManager
     
     settings = get_settings()
-    
-    # Check security configuration
-    # SECRET_KEY may have been auto-generated and persisted by _apply_db_overlay
-    # during get_settings(). If it's still missing, the DB wasn't available.
-    if not settings.SECRET_KEY:
-        logger.warning(
-            "--- SECURITY WARNING --- "
-            "SECRET_KEY is not configured and could not be auto-generated. "
-            "Memory user-ID anonymization will fail unless MEMORY_SECRET_KEY is set. "
-            "Set SECRET_KEY in .env or ensure the SQLite database is writable."
-        )
 
-    if settings.ENABLE_INSECURE_TOKEN_ENDPOINT:
-        logger.warning(
-            "--- SECURITY WARNING --- "
-            "ENABLE_INSECURE_TOKEN_ENDPOINT is on: POST /v1/auth/token issues JWTs "
-            "for any user_id to any caller that passes instance authentication. "
-            "It is only reachable when ENABLE_API_KEY_PROTECTION is also on; "
-            "keep it disabled on shared deployments."
-        )
-    
+    # One-time cleanup for upgraded installs: the conversation-memory feature
+    # was removed; drop its orphaned Qdrant collection. Fail-soft — an inert
+    # leftover collection must never break startup. Skipped if the operator
+    # configured the document collection itself to use that name.
+    try:
+        from ..document_store.indexer import _qdrant_client
+        qc = _qdrant_client()
+        if (
+            settings.QDRANT_COLLECTION_NAME != "cora_memories"
+            and qc.collection_exists("cora_memories")
+        ):
+            qc.delete_collection("cora_memories")
+            logger.info("Dropped retired cora_memories collection")
+    except Exception:
+        pass
+
     try:
         logger.info("Initializing retriever...")
         retriever = LangChainRetriever(retrieval_rounds=settings.DARTBOARD_ROUNDS)
@@ -208,7 +204,7 @@ async def _finalize_initialization() -> None:
     try:
         settings = get_settings()
 
-        # Start async query queue workers (Phase 3)
+        # Start async query queue workers
         async_job_manager = get_async_query_job_manager()
         await async_job_manager.configure(
             max_queue_size=settings.ASYNC_QUERY_QUEUE_MAX_SIZE,
@@ -245,27 +241,22 @@ async def lifespan(app):
     
     logger.info("Starting VCM Assistant API...")
     
-    # Run SQLite migrations synchronously before starting components
-    try:
-        run_migrations()
-        reload_settings(bump_version=False)
-        logger.info("SQLite migrations completed successfully")
-    except Exception as e:
-        logger.error(f"Failed to run SQLite migrations: {e}")
+    # Run SQLite migrations synchronously before starting components.
+    # A failed migration must abort startup: serving on a half-applied schema
+    # produces far worse failures than refusing to boot.
+    run_migrations()
+    reload_settings(bump_version=False)
+    logger.info("SQLite migrations completed successfully")
 
     # Ensure document store tables exist once at startup (avoids per-request checks)
     try:
         from ..document_store.storage import ensure_document_store_tables, recover_interrupted_documents
         ensure_document_store_tables()
         logger.info("Document store tables ensured")
-        # Recover documents left in an in-flight status by a previous
-        # crash/restart. In worker-dispatch mode the API skips recovery
-        # entirely — the API and worker start concurrently, and if the API
-        # marks in-flight documents as failed while the worker is actively
-        # processing them, the worker would later overwrite the status to
-        # 'indexed', leaving a transient incorrect 'failed' state in the UI.
-        # The worker owns all recovery (jobs, documents, stale locks) on its
-        # own startup.
+        # Recover documents left in-flight by a previous crash. In worker
+        # mode the API skips this: it starts concurrently with the worker,
+        # and marking in-flight work 'failed' would only be overwritten to
+        # 'indexed' by the still-running worker. The worker owns recovery.
         dispatch_mode = getattr(get_settings(), "INGESTION_DISPATCH", "in_process")
         if dispatch_mode != "worker":
             try:
@@ -394,11 +385,11 @@ async def hot_swap_llm_client() -> dict:
         else:
             logger.warning("Hot-swap: retriever not available, skipping orchestrator rebuild")
 
-        # Atomic update: both globals are assigned only after client and
-        # orchestrator are successfully rebuilt.
+        # Atomic update: client and orchestrator move together. When the
+        # retriever is unavailable the orchestrator becomes None — a
+        # consistent pair, not an old orchestrator bound to the old client.
         llm_client = new_client
-        if new_orchestrator is not None:
-            rag_orchestrator = new_orchestrator
+        rag_orchestrator = new_orchestrator
         setup_required = False
 
     # Setup-mode path: the app booted without an LLM, so the deferred

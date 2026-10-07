@@ -5,7 +5,7 @@ All functions are synchronous and run inside ``asyncio.to_thread`` from the
 async manager.
 
 The table is created by migration ``011_users_and_chats.sql`` at startup via
-``run_migrations()``, which always runs before the job manager starts (B4).
+``run_migrations()``, which always runs before the job manager starts.
 """
 
 import json

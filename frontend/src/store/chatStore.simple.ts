@@ -4,7 +4,7 @@
  * Purpose: Handle ONLY state storage
  * Actions: Remain in ChatContext.tsx (don't move complex logic)
  *
- * Chats are memory-only (Phase 7): the server owns persistence, the browser
+ * Chats are memory-only: the server owns persistence, the browser
  * holds no chat data in localStorage. On sign-out (auth status 'required')
  * the store is cleared, so nothing is left behind.
  */
@@ -14,8 +14,9 @@ import { create } from 'zustand';
 import { Chat } from './chatStore.types';
 import { useAuthStore } from './authStore';
 
-/** localStorage key used by the pre-Phase-7 persisted chat store (D18). */
+/** localStorage key used by the old persisted chat store. */
 const LEGACY_CHAT_HISTORY_KEY = 'chat-history';
+const LEGACY_USER_PROFILE_KEY = 'userProfile';
 
 export type ChatListStatus = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -223,13 +224,15 @@ useAuthStore.subscribe((state, prevState) => {
 });
 
 /**
- * Remove chat data persisted by the pre-Phase-7 localStorage store (D18).
+ * Remove chat data persisted by the old localStorage store.
  * Called once from main.tsx before React renders so an upgrade leaves no
  * chat content in the browser.
  */
 export function removeLegacyChatHistory(): void {
   try {
     localStorage.removeItem(LEGACY_CHAT_HISTORY_KEY);
+    // The fabricated local profile ID was removed with UserContext.
+    localStorage.removeItem(LEGACY_USER_PROFILE_KEY);
   } catch {
     // localStorage may be unavailable (private browsing) — non-fatal.
   }

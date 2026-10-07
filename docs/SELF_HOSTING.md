@@ -38,26 +38,22 @@ How the protection works:
   too.
 - The key must have 32 characters or more. `app` and `ingest-worker` refuse to
   start with a shorter key.
-- A browser logs in once on a login page. The server sets a `cora_session`
-  cookie: HttpOnly, `SameSite=Strict`, `Secure`, valid for 7 days.
+- On the first visit the login page asks for the access key once and lets you
+  set the owner username and password. After that, each user signs in with a
+  username and password.
+- The server sets a `cora_session` cookie: HttpOnly, `SameSite=Strict`,
+  `Secure`, valid for 7 days.
 - Sign out ends the session on the server. A saved copy of the cookie no
   longer works.
 - Cookie-authenticated requests with a method other than GET, HEAD, or OPTIONS
   and a cross-site `Sec-Fetch-Site` header get a 403.
-- Scripts and API clients send `X-API-Key: <key>` instead of the cookie.
+- Scripts and API clients send `X-API-Key: <key>` instead of the cookie. The
+  key also works as the owner for user-management routes.
 - The key is env-only. To rotate it, change `.env` and restart the stack. The
-  restart also logs out every browser session.
+  new key signs out every user session.
 
-Two credential systems exist:
-
-- The `cora_session` cookie and the `X-API-Key` header are the instance
-  credentials. The middleware checks them on every protected path.
-- `/v1/memory/*` and `/v1/auth/verify` also require a Bearer JWT in the
-  `Authorization` header. With protection on, a caller needs the instance
-  credential first and the JWT second. The browser login never issues a JWT,
-  so the SPA cannot call the memory endpoints. Scripts get a JWT from
-  `POST /v1/auth/token`, which only exists when
-  `ENABLE_INSECURE_TOKEN_ENDPOINT=true` and `ENABLE_API_KEY_PROTECTION=true`.
+The `cora_session` cookie and the `X-API-Key` header are the instance
+credentials. The middleware checks them on every protected path.
 
 Cookie caveats:
 
@@ -68,8 +64,60 @@ Cookie caveats:
   the API when protection is on.
 
 **Where chats are saved.** Cora saves chats on the server, in the SQLite
-database. They sync across your devices. Signing out leaves no chats in the
-browser. One person uses each instance. Do not share the access key.
+database. Signing out leaves no chats in the browser. Only the owner and
+scripts use the access key.
+
+## The owner account
+
+With protection on, the instance has a single owner account. One account,
+one password — there are no member accounts.
+
+The owner sets up their account once. On the first visit the login page shows
+a "Set up owner account" form. It asks for the instance access key, a
+username, and a password. After the claim, the form never shows again and
+sign-in is a username and password.
+
+The owner changes their own password from the user menu under **Account**.
+A password change signs out every other session.
+
+Upgrading from a version with member accounts: migration removes member
+accounts, ends their sessions, and moves their chats and jobs to the owner.
+Nothing else changes.
+
+Upgrading from a version with the conversation-memory API: the migration
+deletes the orphaned `secret_key` settings row, startup drops the now-unused
+`cora_memories` Qdrant collection, and the browser clears the old local
+`userProfile` storage key on first load. No action needed.
+
+Usernames are 3 to 32 lowercase characters: letters, digits, `.`, `_`, `-`.
+Passwords are 15 to 128 characters, must not be one repeated character, and
+are stored as Argon2 hashes.
+
+`X-API-Key` requests act as the owner. Use the key for scripts, not for
+browser sign-in.
+
+The login form accepts 5 tries per minute per IP and username — bad guesses
+from one address cannot lock you out from another. The counter lives in
+memory and resets on restart. Add a stricter limit at the reverse proxy if
+you want one. When a burst of sign-ins fills the password-hashing queue, the
+login returns 503 `Sign-in is busy. Try again in a few seconds.` instead of
+queueing more work.
+
+Every failed sign-in writes one WARNING log line with the username and the
+client IP, for example `Failed sign-in for alice from 172.18.0.1`. Point
+fail2ban at that line if you want IP-level banning. For the real client IP
+to appear, set `FORWARDED_ALLOW_IPS` as described in the reverse-proxy
+section.
+
+**Lost password.** The recovery CLI sets a new password and ends every
+session. The username accepts any case:
+
+```bash
+docker compose exec app python -m src.cli.users reset-password <username>
+```
+
+Run `python -m src.cli.users list` to see the accounts. The same command
+recovers the owner account.
 
 ## Reverse proxy
 
@@ -106,8 +154,35 @@ location / {
 }
 ```
 
-Cora has no user accounts, SSO, or roles. Organizations that need them put
-Cora behind their existing identity-aware proxy.
+Cora has built-in accounts but no SSO or external identity provider.
+Organizations that need SSO put Cora behind their existing identity-aware
+proxy.
+
+### Client IPs behind a proxy
+
+Cora logs the client IP on every failed sign-in and uses it in the log line
+you would point fail2ban at. Behind a reverse proxy, Uvicorn must know which
+addresses are allowed to set `X-Forwarded-For`. That is `FORWARDED_ALLOW_IPS`
+in `.env`.
+
+- The default is `127.0.0.1`. It covers a native run (no Docker) with the
+  proxy on the same machine.
+- In Docker, a proxy on the host reaches the container through the Docker
+  bridge gateway, such as `172.18.0.1`. Set `FORWARDED_ALLOW_IPS` to that
+  address.
+- To find the address, make one failed sign-in through the proxy. Until you
+  set the variable, the log line shows the proxy address in place of the
+  client IP: `docker compose logs app | grep "Failed sign-in"`.
+- Set more than one address as a comma-separated list.
+- Never use `*` unless the app port is unreachable except through the proxy.
+  With `*`, any direct client can spoof `X-Forwarded-For` and the log line
+  loses its value.
+
+Example `.env` line:
+
+```dotenv
+FORWARDED_ALLOW_IPS=172.18.0.1
+```
 
 ## Backup and restore
 
@@ -129,8 +204,7 @@ docker compose exec app rm /app/db/cora-backup.db
 The second command strips provider API keys from the backup copy. It deletes
 the `*api_key` rows in `app_settings` and clears the `api_key` field inside
 saved LLM profiles. The live database is untouched. Keys set in `.env` are
-never in the database. `secret_key` stays in the backup, so memory user-ID
-anonymization keeps the same hashes after a restore. The backup also contains
+never in the database. The backup also contains
 your chats. Skip the second line if you want the keys in the backup. Encrypt
 the backup in that case.
 
@@ -215,19 +289,20 @@ volumes.
 8. Verify the restore. `/ready` returns 200, the Documents page lists your
    documents, and a question about a document returns a cited answer.
 
-> **Backups can contain secrets.** The database backup keeps the instance
-> `secret_key`, the key behind memory user-ID anonymization. Keep backups
-> private and encrypted. If you skipped the strip line above, the backup also
-> holds provider API keys in plain text in the `app_settings` table.
+> **Backups can contain secrets.** If you skipped the strip line above, the
+> backup holds provider API keys in plain text in the `app_settings` table.
+> Keep backups private and encrypted.
 
 ## Limitations
 
 - Single tenant. One shared corpus for everyone on the instance.
 - One host. SQLite and one app instance. No horizontal scaling.
-- No user accounts, roles, or SSO.
-- No application-level rate limiting, including on login. A random key of 32
-  characters or more makes guessing infeasible. Add rate limiting at the
-  proxy if you want it.
+- No SSO or external identity providers. Accounts live in the local database.
+- The login limiter is in memory (5 per minute per IP and username) and resets on
+  restart. It has no distributed or persistent mode. Add a limit at the proxy
+  if you want one that survives restarts.
+- The operator's SQLite backup holds every user's chats and feedback. There
+  is no per-user separation inside a backup.
 - `/docs`, `/openapi.json`, and the health endpoints are public by design.
 - Two instances on one host share the session cookie. Cookies ignore the
   port, so the second login overwrites the first session. Use one hostname

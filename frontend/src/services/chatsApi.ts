@@ -6,10 +6,10 @@ import { detectTopics } from '@/store/chatStore.utils';
 import type { Chat, Message } from '@/store/chatStore.types';
 
 /**
- * Server-side chat API (Phase 7). Chats live in the instance SQLite database
+ * Server-side chat API. Chats live in the instance SQLite database
  * under the owner account; the browser keeps them in memory only.
  *
- * Dev proxy: `/api/chats` is rewritten to `/v1/chats` (vite.config.ts, B10).
+ * Dev proxy: `/api/chats` is rewritten to `/v1/chats` (vite.config.ts).
  * In production the same prefix is served by the FastAPI `/api` mount.
  */
 
@@ -86,7 +86,7 @@ export async function listChats(): Promise<Chat[]> {
  *
  * Each stored turn becomes a user/bot message pair. The bot message is built
  * by the same `buildBotMessage` used for live answers, and recommendation
- * selection is replayed over the user texts in order (D30) so the loaded
+ * selection is replayed over the user texts in order so the loaded
  * chat matches what the live session showed.
  */
 export async function getChat(chatId: string): Promise<Chat> {
