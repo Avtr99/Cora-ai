@@ -24,6 +24,7 @@ interface CaseStudyCardProps {
   rating: string;
   ratingAgency: string;
   sdgs: SDG[];
+  isPriority?: boolean;
 }
 
 const CaseStudyCard: React.FC<CaseStudyCardProps> = ({
@@ -41,6 +42,7 @@ const CaseStudyCard: React.FC<CaseStudyCardProps> = ({
   rating,
   ratingAgency,
   sdgs,
+  isPriority = false,
 }) => {
   return (
     <article className="rounded-xl 3xl:rounded-2xl 4xl:rounded-2xl border border-border-ui bg-surface-card overflow-hidden">
@@ -53,9 +55,12 @@ const CaseStudyCard: React.FC<CaseStudyCardProps> = ({
             srcSet={mainImageSrcSet}
             sizes="(max-width: 767px) calc(100vw - 48px), 42vw"
             alt={title}
-            className="absolute inset-0 h-full w-full object-cover"
-            loading="lazy"
+            className="absolute inset-0 h-full w-full object-cover outline outline-1 -outline-offset-1 outline-black/10"
+            loading={isPriority ? "eager" : "lazy"}
             decoding="async"
+            ref={(el) => {
+              if (isPriority && el) el.setAttribute("fetchpriority", "high");
+            }}
           />
         </div>
 
@@ -109,7 +114,7 @@ const CaseStudyCard: React.FC<CaseStudyCardProps> = ({
               {sdgs.map((sdg) => (
                 <div
                   key={sdg.number}
-                  className={`w-7 h-7 3xl:w-9 3xl:h-9 4xl:w-11 4xl:h-11 rounded-full flex items-center justify-center text-white text-xs 3xl:text-[15px] 4xl:text-lg font-bold text-center leading-none ${SDG_BG_CLASS[sdg.number] ?? 'bg-neutral-500'}`}
+                  className={`w-7 h-7 3xl:w-9 3xl:h-9 4xl:w-11 4xl:h-11 rounded-full flex items-center justify-center text-text-inverse text-xs 3xl:text-[15px] 4xl:text-lg font-bold text-center leading-none ${SDG_BG_CLASS[sdg.number] ?? 'bg-sdg-fallback'}`}
                   title={`SDG ${sdg.number}: ${sdg.title}`}
                   aria-label={`SDG ${sdg.number}: ${sdg.title}`}
                 >
@@ -118,7 +123,7 @@ const CaseStudyCard: React.FC<CaseStudyCardProps> = ({
               ))}
             </div>
             <Link
-              to={`/case-study/${id}`}
+              to={`/case-study/${id}/`}
               className="flex md:inline-flex items-center justify-center md:justify-start gap-2 3xl:gap-3 w-full md:w-auto min-h-11 md:min-h-0 px-4 py-3 md:px-0 md:py-0 rounded-lg md:rounded-none border border-border-ui md:border-0 bg-surface-subtle md:bg-transparent text-brand-700 font-poppins text-sm 3xl:text-[17px] 4xl:text-xl font-semibold hover:bg-surface-base md:hover:bg-transparent hover:text-brand-hover transition-colors duration-200 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2"
             >
               Read case study
@@ -142,7 +147,7 @@ const CaseStudiesPage: React.FC = () => {
           <nav aria-label="Back navigation" className="mb-4 md:mb-8 3xl:mb-10 4xl:mb-12">
             <Link
               to="/"
-              className="inline-flex items-center gap-2 3xl:gap-2.5 text-brand-700 transition-colors duration-200 hover:text-brand-hover font-poppins text-sm md:text-base 3xl:text-lg 4xl:text-xl font-semibold"
+              className="inline-flex items-center gap-2 3xl:gap-2.5 text-brand-700 transition-colors duration-200 hover:text-brand-hover font-poppins text-sm md:text-base 3xl:text-lg 4xl:text-xl font-semibold rounded focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2"
             >
               <IconWrapper Icon={ChevronLeftIcon} size={16} color="currentColor" aria-hidden={true} className="md:w-4.5! md:h-4.5! 3xl:w-5! 3xl:h-5! 4xl:w-6! 4xl:h-6!" />
               <span>Case studies</span>
@@ -157,7 +162,7 @@ const CaseStudiesPage: React.FC = () => {
 
         {/* Cards */}
         <div className="flex flex-col gap-6 md:gap-8 3xl:gap-10 4xl:gap-12">
-          {caseStudies.map((cs) => (
+          {caseStudies.map((cs, index) => (
             <CaseStudyCard
               key={cs.id}
               id={cs.id}
@@ -174,6 +179,7 @@ const CaseStudiesPage: React.FC = () => {
               rating={cs.rating}
               ratingAgency={cs.ratingAgency}
               sdgs={cs.sdgs}
+              isPriority={index === 0}
             />
           ))}
         </div>

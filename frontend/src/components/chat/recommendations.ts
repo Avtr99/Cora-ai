@@ -2,6 +2,37 @@ import type { Recommendation, RecommendationType } from './RecommendationCard';
 import { caseStudies } from '@/data/caseStudies';
 
 /**
+ * Generic VCM terms excluded from topic detection.
+ * These are too broad — they appear in pricing queries ("carbon price", "credit cost")
+ * and are already covered by detectTopics' own generic keyword list.
+ * Everything else in a case study's `keywords` is specific enough to trigger the project topic.
+ */
+const GENERIC_VCM_TERMS = new Set([
+  'carbon', 'credit', 'credits', 'vcm', 'voluntary carbon market',
+  'methodology', 'methodologies', 'protocol', 'protocols',
+  'standard', 'standards', 'validation', 'verification',
+  'high quality', 'community',
+]);
+
+/**
+ * Topic-triggering keywords derived from all case studies' `keywords`,
+ * minus generic VCM terms that would false-positive with pricing queries.
+ * Split into single words (word-boundary matched) and multi-word phrases (substring matched).
+ * Adding a case study with `keywords` automatically makes it detectable in chat —
+ * no need to edit detectTopics.
+ */
+const _allTopicKeywords = caseStudies
+  .flatMap(s => s.keywords)
+  .map(kw => kw.toLowerCase())
+  .filter(kw => !GENERIC_VCM_TERMS.has(kw));
+export const CASE_STUDY_TOPIC_WORDS: string[] = [...new Set(
+  _allTopicKeywords.filter(kw => !kw.includes(' '))
+)];
+export const CASE_STUDY_TOPIC_PHRASES: string[] = [...new Set(
+  _allTopicKeywords.filter(kw => kw.includes(' '))
+)];
+
+/**
  * Default recommendations for each type
  * Project recommendations are dynamically generated from caseStudies.ts
  * to automatically include new case studies as they are added.
@@ -13,7 +44,7 @@ export const RECOMMENDATIONS: Record<RecommendationType, Recommendation[]> = {
     title: study.title,
     description: '', // Not used in new design
     ctaText: '', // Not used in new design
-    ctaLink: `/case-study/${study.id}`,
+    ctaLink: `/case-study/${study.id}/`,
     metadata: {
       type: study.projectType,
       code: study.organizationId
@@ -28,7 +59,7 @@ export const RECOMMENDATIONS: Record<RecommendationType, Recommendation[]> = {
       title: 'Carbon Credit Pricing by Project Type',
       description: 'Explore historical pricing data and factors influencing VCM prices',
       ctaText: 'View detailed pricing analysis',
-      ctaLink: '/pricing',
+      ctaLink: '/pricing/',
       metadata: {
         type: 'Market Analysis',
         code: 'All Categories'
@@ -40,7 +71,7 @@ export const RECOMMENDATIONS: Record<RecommendationType, Recommendation[]> = {
       title: 'Cookstove Carbon Credits Pricing',
       description: '', // Not used in new design
       ctaText: '', // Not used in new design
-      ctaLink: '/pricing',
+      ctaLink: '/pricing/',
       metadata: {
         type: 'Household Devices',
         code: 'VCS Market'
@@ -52,7 +83,7 @@ export const RECOMMENDATIONS: Record<RecommendationType, Recommendation[]> = {
       title: 'REDD+ Projects Price Analysis',
       description: '', // Not used in new design
       ctaText: '', // Not used in new design
-      ctaLink: '/pricing',
+      ctaLink: '/pricing/',
       metadata: {
         type: 'REDD+',
         code: 'VCS Market'
@@ -64,7 +95,7 @@ export const RECOMMENDATIONS: Record<RecommendationType, Recommendation[]> = {
       title: 'Renewable Energy Credit Pricing',
       description: '', // Not used in new design
       ctaText: '', // Not used in new design
-      ctaLink: '/pricing',
+      ctaLink: '/pricing/',
       metadata: {
         type: 'Renewable Energy',
         code: 'VCS Market'
@@ -76,7 +107,7 @@ export const RECOMMENDATIONS: Record<RecommendationType, Recommendation[]> = {
       title: 'Agricultural Carbon Credit Valuations',
       description: '', // Not used in new design
       ctaText: '', // Not used in new design
-      ctaLink: '/pricing',
+      ctaLink: '/pricing/',
       metadata: {
         type: 'Agriculture',
         code: 'VCS Market'

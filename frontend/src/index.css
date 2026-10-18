@@ -156,6 +156,7 @@
   --color-sdg-15: #56c02b;
   --color-sdg-16: #00689d;
   --color-sdg-17: #19486a;
+  --color-sdg-fallback: #737373;
 
   --color-kpi-reduction: #c4627a;
   --color-kpi-reduction-bg: #fdf0f3;

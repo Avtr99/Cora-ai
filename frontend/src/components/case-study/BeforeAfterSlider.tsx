@@ -17,7 +17,6 @@ const HANDLE_BUTTON_STYLE: React.CSSProperties = {
   gap: '0.25rem',
   borderWidth: 1,
   backgroundColor: 'rgba(7, 22, 18, 0.72)',
-  borderColor: 'rgba(255, 255, 255, 0.40)',
   backdropFilter: 'blur(4px)',
   WebkitBackdropFilter: 'blur(4px)',
   boxShadow: '0 1px 4px rgba(0, 0, 0, 0.28)',
@@ -58,14 +57,18 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
           itemOne={
             <ReactCompareSliderImage
               src={before}
-              alt={beforeLabel}
+              alt={`Before: ${beforeLabel}`}
+              loading="lazy"
+              decoding="async"
               className="w-full h-full object-cover"
             />
           }
           itemTwo={
             <ReactCompareSliderImage
               src={after}
-              alt={afterLabel}
+              alt={`After: ${afterLabel}`}
+              loading="lazy"
+              decoding="async"
               className="w-full h-full object-cover"
             />
           }
@@ -78,12 +81,12 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
           }
           defaultPosition={50}
           keyboardIncrement="5%"
-          className="absolute inset-0 focus-visible:**:data-[rcs='handle-root']:ring-2 focus-visible:**:data-[rcs='handle-root']:ring-inset focus-visible:**:data-[rcs='handle-root']:ring-white"
+          className="absolute inset-0 **:data-[rcs='handle-root']:focus-visible:ring-2 **:data-[rcs='handle-root']:focus-visible:ring-inset **:data-[rcs='handle-root']:focus-visible:ring-text-inverse"
         />
-        <span className="absolute top-2 3xl:top-3 left-2 3xl:left-3 z-10 px-2 3xl:px-3 py-1 3xl:py-1.5 rounded-md text-xs 3xl:text-sm 4xl:text-base font-semibold font-inter bg-surface-overlay/60 text-white backdrop-blur-xs pointer-events-none">
+        <span className="absolute top-2 3xl:top-3 left-2 3xl:left-3 z-10 px-2 3xl:px-3 py-1 3xl:py-1.5 rounded-md text-xs 3xl:text-sm 4xl:text-base font-semibold font-inter bg-surface-overlay/60 text-text-inverse backdrop-blur-xs pointer-events-none">
           {beforeLabel}
         </span>
-        <span className="absolute top-2 3xl:top-3 right-2 3xl:right-3 z-10 px-2 3xl:px-3 py-1 3xl:py-1.5 rounded-md text-xs 3xl:text-sm 4xl:text-base font-semibold font-inter bg-surface-overlay/60 text-white backdrop-blur-xs pointer-events-none">
+        <span className="absolute top-2 3xl:top-3 right-2 3xl:right-3 z-10 px-2 3xl:px-3 py-1 3xl:py-1.5 rounded-md text-xs 3xl:text-sm 4xl:text-base font-semibold font-inter bg-surface-overlay/60 text-text-inverse backdrop-blur-xs pointer-events-none">
           {afterLabel}
         </span>
       </div>

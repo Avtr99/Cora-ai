@@ -1,7 +1,7 @@
 import React, { useId } from 'react';
 import { CHIP, GAUGE } from '@/lib/colors';
 
-/** Parse a formatted number string (e.g. '290,025') into a number */
+/** Parse a formatted number string (e.g. '211,636') into a number */
 function parseFormattedNumber(value: string): number {
   return Number(value.replace(/,/g, '')) || 0;
 }
@@ -9,9 +9,9 @@ function parseFormattedNumber(value: string): number {
 interface ProjectStatisticsProps {
   carbonSequestered: string;
   bufferPool?: string;
-  creditsIssued?: string;
-  creditsRetired?: string;
-  source?: string;
+  creditsIssued: string;
+  creditsRetired: string;
+  source: string;
 }
 
 /**
@@ -23,7 +23,7 @@ const CreditChart = ({
   retiredPercent, 
   remainingPercent,
   source 
-}: { retiredPercent: number; remainingPercent: number; source?: string }) => {
+}: { retiredPercent: number; remainingPercent: number; source: string }) => {
   const chartTitleId = useId();
   const chartDescId = `${chartTitleId}-desc`;
 
@@ -71,20 +71,20 @@ const CreditChart = ({
   const rightTipPct = ((center.x + radius) / width) * 100;
 
   return (
-    <div className="flex flex-col w-full lg:w-[460px]">
+    <div className="flex flex-col w-full lg:w-[460px] 3xl:w-[560px] 4xl:w-[680px]">
       <div className="w-full max-w-full sm:max-w-[340px] lg:max-w-[420px] 3xl:max-w-[520px] 4xl:max-w-[620px] mx-auto lg:mx-0 relative">
         {/* Labels positioned above chart at arc tip locations */}
         <div className="absolute top-0 left-0 right-0 z-10">
           {/* Left Label - Credits retired */}
           <div className="absolute top-0 flex flex-col items-center" style={{ left: `${leftTipPct}%`, transform: 'translateX(-50%)' }}>
             <div className="text-gauge-retired text-base sm:text-lg lg:text-2xl 3xl:text-3xl 4xl:text-4xl font-poppins font-semibold leading-[24px] lg:leading-[28px] 3xl:leading-[34px] 4xl:leading-[40px]">{retiredPercent}%</div>
-            <div title="Credits retired" className="text-text-muted text-2xs sm:text-xs 3xl:text-sm 4xl:text-[15px] font-inter font-medium leading-[16px] 3xl:leading-[20px] max-w-[80px] 3xl:max-w-[160px] text-center truncate">Credits retired</div>
+            <div title="Credits retired" className="text-text-muted text-xs sm:text-sm 3xl:text-[15px] 4xl:text-lg font-inter font-medium leading-[16px] 3xl:leading-[20px] max-w-[120px] 3xl:max-w-[160px] text-center whitespace-nowrap">Credits retired</div>
           </div>
 
           {/* Right Label - Credits remaining */}
           <div className="absolute top-0 flex flex-col items-center" style={{ left: `${rightTipPct}%`, transform: 'translateX(-50%)' }}>
-            <div className="text-semantic-success-text text-base sm:text-lg lg:text-2xl 3xl:text-3xl 4xl:text-4xl font-poppins font-semibold leading-[24px] lg:leading-[28px] 3xl:leading-[34px] 4xl:leading-[40px]">{remainingPercent}%</div>
-            <div title="Credits remaining" className="text-text-muted text-2xs sm:text-xs 3xl:text-sm 4xl:text-[15px] font-inter font-medium leading-[16px] 3xl:leading-[20px] max-w-[80px] 3xl:max-w-[160px] text-center truncate">Credits remaining</div>
+            <div className="text-gauge-remaining text-base sm:text-lg lg:text-2xl 3xl:text-3xl 4xl:text-4xl font-poppins font-semibold leading-[24px] lg:leading-[28px] 3xl:leading-[34px] 4xl:leading-[40px]">{remainingPercent}%</div>
+            <div title="Credits remaining" className="text-text-muted text-xs sm:text-sm 3xl:text-[15px] 4xl:text-lg font-inter font-medium leading-[16px] 3xl:leading-[20px] max-w-[120px] 3xl:max-w-[160px] text-center whitespace-nowrap">Credits remaining</div>
           </div>
         </div>
 
@@ -110,11 +110,9 @@ const CreditChart = ({
         </div>
 
         {/* Source text */}
-        {source && (
-          <div className="text-text-muted text-xs 3xl:text-sm 4xl:text-[15px] font-inter font-medium leading-[16px] 3xl:leading-[20px] text-center lg:text-right mt-1 lg:mt-2 3xl:mt-3">
-            Source: {source}
-          </div>
-        )}
+        <div className="text-text-muted text-sm 3xl:text-[15px] 4xl:text-lg font-inter font-medium leading-[16px] 3xl:leading-[20px] text-center lg:text-right mt-1 lg:mt-2 3xl:mt-3">
+          Source: {source}
+        </div>
       </div>
     </div>
   );
@@ -134,8 +132,8 @@ export const ProjectStatistics = ({
   const labelId = useId();
 
   // Compute actual retired percentage from credits data
-  const issued = creditsIssued ? parseFormattedNumber(creditsIssued) : 0;
-  const retired = creditsRetired ? parseFormattedNumber(creditsRetired) : 0;
+  const issued = parseFormattedNumber(creditsIssued);
+  const retired = parseFormattedNumber(creditsRetired);
   const rawRetiredPercent = issued > 0 ? Math.round((retired / issued) * 100) : 0;
   const retiredPercent = Math.min(Math.max(rawRetiredPercent, 0), 100);
   const remainingPercent = 100 - retiredPercent;
@@ -148,7 +146,7 @@ export const ProjectStatistics = ({
           <div className="w-full md:w-auto flex flex-col gap-5 md:gap-8 3xl:gap-10 4xl:gap-12">
             {/* Issuances Remaining - Header */}
             <div className="flex flex-col gap-1 md:gap-1.5 3xl:gap-2">
-              <p id={labelId} className="text-xs 3xl:text-sm 4xl:text-[15px] uppercase text-text-muted font-inter font-semibold leading-[14px] 3xl:leading-[18px] tracking-wide">ISSUANCES REMAINING</p>
+              <p id={labelId} className="text-xs 3xl:text-[15px] 4xl:text-lg uppercase text-text-muted font-inter font-semibold leading-[14px] 3xl:leading-[18px] tracking-wide">ISSUANCES REMAINING</p>
               <div aria-labelledby={labelId} className="text-text-primary text-2xl md:text-3xl 3xl:text-4xl 4xl:text-5xl font-inter font-semibold leading-[24px] md:leading-[36px] 3xl:leading-[44px] 4xl:leading-[56px]">{carbonSequestered}</div>
             </div>
             
@@ -156,28 +154,24 @@ export const ProjectStatistics = ({
             <div className="flex flex-wrap gap-3 md:gap-5 3xl:gap-6 4xl:gap-8">
               {bufferPool && (
                 <div className="flex flex-col gap-0.5 3xl:gap-1">
-                  <span className="text-text-muted text-xs md:text-xs 3xl:text-sm 4xl:text-[15px] font-inter font-medium">Buffer Pool</span>
+                  <span className="text-text-muted text-sm 3xl:text-[15px] 4xl:text-lg font-inter font-medium">Buffer Pool</span>
                   <div className="flex items-center justify-center py-1 3xl:py-1.5 4xl:py-2 px-2.5 3xl:px-3.5 rounded-lg" style={{ backgroundColor: CHIP.positive.bg }}>
-                    <span className="font-inter font-semibold text-xs md:text-xs 3xl:text-sm 4xl:text-[15px] text-text-primary">{bufferPool}</span>
+                    <span className="font-inter font-semibold text-sm 3xl:text-[15px] 4xl:text-lg text-text-primary">{bufferPool}</span>
                   </div>
                 </div>
               )}
-              {creditsIssued && (
-                <div className="flex flex-col gap-0.5 3xl:gap-1">
-                  <span className="text-text-muted text-xs md:text-xs 3xl:text-sm 4xl:text-[15px] font-inter font-medium">Credits issued</span>
-                  <div className="flex items-center justify-center py-1 3xl:py-1.5 4xl:py-2 px-2.5 3xl:px-3.5 rounded-lg" style={{ backgroundColor: CHIP.neutral.bg }}>
-                    <span className="font-inter font-semibold text-xs md:text-xs 3xl:text-sm 4xl:text-[15px] text-text-primary">{creditsIssued}</span>
-                  </div>
+              <div className="flex flex-col gap-0.5 3xl:gap-1">
+                <span className="text-text-muted text-sm 3xl:text-[15px] 4xl:text-lg font-inter font-medium">Credits issued</span>
+                <div className="flex items-center justify-center py-1 3xl:py-1.5 4xl:py-2 px-2.5 3xl:px-3.5 rounded-lg" style={{ backgroundColor: CHIP.neutral.bg }}>
+                  <span className="font-inter font-semibold text-sm 3xl:text-[15px] 4xl:text-lg text-text-primary">{creditsIssued}</span>
                 </div>
-              )}
-              {creditsRetired && (
-                <div className="flex flex-col gap-0.5 3xl:gap-1">
-                  <span className="text-text-muted text-xs md:text-xs 3xl:text-sm 4xl:text-[15px] font-inter font-medium">Credits retired</span>
-                  <div className="flex items-center justify-center py-1 3xl:py-1.5 4xl:py-2 px-2.5 3xl:px-3.5 rounded-lg" style={{ backgroundColor: CHIP.info.bg }}>
-                    <span className="font-inter font-semibold text-xs md:text-xs 3xl:text-sm 4xl:text-[15px] text-text-primary">{creditsRetired}</span>
-                  </div>
+              </div>
+              <div className="flex flex-col gap-0.5 3xl:gap-1">
+                <span className="text-text-muted text-sm 3xl:text-[15px] 4xl:text-lg font-inter font-medium">Credits retired</span>
+                <div className="flex items-center justify-center py-1 3xl:py-1.5 4xl:py-2 px-2.5 3xl:px-3.5 rounded-lg" style={{ backgroundColor: CHIP.info.bg }}>
+                  <span className="font-inter font-semibold text-sm 3xl:text-[15px] 4xl:text-lg text-text-primary">{creditsRetired}</span>
                 </div>
-              )}
+              </div>
             </div>
           </div>
           
