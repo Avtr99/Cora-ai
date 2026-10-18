@@ -7,6 +7,11 @@ export interface Strength {
   text: string;
 }
 
+export interface PermanenceRisk {
+  percentage: number;
+  label: string;
+}
+
 export interface Benefit {
   number: number;
   title: string;
@@ -15,11 +20,13 @@ export interface Benefit {
 
 export interface Statistics {
   carbonSequestered: string;
-  /** Optional: not all registries report a per-project buffer pool (Gold Standard uses a pooled compliance buffer). */
+  /** Credits deposited in the registry's buffer pool; omit when the registry records none. */
   bufferPool?: string;
   creditsIssued: string;
   creditsRetired: string;
   source: string;
+  /** Registry risk rating; stored for future UI — not rendered yet. */
+  permanenceRisk?: PermanenceRisk;
 }
 
 export interface BeforeAfterImage {
@@ -67,12 +74,15 @@ export interface CaseStudyData {
   mapSource?: string;
   projectImages?: string[];
   galleryImages?: string[];
+  /** Credit line rendered beneath the project gallery (e.g. for CC BY-SA photos). */
+  galleryCaption?: string;
   /** Locator/overview map shown in the project details section. */
   overviewMap?: OverviewMapImage;
   /** Side-by-side before/after satellite images (e.g., per village). */
   beforeAfterImages?: BeforeAfterImage[];
   statistics: Statistics;
   benefits: Benefit[];
-  /** Keywords for matching queries to relevant project recommendations */
+  /** Keywords for matching queries to relevant project recommendations.
+   *  Used for both topic detection (minus generic VCM terms) and relevance scoring. */
   keywords: string[];
 }

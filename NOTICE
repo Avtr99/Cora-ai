@@ -44,13 +44,12 @@ frontend/package.json for the full list):
 Content and data
 ----------------
 
-- Humbo Ethiopia case-study hero image
-  URL: https://github.com/Avtr99/Cora-ai/blob/main/frontend/src/assets/case-studies/humbo/pexels-abiy-fikru-176179-27534668.webp
-  Source: https://www.pexels.com/photo/27534668/
-  Author: Abiy Fikru
-  License: Pexels License (free for commercial and non-commercial use,
-           attribution not required but provided)
-  License URL: https://www.pexels.com/license/
+- Humbo Ethiopia case-study hero image (Entoto mountain forest)
+  URL: https://github.com/Avtr99/Cora-ai/blob/main/frontend/src/assets/case-studies/humbo/entoto-nina-r.webp
+  Source: https://commons.wikimedia.org/wiki/File:Ethiopia_(50813987716).jpg
+  Author: Nina R
+  License: Creative Commons Attribution 2.0 Generic (CC BY 2.0)
+  License URL: https://creativecommons.org/licenses/by/2.0/
 
 - Myanmar Mangrove case-study hero image
   URL: https://github.com/Avtr99/Cora-ai/blob/main/frontend/src/assets/case-studies/mangrove/Mangrove_Rakhine_Myanmar_2_landscape.webp
@@ -59,6 +58,15 @@ Content and data
   Author: scottedmunds
   License: CC0 1.0 Universal / Public Domain
   See: https://creativecommons.org/publicdomain/zero/1.0/
+
+- EthioTrees Tigray case-study hero and gallery images
+  URL: https://github.com/Avtr99/Cora-ai/tree/main/frontend/src/assets/case-studies/ethiotrees
+  Sources: https://commons.wikimedia.org/wiki/File:May_Be%27ati.jpg
+           https://commons.wikimedia.org/wiki/File:Inda_Abba_Hadera_forest.jpg
+           https://commons.wikimedia.org/wiki/File:Ziban_Dake_2.jpg
+  Author: Jan Nyssen (Wikimedia Commons)
+  License: Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)
+  License URL: https://creativecommons.org/licenses/by-sa/4.0/
 
 - Case-study satellite imagery
   Derived from Copernicus Sentinel-2 open data (European Union's Copernicus

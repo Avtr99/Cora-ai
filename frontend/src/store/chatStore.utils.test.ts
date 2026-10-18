@@ -46,7 +46,13 @@ describe('detectTopics', () => {
     expect(detectTopics('Tell me about carbon projects')).toContain('project');
     expect(detectTopics('What methodologies are used?')).toContain('project');
     expect(detectTopics('Show me a case study')).toContain('project');
-    expect(detectTopics('What about renewable energy?')).toContain('project');
+    expect(detectTopics('Tell me about mangrove restoration')).toContain('project');
+    expect(detectTopics('What is assisted natural regeneration?')).toContain('project');
+  });
+
+  it('does not detect project for terms with no matching case study', () => {
+    // 'renewable' has no case study — no relevant recommendation to show
+    expect(detectTopics('What about renewable energy?')).not.toContain('project');
   });
 
   it('does not detect project for unrelated words', () => {

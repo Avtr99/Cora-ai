@@ -12,20 +12,15 @@ interface SDGBadgeProps {
   title: string;
 }
 
-const VALID_SDG_NUMBERS: readonly number[] = Array.from({ length: 17 }, (_, i) => i + 1);
-
-const SDGBadge = ({ number, title }: SDGBadgeProps) => {
-  const isValid = VALID_SDG_NUMBERS.includes(number);
-  return (
-    <div
-      className={`h-8 min-w-14 rounded-xs flex items-center justify-center px-2 ${isValid ? SDG_BG_CLASS[number] : 'bg-neutral-500'}`}
-      title={title}
-      aria-label={`SDG ${number}: ${title}`}
-    >
-      <span className="text-white text-xs font-inter font-semibold leading-tight">SDG {number}</span>
-    </div>
-  );
-};
+const SDGBadge = ({ number, title }: SDGBadgeProps) => (
+  <div
+    className={`h-8 min-w-14 rounded-sm flex items-center justify-center px-2 ${SDG_BG_CLASS[number] ?? 'bg-sdg-fallback'}`}
+    title={title}
+    aria-label={`SDG ${number}: ${title}`}
+  >
+    <span className="text-text-inverse text-xs font-inter font-semibold leading-tight">SDG {number}</span>
+  </div>
+);
 
 interface CaseStudyStrengthsProps {
   strengths: Strength[];
@@ -52,7 +47,7 @@ export const CaseStudyStrengths = ({
   ratingNote
 }: CaseStudyStrengthsProps) => {
   return (
-    <div className="bg-surface-card rounded-2xl p-6 md:p-8 shadow-xs border border-border-ui h-full w-full min-w-0">
+    <div className="bg-surface-card rounded-2xl p-6 md:p-8 shadow-xs border border-border-ui w-full min-w-0 h-full">
       {/* Header with title + rating */}
       <div className="flex items-start justify-between gap-4 mb-5">
         <h2 className="font-inter text-sm font-semibold text-text-primary">Strengths</h2>

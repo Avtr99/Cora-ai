@@ -171,7 +171,7 @@ export const FEEDBACK = {
 // ---------------------------------------------------------------------------
 // SDG badge colors (official United Nations Sustainable Development Goals palette)
 // ---------------------------------------------------------------------------
-export const SDG_COLORS: Record<number, string> = {
+export const SDG_COLORS: Record<number | 'fallback', string> = {
   1: '#E5243B',
   2: '#DDA63A',
   3: '#4C9F38',
@@ -189,6 +189,7 @@ export const SDG_COLORS: Record<number, string> = {
   15: '#56C02B',
   16: '#00689D',
   17: '#19486A',
+  fallback: '#737373',
 } as const;
 
 

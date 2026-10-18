@@ -1,4 +1,5 @@
 import { RecommendationType } from '@/components/chat/RecommendationCard';
+import { CASE_STUDY_TOPIC_WORDS, CASE_STUDY_TOPIC_PHRASES } from '@/components/chat/recommendations';
 
 // Module-scoped counter for fallback ID generation to prevent collisions
 let fallbackCounter = 0;
@@ -37,8 +38,10 @@ export const detectTopics = (message: string): RecommendationType[] => {
   const lowerMessage = message.toLowerCase();
 
   // Helper: Check if word exists with word boundaries (avoids "projection" matching "project")
+  // Keywords come from caseStudies data, so escape regex metacharacters before interpolating.
   const hasWord = (word: string): boolean => {
-    const regex = new RegExp(`\\b${word}\\b`, 'i');
+    const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`\\b${escaped}\\b`, 'i');
     return regex.test(message);
   };
 
@@ -52,14 +55,15 @@ export const detectTopics = (message: string): RecommendationType[] => {
     return words.some(word => hasWord(word));
   };
 
-  // Project-related keywords (includes methodology terms since existing case studies
-  // serve as real-world examples of methodologies in practice)
+  // Project-related keywords: generic VCM terms + case-study-specific terms
+  // derived from caseStudies[*].keywords (no manual sync needed).
   if (
     hasAnyWord(['project', 'projects']) ||
     hasPhrase('case study') ||
     hasPhrase('co-benefit') ||
     hasPhrase('co-benefits') ||
-    hasAnyWord(['renewable', 'reforestation', 'protection', 'conservation']) ||
+    hasAnyWord(CASE_STUDY_TOPIC_WORDS) ||
+    CASE_STUDY_TOPIC_PHRASES.some(phrase => hasPhrase(phrase)) ||
     hasAnyWord(['methodology', 'methodologies', 'protocol', 'protocols', 'validation', 'verification']) ||
     hasAnyWord(['standard', 'standards']) ||
     hasPhrase('vm0048') ||
