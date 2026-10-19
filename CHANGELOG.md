@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+# [4.1.0](https://github.com/Avtr99/Cora-ai/compare/v4.0.1...v4.1.0) (2026-10-19)
+
+
+### Features
+
+* add EthioTrees case study and sync case-study improvements ([ee44fc2](https://github.com/Avtr99/Cora-ai/commit/ee44fc24b8fc8b75e535cfd7ac900d0f31047d15))
+
 ## [4.0.1](https://github.com/Avtr99/Cora-ai/compare/v4.0.0...v4.0.1) (2026-10-07)
 
 
