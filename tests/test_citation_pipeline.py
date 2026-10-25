@@ -378,7 +378,7 @@ class _StubStreamClient(BaseRAGClient):
     def model_relevance(self) -> str:
         return "stub-lite"
 
-    async def generate_text_stream(self, prompt: str):
+    async def generate_text_stream(self, prompt: str, **kwargs):
         self.calls += 1
         for chunk in self._chunks:
             yield chunk
@@ -525,6 +525,9 @@ class TestWebSearchAgent:
         result = await agent.search_with_kb_context("market news", kb=kb)
 
         prompt = llm.generate_text.await_args_list[1].args[0]
+        # build_kb_context escapes chunk content at the producer: real
+        # <source> tags remain while document text can never forge prompt
+        # delimiters downstream.
         assert '<source index="1"' in prompt
         assert '<source index="2"' in prompt
         assert long_doc in prompt  # full context, no 2000-char cut

@@ -12,13 +12,17 @@ from limits.storage import MemoryStorage
 from limits.strategies import MovingWindowRateLimiter
 
 LOGIN_LIMIT = parse("5/minute")
+# Aggregate per-source-IP bound: username rotation must not escape the
+# source's total hashing budget (unbounded usernames reset the per-key
+# budget otherwise).
+LOGIN_IP_LIMIT = parse("20/minute")
 
 _limiter = MovingWindowRateLimiter(MemoryStorage())
 
 
-def require_attempt(scope: str, key: str) -> None:
+def require_attempt(scope: str, key: str, limit=LOGIN_LIMIT) -> None:
     """Count this attempt; 429 when the limit is already hit."""
-    if not _limiter.hit(LOGIN_LIMIT, scope, key):
+    if not _limiter.hit(limit, scope, key):
         raise HTTPException(
             status_code=429,
             detail="Too many attempts. Try again in a minute.",

@@ -35,11 +35,20 @@ pymupdf>=1.24.0,<2.0
 # Cap it here so both lockfiles agree.
 websockets>=14,<16
 
+# Security floor repeated from requirements-core.txt: this lock installs on
+# top of requirements-core.lock in the same image and must not resolve below it.
+certifi>=2026.10.19
+
 # Auth deps, repeated from requirements-core.txt so the standalone
 # ingestion lockfile carries the same pins (it installs on top of
 # requirements-core.lock in the same image).
 pwdlib[argon2]>=0.3.1,<0.4
 limits>=5.8,<6
+
+# pillow: 12.3.0 has 35 CVEs but docling-slim requires pillow<13 — the 13.x
+# fix is blocked until docling relaxes the bound. Repeated from
+# requirements-core.txt so both lockfiles agree.
+pillow>=12.3.0,<13.0
 
 # Optional: FastEmbed local CPU embeddings
 # FastEmbed is NOT wired into the current provider factory (only voyage/cohere/ollama/openai

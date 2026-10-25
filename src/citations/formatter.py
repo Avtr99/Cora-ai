@@ -9,6 +9,12 @@ from .sanitizer import SnippetSanitizer
 from .source_name import clean_source_name
 
 
+def _is_safe_url(url: str) -> bool:
+    """Only http(s) or scheme-less relative URLs may reach the client."""
+    scheme = url.split(":", 1)[0].lower()
+    return ":" not in url or scheme in ("http", "https")
+
+
 class CitationFormatter:
     """Converts citation objects into API/text response payloads."""
 
@@ -35,6 +41,9 @@ class CitationFormatter:
 
         for citation, cleaned_name in zip(citations, cleaned_names):
             detail: Dict[str, Any] = {
+                # Names/sections render through React (escaped at output);
+                # running them through the snippet sanitizer would mangle
+                # legitimate text (& -> &amp;, <Section> dropped).
                 "source_name": cleaned_name,
                 "source_type": citation.source_type,
                 "relevance_score": citation.relevance_score,
@@ -49,7 +58,9 @@ class CitationFormatter:
                 detail["page_number"] = citation.page_number
             if citation.section is not None:
                 detail["section"] = citation.section
-            if citation.url:
+            # Emit the URL only when it carries an http(s) scheme so a stored
+            # javascript:/data: value never reaches the client renderer.
+            if citation.url and _is_safe_url(citation.url):
                 detail["url"] = citation.url
             if include_snippets and citation.content_snippet:
                 detail["snippet"] = self.sanitizer.sanitize(citation.content_snippet)

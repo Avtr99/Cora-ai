@@ -22,6 +22,7 @@ from .query_rewriter import QueryRewriterAgent
 from .router import RouterAgent, RouteDecision
 from .web_search import WebSearchAgent
 from .tavily_search import TavilySearchProvider
+from .search_providers import NoopSearchProvider
 from .validator import AnswerValidator
 from .route_processors import RouteProcessor
 from .reasoning_formatter import AgentStep, format_reasoning_steps
@@ -135,7 +136,11 @@ class RAGOrchestrator:
         settings = get_settings()
         search_provider_name = getattr(settings, "SEARCH_PROVIDER", "tavily").lower()
         search_provider = None
-        if search_provider_name == "tavily":
+        if search_provider_name == "none":
+            # Operator disabled web search: no egress to any search provider.
+            logger.info("Web search provider disabled (SEARCH_PROVIDER=none)")
+            search_provider = NoopSearchProvider()
+        elif search_provider_name == "tavily":
             search_provider = TavilySearchProvider()
         else:
             logger.warning(

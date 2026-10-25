@@ -189,7 +189,7 @@ class ConversationalHandler:
         - Otherwise, the cheap regex heuristic (``is_conversational``) runs
           first — no extra latency/cost.
         - If the heuristic is not confident, a tiny LLM intent check
-          (``classify_intent``, gemini-flash-lite) classifies short ambiguous
+          (``classify_intent``, lite model) classifies short ambiguous
           queries, with decisions cached per normalized query.
 
         Callers that gate a query cache lookup should call ``is_conversational``
@@ -209,7 +209,7 @@ class ConversationalHandler:
         """LLM intent classification for short ambiguous queries.
 
         Called only after the cheap heuristic (``is_conversational``) returned
-        False and the query cache missed. Uses a single tiny gemini-flash-lite
+        False and the query cache missed. Uses a single tiny lite-model
         call, with decisions cached per normalized query (in-memory LRU).
 
         Returns False (do not bypass) when chat history exists, the query is

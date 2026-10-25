@@ -9,21 +9,17 @@ it must not import any of them (avoids circular imports).
 from __future__ import annotations
 
 import re
+import sqlite3
 from pathlib import Path
+
+from loguru import logger
 
 from ..config import get_settings
 from ..db.database import get_connection
 
-# Extension -> expected MIME type prefixes for content validation.
-# python-magic is the source of truth; this map only flags obvious mismatches.
-_EXPECTED_MIME_PREFIXES: dict[str, tuple[str, ...]] = {
-    ".pdf": ("application/pdf",),
-    ".md": ("text/plain", "text/markdown"),
-    ".txt": ("text/plain",),
-    ".csv": ("text/plain", "text/csv", "application/csv"),
-    ".json": ("text/plain", "application/json"),
-    ".jsonl": ("text/plain", "application/json"),
-}
+# Extension/content validation lives in uploads._validate_upload_mime:
+# a pure-Python signature check (PDF magic bytes, NUL-byte binary sniff)
+# that needs no libmagic — the Windows DLL access-violates on import.
 
 _SAFE_FILENAME_CHARS = re.compile(r"[^A-Za-z0-9._-]+")
 
@@ -75,10 +71,28 @@ CREATE INDEX IF NOT EXISTS idx_document_store_jobs_status ON document_store_jobs
 """
 
 
+# Content-addressed dedup enforced at the DB level: at most one live document
+# per sha256. Kept out of _SCHEMA_SQL because existing installs may already
+# hold duplicate hashes — a failing CREATE UNIQUE INDEX would abort the whole
+# schema script, so it is created separately after a duplicate check.
+_SHA256_UNIQUE_INDEX_SQL = (
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_document_store_documents_sha256_active "
+    "ON document_store_documents(sha256) WHERE status != 'deleted'"
+)
+
+
 def ensure_document_store_tables() -> None:
     conn = get_connection()
     try:
         conn.executescript(_SCHEMA_SQL)
+        try:
+            conn.execute(_SHA256_UNIQUE_INDEX_SQL)
+        except sqlite3.IntegrityError:
+            logger.warning(
+                "Duplicate sha256 rows exist in document_store_documents; "
+                "the unique index could not be created. App-level dedup still "
+                "applies — remove the duplicates to enable the constraint."
+            )
         conn.commit()
     finally:
         conn.close()

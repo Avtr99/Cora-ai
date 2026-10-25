@@ -1,5 +1,6 @@
 """Ollama model-listing helpers and route for the LLM settings routes."""
 
+from ipaddress import ip_address
 from typing import Optional, List
 from urllib.parse import urlparse
 
@@ -26,10 +27,24 @@ router = APIRouter()
 
 
 # Hostnames permitted for the Ollama model-listing proxy. Restricting to
-# loopback addresses prevents SSRF -- the server fetches the URL on the
-# user's behalf, so an attacker could otherwise target internal services.
-_ALLOWED_OLLAMA_HOSTS = {"localhost", "127.0.0.1", "::1"}
+# loopback and private addresses prevents SSRF -- the server fetches the URL
+# on the user's behalf, so an attacker could otherwise target internal
+# services. host.docker.internal and RFC-1918 hosts cover Docker/LAN Ollama
+# installs (the .env OLLAMA_BASE_URL is unrestricted regardless).
+_ALLOWED_OLLAMA_HOSTS = {"localhost", "127.0.0.1", "::1", "host.docker.internal"}
 _ALLOWED_OLLAMA_PORT = 11434
+
+
+def _is_allowed_ollama_host(hostname: str) -> bool:
+    """True for the literal allowlist or any private/loopback IP literal."""
+    host = hostname.lower()
+    if host in _ALLOWED_OLLAMA_HOSTS:
+        return True
+    try:
+        addr = ip_address(host.strip("[]"))
+    except ValueError:
+        return False  # a DNS name we can't verify: reject
+    return addr.is_loopback or addr.is_private or addr.is_link_local
 
 
 def _validate_ollama_url(base_url: str) -> str:
@@ -50,10 +65,10 @@ def _validate_ollama_url(base_url: str) -> str:
             status_code=400,
             detail="base_url must include a hostname.",
         )
-    if parsed.hostname not in _ALLOWED_OLLAMA_HOSTS:
+    if not _is_allowed_ollama_host(parsed.hostname):
         raise HTTPException(
             status_code=400,
-            detail=f"Host '{parsed.hostname}' is not allowed. Only local Ollama instances are supported.",
+            detail=f"Host '{parsed.hostname}' is not allowed. Only local or private-network Ollama instances are supported.",
         )
     port = parsed.port or _ALLOWED_OLLAMA_PORT
     if port != _ALLOWED_OLLAMA_PORT:
@@ -62,7 +77,10 @@ def _validate_ollama_url(base_url: str) -> str:
             detail=f"Port {port} is not allowed. Ollama must run on port {_ALLOWED_OLLAMA_PORT}.",
         )
     # Rebuild a clean URL to avoid any path/query/userinfo tricks.
-    return f"{parsed.scheme}://{parsed.hostname}:{port}"
+    host = parsed.hostname
+    if ":" in host:  # IPv6 literal needs brackets to stay a valid URL
+        host = f"[{host}]"
+    return f"{parsed.scheme}://{host}:{port}"
 
 
 async def _list_ollama_models(base_url: str) -> LLMModelsResponse:

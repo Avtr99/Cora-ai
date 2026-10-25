@@ -37,20 +37,25 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         app: ASGIApp,
         api_key_header: str = "X-API-Key",
         protected_paths: Optional[List[str]] = None,
-        exclude_paths: Optional[List[str]] = None
+        exclude_paths: Optional[List[str]] = None,
+        csrf_paths: Optional[List[str]] = None
     ):
         """
         Initialize security middleware.
-        
+
         Args:
             app: ASGI application
             api_key_header: Header name for API key
             protected_paths: Paths that require API key (None = all paths)
             exclude_paths: Paths excluded from API key requirement
+            csrf_paths: Prefixes where browser-flagged cross-site mutations
+                are rejected even when API-key protection is disabled
+                (defaults to protected_paths)
         """
         super().__init__(app)
         self.api_key_header = api_key_header
         self.protected_paths = protected_paths
+        self.csrf_paths = csrf_paths if csrf_paths is not None else protected_paths
         self.exclude_paths = exclude_paths or [
             "/health",
             "/docs",
@@ -99,7 +104,34 @@ class SecurityMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Callable):
         """Process request through security middleware."""
         path = request.url.path
-        
+
+        # Reject browser-flagged cross-site mutations on guarded prefixes
+        # for ambient credentials: cookie auth, or the implicit-owner
+        # fallback when API-key protection is disabled. A valid X-API-Key
+        # is a non-ambient credential -- the caller already possesses it,
+        # so fetch metadata cannot be used to forge its requests.
+        if is_cross_site_request(request) and not key_matches(
+            request.headers.get(self.api_key_header)
+        ):
+            excluded = any(
+                path == e or path.startswith(e + "/")
+                for e in self.exclude_paths
+            )
+            guarded = any(
+                path == p or path.startswith(p + "/")
+                for p in (self.csrf_paths or [])
+            )
+            if not excluded and guarded:
+                response = JSONResponse(
+                    status_code=403,
+                    content={
+                        "error": "forbidden",
+                        "message": "Cross-origin request rejected"
+                    }
+                )
+                self._add_security_headers(response)
+                return response
+
         # Check credentials for protected paths: X-API-Key header or session cookie
         if self._is_path_protected(path):
             api_key = request.headers.get(self.api_key_header)
@@ -137,8 +169,12 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
 
         # Auth responses carry session state — never let a proxy cache them.
+        # Private GETs under the API prefixes get the same treatment: an
+        # intermediary must never replay an owner's response to another caller.
         if path.startswith(("/api/auth", "/v1/auth", "/api/account", "/v1/account")):
             response.headers["Cache-Control"] = "no-store"
+        elif any(path == p or path.startswith(p + "/") for p in (self.csrf_paths or [])):
+            response.headers.setdefault("Cache-Control", "private, no-store")
 
         # Add security headers to all responses
         self._add_security_headers(response)

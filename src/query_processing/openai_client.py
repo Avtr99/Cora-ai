@@ -106,8 +106,8 @@ class OpenAICompatibleClient(BaseRAGClient):
         settings = get_settings()
         host = (self._base_url or "").rsplit("//", 1)[-1].split("/", 1)[0].lower()
         if "openrouter" in host:
-            return getattr(settings, "OPENROUTER_MODEL", None) or "google/gemini-2.5-flash"
-        return getattr(settings, "OPENAI_MODEL", None) or "gpt-4.1-mini"
+            return getattr(settings, "OPENROUTER_MODEL", None) or "openai/gpt-6-luna"
+        return getattr(settings, "OPENAI_MODEL", None) or "gpt-6-luna"
 
     def _resolve_model(self, model: Optional[str], fallback: str) -> str:
         """Return ``model`` if it is a valid OpenAI-compatible ID, else ``fallback``."""
@@ -181,8 +181,14 @@ class OpenAICompatibleClient(BaseRAGClient):
         model: Optional[str] = None,
         temperature: float = 0.3,
         top_p: float = 0.9,
+        usage_out: Optional[list] = None,
     ) -> AsyncIterator[str]:
-        """Stream text chunks from a prompt via OpenAI streaming."""
+        """Stream text chunks from a prompt via OpenAI streaming.
+
+        When ``usage_out`` is given, requests ``stream_options.include_usage``
+        so the final chunk carries token counts, appended as a normalized
+        ``{"tokens_in", "tokens_out"}`` dict.
+        """
         resolved_model = model or self.model_main
 
         if self._circuit and not await self._circuit.can_execute():
@@ -192,11 +198,20 @@ class OpenAICompatibleClient(BaseRAGClient):
             resolved_model, prompt, temperature=temperature, top_p=top_p,
             stream=True,
         )
+        if usage_out is not None:
+            kwargs["stream_options"] = {"include_usage": True}
 
         stream_error = None
         try:
             stream = await self.client.chat.completions.create(**kwargs)
             async for chunk in stream:
+                usage = getattr(chunk, "usage", None)
+                if usage is not None and usage_out is not None:
+                    usage_out.clear()
+                    usage_out.append({
+                        "tokens_in": getattr(usage, "prompt_tokens", 0) or 0,
+                        "tokens_out": getattr(usage, "completion_tokens", 0) or 0,
+                    })
                 if chunk.choices and chunk.choices[0].delta.content:
                     yield chunk.choices[0].delta.content
         except Exception as e:
@@ -246,8 +261,8 @@ class OpenAICompatibleClient(BaseRAGClient):
     # ------------------------------------------------------------------
 
     # Models that use reasoning tokens and reject temperature/top_p/max_tokens.
-    # Covers GPT-5.x (luna/terra/sol), o1, o3, o4 series.
-    _REASONING_MODEL_PREFIXES = ("gpt-5", "o1", "o3", "o4")
+    # Covers GPT-5.x/6.x (luna/terra/sol/astra), o1, o3, o4 series.
+    _REASONING_MODEL_PREFIXES = ("gpt-5", "gpt-6", "o1", "o3", "o4")
 
     def _is_reasoning_model(self, model_name: str) -> bool:
         """Check if a model rejects temperature/top_p/max_tokens (reasoning models).

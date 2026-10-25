@@ -8,6 +8,7 @@ that index; nothing rewrites the answer's numbering.
 
 from __future__ import annotations
 
+import html
 import re
 from typing import Callable, Dict, List, Set, Tuple
 
@@ -148,6 +149,6 @@ def build_citation_correction(
         error_lines="\n".join(f"- {error}" for error in errors),
         web_clause=web_clause,
         non_answer=NO_ANSWER_FOUND,
-        answer=answer,
+        answer=html.escape(answer),
     )
     return f"{prompt}\n\n{correction}"

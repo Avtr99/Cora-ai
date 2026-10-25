@@ -111,6 +111,8 @@ class CircuitBreaker:
 
     def _record_failure(self, error: Exception) -> None:
         """Record failed call."""
+        if isinstance(error, (asyncio.CancelledError, GeneratorExit)):
+            return
         with self._state_lock:
             self._stats.failures += 1
             self._stats.last_failure_time = time.time()

@@ -28,7 +28,7 @@ from .auth.credentials import (
     hash_password_async,
     verify_password_async,
 )
-from .auth.login_limiter import require_attempt
+from .auth.login_limiter import LOGIN_IP_LIMIT, require_attempt
 from .auth.session_auth import (
     SESSION_COOKIE,
     SESSION_TTL,
@@ -114,10 +114,16 @@ async def login(body: LoginRequest, request: Request, response: Response):
     there is no stored hash — so neither the body nor the timing distinguishes
     them.
     """
+    # Trusted proxies rewrite client.host via FORWARDED_ALLOW_IPS (wired in
+    # main.py's uvicorn.run) — behind an unlisted proxy this stays the proxy
+    # IP and all its clients share one rate-limit bucket.
     client_ip = request.client.host if request.client else "unknown"
     try:
         # Keyed on IP + username: an attacker spamming guesses burns their own
         # IP's budget instead of locking the owner out of their account.
+        # Per-IP aggregate bound first: novel usernames still cost the
+        # source one of its limited attempts.
+        require_attempt("login-ip", client_ip, LOGIN_IP_LIMIT)
         require_attempt("login", f"{client_ip}:{body.username}")
     except HTTPException:
         logger.warning(

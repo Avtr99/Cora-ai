@@ -8,14 +8,12 @@ Optimizations:
 
 from google import genai
 from google.genai import types
-from google.genai import errors
 from typing import Dict, Any, Optional, Tuple, AsyncIterator
-import re
-from tenacity import AsyncRetrying, stop_after_attempt, wait_random_exponential, retry_if_exception
 from loguru import logger
 
 from ..config import get_settings
 from ..api.middleware.circuit_breaker import gemini_circuit
+from ..utils.gemini_config import build_generate_content_config, is_retired_model, _bare_model
 from .fallback_answers import GENERATION_FAILED_ANSWER
 from .prompts import (
     get_system_instruction,
@@ -52,8 +50,12 @@ class GeminiClient(BaseRAGClient):
             prefix, _, suffix = model.partition("/")
             if prefix == "tunedModels":
                 return True
-            return prefix == "models" and suffix.startswith("gemini-")
-        return model.startswith("gemini-")
+            return (
+                prefix == "models"
+                and suffix.startswith("gemini-")
+                and not is_retired_model(suffix)
+            )
+        return model.startswith("gemini-") and not is_retired_model(model)
 
     @property
     def model_name(self) -> str:
@@ -71,7 +73,7 @@ class GeminiClient(BaseRAGClient):
                 f"Gemini model ID; falling back to env default."
             )
         settings = get_settings()
-        return getattr(settings, "GEMINI_MODEL_MAIN", "gemini-2.5-flash")
+        return getattr(settings, "GEMINI_MODEL_MAIN", "gemini-3.8-flash")
 
     @property
     def circuit(self):
@@ -94,7 +96,7 @@ class GeminiClient(BaseRAGClient):
                 f"valid Gemini model ID; falling back to env default."
             )
         settings = get_settings()
-        return getattr(settings, "GEMINI_MODEL_LITE", "gemini-2.5-flash-lite")
+        return getattr(settings, "GEMINI_MODEL_LITE", "gemini-3.5-flash-lite")
 
     @property
     def model_relevance(self) -> str:
@@ -130,17 +132,46 @@ class GeminiClient(BaseRAGClient):
         self._model_relevance = model_relevance
         self._initialize_client()
 
-        # Generation config optimized for factual RAG responses
-        self.generation_config = types.GenerateContentConfig(
-            temperature=0.3,
-            top_p=0.9,
-            top_k=50,
-            candidate_count=1,
+    @property
+    def generation_config(self) -> types.GenerateContentConfig:
+        """Generation config for the main model, built on demand.
+
+        Lazily built so a retired configured model surfaces the clear
+        ``build_generate_content_config`` error at request time rather than
+        during client construction. gemini-3.x takes a ``ThinkingConfig``
+        instead of temperature/top_p/top_k.
+        """
+        return build_generate_content_config(
+            self.model_name,
+            thinking_level=get_settings().GEMINI_THINKING_LEVEL,
         )
+
+    def _thinking_level_for(self, model_name: str) -> Optional[str]:
+        """Pick the configured thinking level for a resolved model.
+
+        Lite and relevance models use ``GEMINI_THINKING_LEVEL_LITE``; the main
+        model uses ``GEMINI_THINKING_LEVEL``. Main is checked first: when the
+        same model serves both tiers, the main level wins — the lite level may
+        be MINIMAL, which the main model can reject.
+        """
+        settings = get_settings()
+        bare = _bare_model(model_name)
+        if bare == _bare_model(self.model_name):
+            return settings.GEMINI_THINKING_LEVEL
+        if bare in (
+            _bare_model(self.model_lite),
+            _bare_model(self.model_relevance),
+        ):
+            return settings.GEMINI_THINKING_LEVEL_LITE
+        return settings.GEMINI_THINKING_LEVEL
 
     def _initialize_client(self):
         """Initialize the genai client using Gemini API key."""
         settings = get_settings()
+        # Single retry layer: the SDK retries matching status codes plus
+        # transient httpx errors. 429/RESOURCE_EXHAUSTED is excluded —
+        # retrying while over quota makes the problem worse, so it fails
+        # fast and lets the circuit breaker handle backpressure.
         http_options = types.HttpOptions(
             retry_options=types.HttpRetryOptions(
                 attempts=3,
@@ -148,7 +179,7 @@ class GeminiClient(BaseRAGClient):
                 max_delay=8.0,
                 exp_base=2.0,
                 jitter=True,
-                http_status_codes=[429, 500, 502, 503, 504],
+                http_status_codes=[500, 502, 503, 504],
             )
         )
 
@@ -161,33 +192,14 @@ class GeminiClient(BaseRAGClient):
             http_options=http_options,
         )
         logger.info("Gemini client initialized")
-        
-    # Pre-compiled regex for word-boundary numeric code matching (avoids false positives on ports/IDs)
-    _RETRYABLE_CODE_REGEX = re.compile(r'\b(?:500|502|503|504)\b')
-
-    @staticmethod
-    def _is_retryable_error(exception: Exception) -> bool:
-        """Check if an exception is retryable.
-
-        429 / RESOURCE_EXHAUSTED is NOT retryable — retrying while over quota
-        makes the problem worse. The caller should fail fast and let upstream
-        circuit-breakers or backpressure handle it.
-        """
-        if isinstance(exception, errors.APIError):
-            return exception.code in {500, 502, 503, 504}
-        error_msg = str(exception).upper()
-        # Use word-boundary matching for numeric codes to avoid matching port numbers or IDs
-        return (
-            bool(GeminiClient._RETRYABLE_CODE_REGEX.search(error_msg))
-            or "INTERNAL" in error_msg
-            or "UNAVAILABLE" in error_msg
-        )
 
     async def generate(self, prompt: str):
-        """Generate content from a prompt with bounded retries.
+        """Generate content from a prompt.
 
         Public API for callers that need raw Gemini generation without
         the full search-and-process pipeline (e.g. summarization).
+        Transient-failure retries are handled inside the SDK (see
+        ``_initialize_client``).
 
         **Trust boundary:** This method does NOT perform input validation
         (length checks, sanitization, or injection detection) because it
@@ -203,7 +215,7 @@ class GeminiClient(BaseRAGClient):
         Returns:
             GenerateContentResponse from the Gemini API.
         """
-        return await self._generate_with_retry(prompt)
+        return await self._generate_async(prompt)
 
     async def generate_text(
         self,
@@ -219,9 +231,8 @@ class GeminiClient(BaseRAGClient):
 
         This is the unified method used by all agents (router, rewriter,
         validator, conversational handler, web search). It handles:
-        - Per-call generation config (temperature, top_p, json_mode)
+        - Per-call generation config (json_mode, max_output_tokens, thinking level)
         - Circuit breaker protection via ``gemini_circuit``
-        - Retry with exponential backoff for transient failures
 
         Unlike ``generate()`` / ``_generate_async()``, this method does NOT
         prepend the VCM system instruction — agents build their own prompts
@@ -231,8 +242,10 @@ class GeminiClient(BaseRAGClient):
         Args:
             prompt: The prompt string to send to the model.
             model: Model name override. Defaults to ``self.model_name``.
-            temperature: Sampling temperature (0.0-2.0).
-            top_p: Nucleus sampling parameter.
+            temperature: Ignored — gemini-3.x rejects sampling parameters.
+                Reasoning effort is set via ``GEMINI_THINKING_LEVEL`` /
+                ``GEMINI_THINKING_LEVEL_LITE`` instead.
+            top_p: Ignored — see ``temperature``.
             max_output_tokens: Maximum tokens to generate. None = provider default.
             json_mode: If True, force JSON-formatted output.
 
@@ -241,41 +254,32 @@ class GeminiClient(BaseRAGClient):
         """
         resolved_model = model or self.model_name
 
-        config_kwargs: Dict[str, Any] = {
-            "temperature": temperature,
-            "top_p": top_p,
-            "candidate_count": 1,
-        }
+        config_kwargs: Dict[str, Any] = {}
         if max_output_tokens is not None:
             config_kwargs["max_output_tokens"] = max_output_tokens
         if json_mode:
             config_kwargs["response_mime_type"] = "application/json"
 
-        call_config = types.GenerateContentConfig(**config_kwargs)
+        call_config = build_generate_content_config(
+            resolved_model,
+            thinking_level=self._thinking_level_for(resolved_model),
+            **config_kwargs,
+        )
 
-        async def _call():
-            if gemini_circuit:
-                return await gemini_circuit.call(
-                    self.client.aio.models.generate_content,
-                    model=resolved_model,
-                    contents=prompt,
-                    config=call_config,
-                )
-            return await self.client.aio.models.generate_content(
+        if gemini_circuit:
+            response = await gemini_circuit.call(
+                self.client.aio.models.generate_content,
                 model=resolved_model,
                 contents=prompt,
                 config=call_config,
             )
-
-        async for attempt in AsyncRetrying(
-            stop=stop_after_attempt(3),
-            wait=wait_random_exponential(multiplier=1, max=8),
-            retry=retry_if_exception(self._is_retryable_error),
-            reraise=True,
-        ):
-            with attempt:
-                response = await _call()
-                return self._extract_response_text(response)
+        else:
+            response = await self.client.aio.models.generate_content(
+                model=resolved_model,
+                contents=prompt,
+                config=call_config,
+            )
+        return self._extract_response_text(response)
 
     async def generate_text_stream(
         self,
@@ -284,20 +288,29 @@ class GeminiClient(BaseRAGClient):
         model: Optional[str] = None,
         temperature: float = 0.3,
         top_p: float = 0.9,
+        usage_out: Optional[list] = None,
     ) -> AsyncIterator[str]:
         """Stream text chunks from a prompt (LLMClient interface).
 
-        Unlike ``GeminiStreamingClient.generate_stream()``, this does NOT
-        prepend the VCM system instruction — callers build their own prompts.
+        Does NOT prepend the VCM system instruction — callers build their
+        own prompts.
+
+        Args:
+            prompt: The prompt string to send to the model.
+            model: Model name override. Defaults to ``self.model_name``.
+            temperature: Ignored — gemini-3.x rejects sampling parameters.
+            top_p: Ignored — see ``temperature``.
+            usage_out: Optional mutable list; the final chunk's usage is
+                appended as a normalized ``{"tokens_in", "tokens_out"}`` dict
+                (gemini-3.x thought tokens included in ``tokens_out``).
 
         Yields:
             Text chunks as they arrive from the model.
         """
         resolved_model = model or self.model_name
-        call_config = types.GenerateContentConfig(
-            temperature=temperature,
-            top_p=top_p,
-            candidate_count=1,
+        call_config = build_generate_content_config(
+            resolved_model,
+            thinking_level=self._thinking_level_for(resolved_model),
         )
 
         if not await gemini_circuit.can_execute():
@@ -306,21 +319,24 @@ class GeminiClient(BaseRAGClient):
         stream = None
         stream_error = None
         try:
-            async for attempt in AsyncRetrying(
-                stop=stop_after_attempt(3),
-                wait=wait_random_exponential(multiplier=1, max=8),
-                retry=retry_if_exception(self._is_retryable_error),
-                reraise=True,
-            ):
-                with attempt:
-                    stream = await self.client.aio.models.generate_content_stream(
-                        model=resolved_model,
-                        contents=prompt,
-                        config=call_config,
-                    )
-                    break
+            stream = await self.client.aio.models.generate_content_stream(
+                model=resolved_model,
+                contents=prompt,
+                config=call_config,
+            )
 
             async for chunk in stream:
+                usage = getattr(chunk, "usage_metadata", None)
+                if usage is not None and usage_out is not None:
+                    usage_out.clear()
+                    usage_out.append({
+                        "tokens_in": getattr(usage, "prompt_token_count", 0) or 0,
+                        # gemini-3.x bills thoughts_token_count at the output rate.
+                        "tokens_out": (
+                            (getattr(usage, "candidates_token_count", 0) or 0)
+                            + (getattr(usage, "thoughts_token_count", 0) or 0)
+                        ),
+                    })
                 text = self._extract_text_from_chunk(chunk) if hasattr(self, "_extract_text_from_chunk") else None
                 if text is None:
                     text = getattr(chunk, "text", None)
@@ -348,17 +364,6 @@ class GeminiClient(BaseRAGClient):
             Extracted text string.
         """
         return self._extract_response_text(response)
-
-    async def _generate_with_retry(self, prompt: str):
-        """Generate content with bounded retries for transient provider failures."""
-        async for attempt in AsyncRetrying(
-            stop=stop_after_attempt(3),
-            wait=wait_random_exponential(multiplier=1, max=8),
-            retry=retry_if_exception(self._is_retryable_error),
-            reraise=True,
-        ):
-            with attempt:
-                return await self._generate_async(prompt)
 
     # check_query_cache, persist_to_cache, and search_and_process are inherited
     # from BaseRAGClient (provider-agnostic implementations).
@@ -403,7 +408,7 @@ class GeminiClient(BaseRAGClient):
         Returns:
             Tuple of (answer_text, usage_dict).
         """
-        response = await self._generate_with_retry_raw(prompt)
+        response = await self._generate_raw(prompt)
         answer_text = self._extract_response_text(response)
 
         tokens_in = 0
@@ -411,36 +416,34 @@ class GeminiClient(BaseRAGClient):
         usage_metadata = getattr(response, "usage_metadata", None)
         if usage_metadata:
             tokens_in = getattr(usage_metadata, "prompt_token_count", 0) or 0
-            tokens_out = getattr(usage_metadata, "candidates_token_count", 0) or 0
+            # gemini-3.x bills thoughts_token_count at the output rate.
+            tokens_out = (
+                (getattr(usage_metadata, "candidates_token_count", 0) or 0)
+                + (getattr(usage_metadata, "thoughts_token_count", 0) or 0)
+            )
 
         return answer_text, {"tokens_in": tokens_in, "tokens_out": tokens_out}
 
-    async def _generate_with_retry_raw(self, prompt: str):
-        """Generate content with retries, WITHOUT prepending system instruction.
+    async def _generate_raw(self, prompt: str):
+        """Generate content WITHOUT prepending system instruction.
 
-        Unlike ``_generate_with_retry`` → ``_generate_async``, this does NOT
-        prepend the VCM system instruction — the caller (``_generate_for_rag``)
-        receives a prompt that already has it prepended by the base class.
+        Unlike ``_generate_async``, this does NOT prepend the VCM system
+        instruction — the caller (``_generate_for_rag``) receives a prompt
+        that already has it prepended by the base class. Retries are handled
+        inside the SDK (see ``_initialize_client``).
         """
-        async for attempt in AsyncRetrying(
-            stop=stop_after_attempt(3),
-            wait=wait_random_exponential(multiplier=1, max=8),
-            retry=retry_if_exception(self._is_retryable_error),
-            reraise=True,
-        ):
-            with attempt:
-                if gemini_circuit:
-                    return await gemini_circuit.call(
-                        self.client.aio.models.generate_content,
-                        model=self.model_name,
-                        contents=prompt,
-                        config=self.generation_config,
-                    )
-                return await self.client.aio.models.generate_content(
-                    model=self.model_name,
-                    contents=prompt,
-                    config=self.generation_config,
-                )
+        if gemini_circuit:
+            return await gemini_circuit.call(
+                self.client.aio.models.generate_content,
+                model=self.model_name,
+                contents=prompt,
+                config=self.generation_config,
+            )
+        return await self.client.aio.models.generate_content(
+            model=self.model_name,
+            contents=prompt,
+            config=self.generation_config,
+        )
 
     def _extract_response_text(self, response: Any) -> str:
         """Safely extract answer text from a Gemini response.

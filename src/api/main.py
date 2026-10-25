@@ -95,6 +95,7 @@ protected_paths = API_KEY_PROTECTED_PATHS if settings.ENABLE_API_KEY_PROTECTION 
 app.add_middleware(
     SecurityMiddleware,
     protected_paths=protected_paths,
+    csrf_paths=API_KEY_PROTECTED_PATHS,
     exclude_paths=API_KEY_EXCLUDED_PATHS
 )
 
@@ -115,9 +116,11 @@ app.add_middleware(
         "/docs",
         "/redoc",
         "/openapi.json",
-        "/v1/documents",
-        "/api/documents",
-    ]
+    ],
+    path_limits={
+        "/v1/documents": settings.DOCUMENT_UPLOAD_MAX_BYTES + 1024 * 1024,
+        "/api/documents": settings.DOCUMENT_UPLOAD_MAX_BYTES + 1024 * 1024,
+    }
 )
 
 # Compress responses >= 1 KB (SPA bundles, JSON payloads). Streaming SSE
@@ -505,4 +508,9 @@ async def serve_spa(full_path: str):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host=settings.UVICORN_HOST, port=settings.PORT)
+    uvicorn.run(
+        app,
+        host=settings.UVICORN_HOST,
+        port=settings.PORT,
+        forwarded_allow_ips=settings.FORWARDED_ALLOW_IPS,
+    )

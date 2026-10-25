@@ -159,9 +159,12 @@ class HybridRouteHandler:
         web_answer = web_results.get("answer", "")
         # The provider sets grounded only when the answer has web evidence.
         web_answer_usable = web_result_is_usable(web_results)
+        method = "web_answer"
 
         if kb.text and web_answer_usable:
-            # Combine KB context with web results
+            # Combine KB context with web results — the hybrid route exists to
+            # merge the curated corpus with live web data.
+            method = "hybrid"
             remaining_budget = remaining_budget_ms(timeout_budget_ms, step_start)
             hybrid_web_timeout_ms = derive_web_timeout_ms(remaining_budget)
             result = await self.web_search.search_with_kb_context(
@@ -177,6 +180,7 @@ class HybridRouteHandler:
             else:
                 # Synthesis produced nothing usable — fall back to the web-only
                 # answer rather than shipping an empty/non-answer as "hybrid".
+                method = "web_answer"
                 result = {
                     "answer": web_answer,
                     "sources": [(s.get("title") or s.get("url") or "web") for s in web_results.get("sources", [])],
@@ -189,12 +193,14 @@ class HybridRouteHandler:
                 }
         elif kb.text:
             # KB only
+            method = "kb_fallback"
             result = await self.answer_generator.search_and_process(
                 original_query, vector_results, resolved_query=query
             )
         else:
             # Web only. A scope refusal is terminal — surface it rather than
             # downgrading to the generic non-answer.
+            method = "web_only"
             web_sources = web_results.get("sources", []) if web_answer_usable else []
             result = {
                 "answer": web_answer if (web_answer_usable or is_refusal(web_answer)) else NO_ANSWER_FOUND,
@@ -212,7 +218,7 @@ class HybridRouteHandler:
             name="Answer Synthesis",
             status="completed",
             duration_ms=round(gen_duration, 2),
-            details={"method": "hybrid"}
+            details={"method": method}
         ))
 
         # Post-generation relevance check: if the synthesized answer is not

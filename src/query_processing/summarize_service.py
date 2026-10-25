@@ -9,6 +9,7 @@ methodology documents.
 
 from __future__ import annotations
 
+import html
 import logging
 import time
 from typing import Any, Dict, List, Optional, Sequence
@@ -99,7 +100,9 @@ def _build_context(citations: Sequence[Dict[str, Any]]) -> str:
         text = c.get("content", c.get("text", ""))
         page_ref = f" p.{page}" if page else ""
         doc_ref = f" ({doc_id}{page_ref})" if doc_id else ""
-        blocks.append(f"[{i}]{doc_ref}\n{text}")
+        # Corpus text enters prompt structure here; escape so document
+        # content can never forge prompt delimiters.
+        blocks.append(f"[{i}]{doc_ref}\n{html.escape(text)}")
     return "\n\n".join(blocks)
 
 

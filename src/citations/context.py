@@ -89,7 +89,9 @@ def build_kb_context(vector_results: Dict[str, Any]) -> KBContext:
         # the way through to the displayed citation list.
         index = placed + 1
         tag_name = html.escape(source_name or f"Document {index}", quote=True)
-        wrapped = f'<source index="{index}" name="{tag_name}">\n{doc}\n</source>'
+        # Content is escaped at the producer so the wrapper stays real markup
+        # and document text can never forge prompt delimiters downstream.
+        wrapped = f'<source index="{index}" name="{tag_name}">\n{html.escape(doc)}\n</source>'
         wrapped_len = len(wrapped)
 
         if current_length + wrapped_len > max_context_chars:
@@ -241,4 +243,4 @@ def _structured_context(vector_results: Dict[str, Any]) -> KBContext:
         marker_type="knowledge_base",
         document_key=str(doc_store_id) if doc_store_id is not None else None,
     )
-    return KBContext(text=document, summaries=[], sources=[], citations=[citation])
+    return KBContext(text=html.escape(document), summaries=[], sources=[], citations=[citation])

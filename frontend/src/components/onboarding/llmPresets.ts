@@ -30,8 +30,8 @@ export const PRESETS: Record<ProviderPreset, PresetConfig> = {
     base_url: null,
     needsApiKey: true,
     needsBaseUrl: false,
-    modelPlaceholder: "gemini-2.5-flash",
-    defaultModel: "gemini-2.5-flash",
+    modelPlaceholder: "gemini-3.8-flash",
+    defaultModel: "gemini-3.8-flash",
     description: "Google's Gemini models. Requires a Gemini API key.",
   },
   openai: {
@@ -40,8 +40,8 @@ export const PRESETS: Record<ProviderPreset, PresetConfig> = {
     base_url: "https://api.openai.com/v1",
     needsApiKey: true,
     needsBaseUrl: false,
-    modelPlaceholder: "gpt-4.1-mini",
-    defaultModel: "gpt-4.1-mini",
+    modelPlaceholder: "gpt-6-luna",
+    defaultModel: "gpt-6-luna",
     description: "OpenAI's GPT models. Requires an OpenAI API key.",
   },
   ollama: {
@@ -60,8 +60,8 @@ export const PRESETS: Record<ProviderPreset, PresetConfig> = {
     base_url: "https://openrouter.ai/api/v1",
     needsApiKey: true,
     needsBaseUrl: false,
-    modelPlaceholder: "e.g. anthropic/claude-3.5-sonnet",
-    defaultModel: "google/gemini-2.5-flash",
+    modelPlaceholder: "e.g. openai/gpt-6-luna",
+    defaultModel: "openai/gpt-6-luna",
     description: "Access multiple providers through OpenRouter. Requires an OpenRouter API key.",
   },
   custom: {

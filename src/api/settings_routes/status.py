@@ -189,8 +189,8 @@ async def get_config_status() -> ConfigStatusResponse:
         finally:
             client.close()
     except Exception as e:
-        qdrant_info = {"error": str(e)}
-        warnings.append(f"Could not connect to Qdrant at {settings.QDRANT_URL}: {e}")
+        qdrant_info = {"error": type(e).__name__}
+        warnings.append("Could not connect to Qdrant.")
 
     # --- Overall readiness ---
     ready = llm_configured and emb_configured and rerank_configured and search_configured

@@ -1173,7 +1173,7 @@ class TestRouteProcessorCitationRegressions:
             "distances": [0.1],
         }
         web_search_result = {
-            "answer": "Found web results",
+            "answer": "The carbon credit verification methodology supports integrity [Web, cite: 1].",
             "sources": [
                 {
                     "title": "External Article",

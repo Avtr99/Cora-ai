@@ -25,10 +25,12 @@ class RequestSizeLimitMiddleware:
         app: ASGIApp,
         max_content_length: int,
         exclude_paths: Optional[Iterable[str]] = None,
+        path_limits: Optional[dict] = None,
     ) -> None:
         self.app = app
         self.max_content_length = max(1, int(max_content_length))
         self.exclude_paths = tuple(exclude_paths or ())
+        self.path_limits = dict(path_limits or {})
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope.get("type") != "http":
@@ -40,8 +42,17 @@ class RequestSizeLimitMiddleware:
             await self.app(scope, receive, send)
             return
 
+        # Per-path cap for exempted-but-bounded routes (e.g. uploads):
+        # counts actual bytes received so the multipart parser never sees
+        # an unbounded body.
+        max_content_length = self.max_content_length
+        for prefix, limit in self.path_limits.items():
+            if path == prefix or path.startswith(prefix + "/"):
+                max_content_length = limit
+                break
+
         content_length = self._get_content_length(scope)
-        if content_length is not None and content_length > self.max_content_length:
+        if content_length is not None and content_length > max_content_length:
             await self._send_payload_too_large(send)
             return
 
@@ -59,7 +70,7 @@ class RequestSizeLimitMiddleware:
             message = await receive()
             if message.get("type") == "http.request":
                 bytes_received += len(message.get("body", b""))
-                if bytes_received > self.max_content_length:
+                if bytes_received > max_content_length:
                     raise _RequestSizeExceededError
             return message
 

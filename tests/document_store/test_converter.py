@@ -501,7 +501,7 @@ async def test_convert_pdf_with_llm_api_mocked_http(tmp_path):
         "available": True,
         "provider": "openai",
         "api_key": "test-key",
-        "model": "gpt-4.1-mini",
+        "model": "gpt-6-luna",
         "url": "https://api.openai.com/v1/chat/completions",
     }
 

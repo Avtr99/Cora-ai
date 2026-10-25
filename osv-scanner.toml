@@ -21,7 +21,7 @@
 name = "aiohttp"
 ecosystem = "PyPI"
 vulnerability.ignore = true
-reason = "False positive — requirements.txt floor is 3.14.1, lockfile pins 3.14.3 (above fix versions). osv-scanner checks the floor, not the resolved version."
+reason = "False positive — requirements.txt floor is 3.14.4, lockfile pins the latest release (above fix versions). osv-scanner checks the floor, not the resolved version."
 
 [[PackageOverrides]]
 name = "authlib"
@@ -35,11 +35,9 @@ ecosystem = "PyPI"
 vulnerability.ignore = true
 reason = "False positive — requirements.txt floor is 7.1.4, lockfile pins 7.1.6."
 
-[[PackageOverrides]]
-name = "certifi"
-ecosystem = "PyPI"
-vulnerability.ignore = true
-reason = "False positive — requirements.txt floor is 2026.6.17, lockfile pins 2026.7.22."
+# certifi override removed: requirements-ingestion.lock resolved below the
+# declared >=2026.10.19 floor (2026.7.22), so the mask claim was stale.
+# Re-add only after the lock is regenerated above the floor.
 
 [[PackageOverrides]]
 name = "datasets"
@@ -63,7 +61,7 @@ reason = "False positive — requirements.txt floor is 3.29.4, lockfile pins 3.3
 name = "google-genai"
 ecosystem = "PyPI"
 vulnerability.ignore = true
-reason = "False positive — requirements.txt floor is 2.9.0, lockfile pins 2.16.0."
+reason = "False positive — requirements.txt floor is 2.30.1, lockfile pins the latest release."
 
 [[PackageOverrides]]
 name = "langchain"
@@ -123,7 +121,7 @@ reason = "False positive — requirements.txt floor is 3.0.3, lockfile pins 3.0.
 name = "pillow"
 ecosystem = "PyPI"
 vulnerability.ignore = true
-reason = "False positive — requirements.txt floor is 12.2.0, lockfile pins 12.3.0."
+reason = "False positive — requirements.txt floor is 12.3.0, lockfile pins 12.3.0 — pillow>=13 blocked by docling-slim<13 constraint."
 
 [[PackageOverrides]]
 name = "protobuf"

@@ -1,9 +1,9 @@
 """
-Prompt templates and security patterns for the Gemini 2.5 Flash client.
+Prompt templates and security patterns for the Gemini 3.x Flash client.
 
 Optimized for:
 - Low CPU overhead via pre-compiled Regex
-- Gemini 2.5 Flash (XML structure preference for data sandboxing)
+- Gemini 3.x Flash (XML structure preference for data sandboxing)
 - Cost/Token minimization
 - Security without false positives on legitimate content
 """
@@ -61,15 +61,15 @@ The current date is {current_date}. When reference data mentions future events, 
 </temporal_awareness>
 
 <output_rules>
-1. Treat <reference_data> as your own innate expertise. Answer directly and authoritatively. NEVER mention the existence of "reference data", "context", "provided information", or a "knowledge base".
-2. If <reference_data> is empty OR the retrieved chunks do not actually address the user's question, state: "{non_answer}" Do not answer from unrelated material.
-3. Start your answer immediately with the core facts. Strictly prohibited phrases include: "Based on...", "According to...", "The provided context states...", or "Research shows...". 
-4. Match depth to the question: be concise for simple lookups, educational and thorough for conceptual or analytical questions.
-5. For factual questions (e.g., "What is X?"), explain the concept, its significance, and key mechanisms — not just a one-line definition.
-6. For comparative or analytical questions, explore trade-offs, differences, and implications.
-7. Use professional markdown formatting with descriptive headers and bullet points for clarity.
-8. Cite your sources for key claims. Use ONLY bracketed citations at the end of the relevant paragraph or key claim. If the entire answer comes from a single source, cite it once at the end of the first relevant paragraph. Do not repeat the same citation within a paragraph or on every sentence. Use the format `[cite_kb: N]` where N is the source number from the `<source index="N">` tag surrounding the retrieved chunk (e.g., "Carbon offsets must be verifiable [cite_kb: 1]."). NEVER use narrative citations (e.g., Do NOT say "According to...").
-9. Keep answers focused and well-structured under 600 words. Do not reproduce full lists or full document text by default; the mode-specific instructions below will explicitly request a complete list when the user asks for one.
+1. Treat <reference_data> as your own expertise and answer directly. Do not mention reference data, context, provided documents, or a knowledge base, and do not open with phrases like "Based on" or "According to".
+2. If <reference_data> is empty OR the retrieved chunks do not actually address the user's question, reply exactly: "{non_answer}" Do not answer from unrelated material.
+3. Cite sources for key claims ONLY with a `[cite_kb: N]` marker at the end of the sentence it supports, where N is the index from the `<source index="N">` tag surrounding the retrieved chunk (e.g., "Credits must be verified by an accredited body [cite_kb: 1]."). If the whole answer comes from one source, cite it once at the end of the first relevant paragraph. Never narrate citations.
+4. Stay under 600 words unless the mode-specific instructions below ask for a complete list; those instructions override length and format rules.
+5. Write for a carbon market professional. Be precise, comprehensive, and specific.
+6. Lead with the core answer, then cover mechanisms, requirements, and implications under descriptive markdown headers with bullets.
+7. Include every relevant concrete detail in the data: figures, percentages, methodology codes and versions, dates, registries, standards, and named programmes. Prefer a specific fact over a general statement.
+8. For comparisons, set out the differences point by point (a table is fine) and state the trade-offs.
+9. Simple lookups: one focused paragraph. Conceptual or analytical questions: 300-550 words.
 </output_rules>"""
 
 _VCM_IDENTITY = "You are an expert VCM (Voluntary Carbon Markets) Assistant."
@@ -302,9 +302,12 @@ def build_query_prompt(
         sanitized_summaries.append(sanitized_summary)
         total_summaries_length = potential_length
     
-    # 4. Escape all values for safe XML injection
+    # 4. Escape all values for safe XML injection. Context content arrives
+    # already escaped by its producers (build_kb_context/_structured_context
+    # escape document text inside the <source> wrapper); escaping it again
+    # here would double-escape. Query/summaries are still user/session data.
     escaped_query = _escape_xml(sanitized_query)
-    escaped_context = _escape_xml(sanitized_context)
+    escaped_context = sanitized_context
     escaped_summaries = [_escape_xml(s) for s in sanitized_summaries]
     
     # 5. Format summaries as bullet list

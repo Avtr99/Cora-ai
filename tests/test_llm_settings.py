@@ -29,8 +29,8 @@ def mock_settings():
     """A minimal Settings-like object for .env detection."""
     class _Settings:
         GEMINI_API_KEY = "gemini-test-key"
-        GEMINI_MODEL_MAIN = "gemini-2.5-flash"
-        GEMINI_MODEL_LITE = "gemini-2.5-flash-lite"
+        GEMINI_MODEL_MAIN = "gemini-3.8-flash"
+        GEMINI_MODEL_LITE = "gemini-3.5-flash-lite"
         OPENAI_API_KEY = None
         OPENROUTER_API_KEY = None
 
@@ -43,8 +43,8 @@ def gemini_llm_settings():
         "provider": "gemini",
         "api_key": "gemini-test-key",
         "base_url": None,
-        "model_main": "gemini-2.5-flash",
-        "model_lite": "gemini-2.5-flash-lite",
+        "model_main": "gemini-3.8-flash",
+        "model_lite": "gemini-3.5-flash-lite",
         "model_relevance": None,
         "organization": None,
     }
@@ -56,8 +56,8 @@ def openai_llm_settings():
         "provider": "openai_compatible",
         "api_key": "openai-test-key",
         "base_url": "https://api.openai.com/v1",
-        "model_main": "gpt-4.1-mini",
-        "model_lite": "gpt-4.1-mini",
+        "model_main": "gpt-6-luna",
+        "model_lite": "gpt-6-luna",
         "model_relevance": None,
         "organization": None,
     }
@@ -75,7 +75,7 @@ class TestLLMSettingsGet:
         assert data["is_configured"] is True
         assert data["provider"] == "gemini"
         assert data["has_api_key"] is True
-        assert data["model_main"] == "gemini-2.5-flash"
+        assert data["model_main"] == "gemini-3.8-flash"
         assert "api_key" not in data  # API key must never be returned
 
     def test_get_llm_config_fills_defaults_from_env(self, test_client, mock_settings):
@@ -96,8 +96,8 @@ class TestLLMSettingsGet:
 
         assert response.status_code == 200
         data = response.json()
-        assert data["model_main"] == "gemini-2.5-flash"
-        assert data["model_lite"] == "gemini-2.5-flash-lite"
+        assert data["model_main"] == "gemini-3.8-flash"
+        assert data["model_lite"] == "gemini-3.5-flash-lite"
 
 
 class TestLLMSettingsUpdate:
@@ -106,20 +106,20 @@ class TestLLMSettingsUpdate:
             "provider": "openai_compatible",
             "api_key": "openai-test-key",
             "base_url": "https://api.openai.com/v1",
-            "model_main": "gpt-4.1-mini",
-            "model_lite": "gpt-4.1-mini",
+            "model_main": "gpt-6-luna",
+            "model_lite": "gpt-6-luna",
         }
         with patch("src.api.settings_routes.llm_config._write_llm_settings") as mock_write, \
              patch("src.api.settings_routes.llm_config.get_llm_settings", return_value=openai_llm_settings), \
              patch("src.api.settings_routes.llm_config.is_llm_configured", return_value=True), \
              patch("src.api.settings_routes.llm_config._save_profile") as mock_save_profile, \
-             patch("src.api.settings_routes.llm_config.hot_swap_llm_client", new=AsyncMock(return_value={"success": True, "client_type": "OpenAICompatibleClient", "model": "gpt-4.1-mini"})):
+             patch("src.api.settings_routes.llm_config.hot_swap_llm_client", new=AsyncMock(return_value={"success": True, "client_type": "OpenAICompatibleClient", "model": "gpt-6-luna"})):
             response = test_client.put("/v1/settings/llm", json=payload)
 
         assert response.status_code == 200
         data = response.json()
         assert data["provider"] == "openai_compatible"
-        assert data["model_main"] == "gpt-4.1-mini"
+        assert data["model_main"] == "gpt-6-luna"
         mock_write.assert_called_once()
         mock_save_profile.assert_called_once()
 
@@ -134,7 +134,7 @@ class TestLLMSettingsUpdate:
         payload = {
             "provider": "openai_compatible",
             "api_key": "openai-test-key",
-            "model_main": "gpt-4.1-mini",
+            "model_main": "gpt-6-luna",
         }
         with patch("src.api.settings_routes.llm_config._write_llm_settings") as mock_write, \
              patch("src.api.settings_routes.llm_config.get_llm_settings", return_value=openai_llm_settings), \
@@ -178,8 +178,8 @@ class TestLLMProviderSwitch:
             "provider": "openai_compatible",
             "api_key": "openai-test-key",
             "base_url": "https://api.openai.com/v1",
-            "model_main": "gpt-4.1-mini",
-            "model_lite": "gpt-4.1-mini",
+            "model_main": "gpt-6-luna",
+            "model_lite": "gpt-6-luna",
             "model_relevance": None,
             "organization": None,
         }
@@ -189,7 +189,7 @@ class TestLLMProviderSwitch:
              patch("src.db.llm_profile_manager._read_profile", return_value=profile) as mock_read_profile, \
              patch("src.db.llm_profile_manager.detect_env_providers", return_value=[]), \
              patch("src.api.settings_routes.llm_profiles._write_llm_settings") as mock_write, \
-             patch("src.api.settings_routes.llm_profiles.hot_swap_llm_client", new=AsyncMock(return_value={"success": True, "client_type": "OpenAICompatibleClient", "model": "gpt-4.1-mini"})):
+             patch("src.api.settings_routes.llm_profiles.hot_swap_llm_client", new=AsyncMock(return_value={"success": True, "client_type": "OpenAICompatibleClient", "model": "gpt-6-luna"})):
             response = test_client.post("/v1/settings/llm/switch", json={"label": "openai"})
 
         assert response.status_code == 200
@@ -208,7 +208,7 @@ class TestLLMProviderSwitch:
              patch("src.api.settings_routes.llm_profiles._save_profile"), \
              patch("src.db.llm_profile_manager._read_profile", return_value=None), \
              patch("src.api.settings_routes.llm_profiles._write_llm_settings"), \
-             patch("src.api.settings_routes.llm_profiles.hot_swap_llm_client", new=AsyncMock(return_value={"success": True, "client_type": "GeminiClient", "model": "gemini-2.5-flash"})):
+             patch("src.api.settings_routes.llm_profiles.hot_swap_llm_client", new=AsyncMock(return_value={"success": True, "client_type": "GeminiClient", "model": "gemini-3.8-flash"})):
             response = test_client.post("/v1/settings/llm/switch", json={"label": "gemini"})
 
         assert response.status_code == 200
@@ -263,8 +263,8 @@ class TestLLMProvidersList:
                 "provider": "openai_compatible",
                 "api_key": "openai-test-key",
                 "base_url": "https://api.openai.com/v1",
-                "model_main": "gpt-4.1-mini",
-                "model_lite": "gpt-4.1-mini",
+                "model_main": "gpt-6-luna",
+                "model_lite": "gpt-6-luna",
             }
         }
         with patch("src.api.settings_routes.llm_profiles.get_settings", return_value=mock_settings), \
@@ -314,7 +314,7 @@ class TestLLMConnectionTest:
             response = test_client.post("/v1/settings/llm/test", json={
                 "provider": "gemini",
                 "api_key": "test-key",
-                "model_main": "gemini-2.5-flash",
+                "model_main": "gemini-3.8-flash",
             })
 
         assert response.status_code == 200
@@ -328,7 +328,7 @@ class TestLLMConnectionTest:
                 "provider": "openai_compatible",
                 "api_key": "test-key",
                 "base_url": "https://api.openai.com/v1",
-                "model_main": "gpt-4.1-mini",
+                "model_main": "gpt-6-luna",
             })
 
         assert response.status_code == 200
@@ -353,13 +353,13 @@ class TestLLMConfigUnion:
             "provider": "gemini",
             "api_key": "AIza-test-key",
             "base_url": "https://openrouter.ai/api/v1",  # should be silently dropped
-            "model_main": "gemini-2.5-flash",
+            "model_main": "gemini-3.8-flash",
         }
         with patch("src.api.settings_routes.llm_config._write_llm_settings"), \
              patch("src.api.settings_routes.llm_config.get_llm_settings", return_value=openai_llm_settings), \
              patch("src.api.settings_routes.llm_config.is_llm_configured", return_value=True), \
              patch("src.api.settings_routes.llm_config._save_profile"), \
-             patch("src.api.settings_routes.llm_config.hot_swap_llm_client", new=AsyncMock(return_value={"success": True, "client_type": "GeminiClient", "model": "gemini-2.5-flash"})), \
+             patch("src.api.settings_routes.llm_config.hot_swap_llm_client", new=AsyncMock(return_value={"success": True, "client_type": "GeminiClient", "model": "gemini-3.8-flash"})), \
              patch("src.api.settings_routes.llm_config.invalidate_query_cache_for_config_change", new=AsyncMock()), \
              patch("src.api.settings_routes.llm_config.reload_settings"), \
              patch("src.api.settings_routes.llm_config._validate_llm_models"):
@@ -375,13 +375,13 @@ class TestLLMConfigUnion:
         payload = {
             "provider": "gemini",
             "api_key": "sk-or-v1-xxx",  # wrong provider key
-            "model_main": "gemini-2.5-flash",
+            "model_main": "gemini-3.8-flash",
         }
         with patch("src.api.settings_routes.llm_config._write_llm_settings") as mock_write, \
              patch("src.api.settings_routes.llm_config.get_llm_settings", return_value=openai_llm_settings), \
              patch("src.api.settings_routes.llm_config.is_llm_configured", return_value=True), \
              patch("src.api.settings_routes.llm_config._save_profile"), \
-             patch("src.api.settings_routes.llm_config.hot_swap_llm_client", new=AsyncMock(return_value={"success": True, "client_type": "GeminiClient", "model": "gemini-2.5-flash"})), \
+             patch("src.api.settings_routes.llm_config.hot_swap_llm_client", new=AsyncMock(return_value={"success": True, "client_type": "GeminiClient", "model": "gemini-3.8-flash"})), \
              patch("src.api.settings_routes.llm_config.invalidate_query_cache_for_config_change", new=AsyncMock()), \
              patch("src.api.settings_routes.llm_config.reload_settings"), \
              patch("src.api.settings_routes.llm_config._validate_llm_models"):
@@ -398,13 +398,13 @@ class TestLLMConfigUnion:
             "provider": "openai_compatible",
             "api_key": "AIza-test-key",  # wrong provider key
             "base_url": "https://api.openai.com/v1",
-            "model_main": "gpt-4.1-mini",
+            "model_main": "gpt-6-luna",
         }
         with patch("src.api.settings_routes.llm_config._write_llm_settings") as mock_write, \
              patch("src.api.settings_routes.llm_config.get_llm_settings", return_value=openai_llm_settings), \
              patch("src.api.settings_routes.llm_config.is_llm_configured", return_value=True), \
              patch("src.api.settings_routes.llm_config._save_profile"), \
-             patch("src.api.settings_routes.llm_config.hot_swap_llm_client", new=AsyncMock(return_value={"success": True, "client_type": "OpenAICompatibleClient", "model": "gpt-4.1-mini"})), \
+             patch("src.api.settings_routes.llm_config.hot_swap_llm_client", new=AsyncMock(return_value={"success": True, "client_type": "OpenAICompatibleClient", "model": "gpt-6-luna"})), \
              patch("src.api.settings_routes.llm_config.invalidate_query_cache_for_config_change", new=AsyncMock()), \
              patch("src.api.settings_routes.llm_config.reload_settings"), \
              patch("src.api.settings_routes.llm_config._validate_llm_models"):
@@ -424,7 +424,7 @@ class TestLLMConfigUnion:
                 "provider": "gemini",
                 "api_key": "AIzaXXX",
                 "base_url": "https://openrouter.ai/api/v1",  # stale
-                "model_main": "gemini-2.5-flash",
+                "model_main": "gemini-3.8-flash",
                 "model_lite": None,
                 "model_relevance": None,
                 "organization": "org-123",  # stale
@@ -446,7 +446,7 @@ class TestLLMConfigUnion:
                 "provider": "gemini",
                 "api_key": "sk-or-v1-xxx",  # wrong provider
                 "base_url": None,
-                "model_main": "gemini-2.5-flash",
+                "model_main": "gemini-3.8-flash",
                 "model_lite": None,
                 "model_relevance": None,
                 "organization": None,

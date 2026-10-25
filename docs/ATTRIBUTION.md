@@ -125,6 +125,10 @@ derivatives and carry the same license.
 Credit line on the page (hero):
 > Photo by Jan Nyssen, CC BY-SA 4.0, via Wikimedia Commons.
 
+Note: an earlier draft used photographs extracted from the EthioTrees PDD and
+Annual Report PDFs. Those images are EthioTrees copyright with no public reuse
+license, so they were removed in favour of the Commons set above.
+
 ## Notes
 
 - These are real satellite images of the actual project locations, not field photographs.

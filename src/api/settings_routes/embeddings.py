@@ -9,6 +9,7 @@ from ...config import get_settings, reload_settings
 from ...db.app_settings import save_app_settings
 from ...utils.cache import invalidate_query_cache_for_config_change
 from .helpers import embedding_has_api_key
+from .llm_ollama import _validate_ollama_url
 
 router = APIRouter()
 
@@ -97,6 +98,9 @@ async def update_embedding_config(update: EmbeddingSettingsUpdate) -> EmbeddingS
             settings_dict["embedding_openai_api_key"] = update.api_key or None
         # Ollama doesn't need a key
 
+    if update.ollama_base_url:
+        # Same allowlist as the LLM Ollama endpoint: loopback :11434 only.
+        update.ollama_base_url = _validate_ollama_url(update.ollama_base_url)
     if update.ollama_base_url is not None:
         settings_dict["ollama_base_url"] = update.ollama_base_url or None
 

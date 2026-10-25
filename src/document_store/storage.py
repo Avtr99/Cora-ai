@@ -45,7 +45,6 @@ from .schema import (
     ensure_document_store_tables,
 )
 from .uploads import (
-    _EXPECTED_MIME_PREFIXES,
     _validate_upload_mime,
     normalize_tags,
     parse_tags,
@@ -60,7 +59,6 @@ __all__ = [
     "allowed_extensions",
     "_INTERRUPTED_STATUSES",
     "_SAFE_FILENAME_CHARS",
-    "_EXPECTED_MIME_PREFIXES",
     # repository
     "insert_document",
     "set_document_metadata",

@@ -91,6 +91,19 @@ def insert_document(record: DocumentRecord) -> None:
         conn.close()
 
 
+def corpus_stats() -> tuple[int, int]:
+    """Return (live document count, total size_bytes) for the upload quota."""
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            "SELECT COUNT(*) AS n, COALESCE(SUM(size_bytes), 0) AS total "
+            "FROM document_store_documents WHERE status != 'deleted'"
+        ).fetchone()
+        return int(row["n"]), int(row["total"])
+    finally:
+        conn.close()
+
+
 def update_document(
     record_id: str,
     *,

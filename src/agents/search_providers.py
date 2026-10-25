@@ -21,6 +21,15 @@ class SearchResult:
         self.published_date = published_date
 
 
+class NoopSearchProvider:
+    """Disabled provider for SEARCH_PROVIDER=none. Returns no results and
+    performs no egress. Reached only if a web route fires despite
+    ``enable_web_search=False`` (which ``SEARCH_PROVIDER=none`` implies)."""
+
+    async def search(self, query: str, max_results: int = 5) -> List["SearchResult"]:
+        return []
+
+
 class SearchProvider:
     """Abstract base for web search providers.
 
