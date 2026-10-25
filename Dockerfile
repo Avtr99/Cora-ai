@@ -93,14 +93,19 @@ RUN mkdir -p /app/data/documents/originals /app/data/documents/converted /app/da
 USER 1000:1000
 
 # Prebake Docling models into the image so the first PDF upload is fast and
-# works offline. Downloads layout + TableFormer + RapidOCR models (~700MB total)
+# works offline. Downloads layout + TableFormer + RapidOCR models (~540MB total)
 # that the standard route needs — skips the ~610MB CodeFormulaV2 and picture
 # classifier models that download_models() would pull by default but that are
 # never used (do_formula_enrichment=False, do_picture_description=False).
+# DOCLING_LAYOUT_ENGINE selects which layout repo is baked (onnxruntime |
+# transformers); it must match the runtime DOCUMENT_DOCLING_LAYOUT_ENGINE or
+# the layout model will be missing at first conversion.
 # Gated by INSTALL_INGESTION so query-only images stay small.
+ARG DOCLING_LAYOUT_ENGINE=onnxruntime
 COPY --chown=1000:1000 scripts/docker/download_docling_models.py ./scripts/docker/
 RUN if [ "$INSTALL_INGESTION" != "false" ]; then \
         mkdir -p /app/models/docling && \
+        DOCLING_LAYOUT_ENGINE=$DOCLING_LAYOUT_ENGINE \
         python scripts/docker/download_docling_models.py /app/models/docling; \
     fi
 

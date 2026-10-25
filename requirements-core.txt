@@ -73,7 +73,7 @@ urllib3>=2.8.0,<3.0           # 3 CVEs in 2.7.0 (cross-redirect cookie/header di
 requests>=2.33.0,<3.0         # 1 CVE in 2.32.5
 protobuf>=5.29.6               # 1 CVE in 5.29.5; let google packages pull compatible max
 jinja2>=3.1.6,<4.0             # 1 CVE in 3.1.5 (sandbox escape)
-pillow>=12.3.0,<13.0           # 12.3.0 has 35 CVEs (OOB reads, heap overflows, UAF) but docling-slim
-                               # requires pillow<13 — the 13.x fix is blocked until docling relaxes it
+pillow>=13.0.0,<14.0           # 12.x has 35 CVEs (OOB reads, heap overflows, UAF), fixed in 13.x;
+                               # docling-slim 2.142+ allows pillow<14
 authlib>=1.7.1,<2.0            # 6 CVEs in 1.6.6 (transitive)
 

@@ -8,12 +8,6 @@
 #
 # Verified against requirements-core.lock, requirements-ingestion.lock, and
 # requirements-ci.lock (regenerated 2026-07-30 with uv pip compile --upgrade).
-#
-# Strategy: [[PackageOverrides]] with vulnerability.ignore = true for each
-# package where the requirements.txt floor version differs from the lockfile
-# version. This tells osv-scanner to skip vulnerability checks for these
-# packages entirely, since the lockfiles (which have exact pins with hashes)
-# are the source of truth for what's actually installed.
 
 # --- False positives: packages where floor != actual lockfile version ---
 
@@ -118,12 +112,6 @@ vulnerability.ignore = true
 reason = "False positive — requirements.txt floor is 3.0.3, lockfile pins 3.0.5."
 
 [[PackageOverrides]]
-name = "pillow"
-ecosystem = "PyPI"
-vulnerability.ignore = true
-reason = "False positive — requirements.txt floor is 12.3.0, lockfile pins 12.3.0 — pillow>=13 blocked by docling-slim<13 constraint."
-
-[[PackageOverrides]]
 name = "protobuf"
 ecosystem = "PyPI"
 vulnerability.ignore = true
@@ -205,7 +193,7 @@ reason = "No fix available — accelerate 1.14.0 is the latest release. Transiti
 name = "docling"
 ecosystem = "PyPI"
 vulnerability.ignore = true
-reason = "False positive — lockfile pins 2.107.0. osv-scanner checks the floor of the bounded range in requirements-ingestion.txt."
+reason = "False positive — lockfile pins 2.142.1. osv-scanner checks the floor of the bounded range in requirements-ingestion.txt."
 
 [[PackageOverrides]]
 name = "httpx"

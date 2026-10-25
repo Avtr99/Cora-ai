@@ -29,4 +29,4 @@ export type {
 
 export { buildAgentReasoning } from './cora/agentReasoning';
 export { queryCoraStream, toCoraResponse, validateQueryResponse } from './cora/streaming';
-export { checkHealth } from './cora/healthCheck';
+export { checkHealth, getAppVersion } from './cora/healthCheck';

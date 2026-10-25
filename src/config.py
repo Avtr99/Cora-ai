@@ -238,10 +238,18 @@ class Settings(BaseSettings):
     # --- Docling standard (classical, non-VLM) PDF conversion ---
     # Formula/picture enrichment loads VLMs, so they are OFF by default (opt in via .env).
     DOCUMENT_DOCLING_OCR_ENGINE: str = "rapidocr"  # rapidocr | tesseract | onnxtr | easyocr
+    # Layout inference runtime: onnxruntime (~30% faster on CPU, identical output)
+    # or transformers (PyTorch eager). The Docker prebake ships the model repo for
+    # the default engine — switching at runtime needs the other repo downloaded.
+    DOCUMENT_DOCLING_LAYOUT_ENGINE: str = "onnxruntime"  # onnxruntime | transformers
     DOCUMENT_DOCLING_DO_OCR: bool = True
     DOCUMENT_DOCLING_DO_TABLES: bool = True
     # "fast" = 20% faster, ~70MB less RAM (see results/docling_benchmark_full/COMPARISON.md).
     DOCUMENT_DOCLING_TABLE_MODE: str = "fast"
+    # Opt-in: decode formula regions via Docling's built-in CodeFormulaV2 VLM
+    # (~610MB model, unstable on CPU). OFF by default — undecoded formulas emit
+    # a placeholder that _recover_flattened_formulas replaces with hedged
+    # flattened text-layer content (see converter.py).
     DOCUMENT_DOCLING_DO_FORMULAS: bool = False
     DOCUMENT_DOCLING_MAX_FILE_BYTES: int = 50 * 1024 * 1024
     # Docling returns PARTIAL_SUCCESS past this; we surface a clear timeout error instead of indexing partial docs.

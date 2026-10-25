@@ -1,7 +1,7 @@
 import { apiFetch } from '../apiFetch';
 import { HEALTH_CHECK_TIMEOUT_MS, HEALTH_ENDPOINT } from './config';
 
-export async function checkHealth(): Promise<{ status: string; reachable: boolean; httpStatus?: number }> {
+export async function checkHealth(): Promise<{ status: string; reachable: boolean; httpStatus?: number; version?: string }> {
   const healthUrl = HEALTH_ENDPOINT;
 
   const controller = new AbortController();
@@ -32,6 +32,7 @@ export async function checkHealth(): Promise<{ status: string; reachable: boolea
       status: data.status || 'unknown',
       reachable: true,
       httpStatus: response.status,
+      version: typeof data.version === 'string' ? data.version : undefined,
     };
   } catch (error) {
     console.error('Health check failed:', error);
@@ -39,4 +40,17 @@ export async function checkHealth(): Promise<{ status: string; reachable: boolea
   } finally {
     clearTimeout(timeoutId);
   }
+}
+
+let appVersionPromise: Promise<string | null> | null = null;
+
+// Deployed backend version from /health, memoized for the session so the UI
+// tracks the running release rather than the build-time __APP_VERSION__.
+// Plain fetch (not react-query): the footer also renders on static routes
+// that deliberately have no QueryClientProvider.
+export function getAppVersion(): Promise<string | null> {
+  if (!appVersionPromise) {
+    appVersionPromise = checkHealth().then((r) => (r.reachable ? (r.version ?? null) : null));
+  }
+  return appVersionPromise;
 }

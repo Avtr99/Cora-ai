@@ -67,7 +67,7 @@ const StaticTr = (props: React.HTMLAttributes<HTMLTableRowElement>) => (
   <tr className="even:bg-surface-subtle/60 transition-colors hover:bg-surface-subtle" {...props} />
 );
 const StaticTh = (props: React.ThHTMLAttributes<HTMLTableCellElement>) => (
-  <th className="px-4 3xl:px-5 py-2.5 3xl:py-3 text-left font-poppins font-semibold text-xs 3xl:text-sm 4xl:text-base uppercase tracking-[0.08em] text-text-muted" {...props} />
+  <th className="px-4 3xl:px-5 py-2.5 3xl:py-3 text-left font-inter font-semibold text-xs 3xl:text-sm 4xl:text-base uppercase tracking-[0.08em] text-text-muted" {...props} />
 );
 const StaticTd = (props: React.TdHTMLAttributes<HTMLTableCellElement>) => (
   <td className="px-4 3xl:px-5 py-2.5 3xl:py-3 font-inter text-sm 3xl:text-base 4xl:text-lg text-text-secondary leading-normal" {...props} />

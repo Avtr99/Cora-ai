@@ -33,13 +33,12 @@
   margin-bottom: 0.25rem;
 }
 
-.markdown-content h1, 
-.markdown-content h2, 
+.markdown-content h1,
+.markdown-content h2,
 .markdown-content h3,
-.markdown-content h4, 
-.markdown-content h5, 
+.markdown-content h4,
+.markdown-content h5,
 .markdown-content h6 {
-  font-family: 'Poppins', sans-serif;
   font-weight: 500;
   margin-bottom: 0.5rem;
   color: #111827; /* text-gray-900 for better contrast on light bubbles */
