@@ -11,12 +11,13 @@
 
 # Document Store PDF conversion (required for PDF ingestion)
 # Docling: standard/classical, non-VLM PDF pipeline (layout model + RapidOCR +
-# TableFormer). No VLM is loaded by default. Pinned per the 7-day release rule
-# (2.108.0 is <7 days old at pin time; 2.106.0 is the safe floor).
+# TableFormer). No VLM is loaded by default. 2.142.x is pinned inside the
+# 7-day release window on purpose: docling-slim 2.142+ relaxes pillow<13 to
+# pillow<14, unblocking the pillow 13.x CVE fix.
 # A/B OCR engines (optional, not installed by default):
 #   Tesseract: apt-get install tesseract-ocr tesseract-ocr-eng && pip install "docling[tesserocr]"
 #   OnnxTR:    pip install "docling-ocr-onnxtr[cpu]"
-docling[rapidocr]>=2.106.0,<2.108.0
+docling[rapidocr]>=2.142.0,<2.143.0
 
 # PyTorch CPU-only: Docling 2.107+ imports torch/torchvision unconditionally
 # (granite_vision.py, table_structure_model_v2.py) even when VLM features are
@@ -28,6 +29,9 @@ torchvision>=0.26.0,<1.0
 # PyMuPDF: page rendering for llm_api input (rasterizes PDF pages to PNG images).
 # The standard path no longer uses PyMuPDF — Docling handles text extraction.
 pymupdf>=1.24.0,<2.0
+# pix2tex was evaluated as a formula decoder and removed: ~1-in-4 usable decodes
+# on the VCM corpus (rest were syntactically broken or semantically wrong LaTeX).
+# Formula regions fall back to the hedged flattened-text splice in converter.py.
 
 # This lock installs on top of requirements-core.lock, which pins langgraph-sdk
 # (via langchain -> langgraph). langgraph-sdk requires websockets<16, but this
@@ -45,10 +49,10 @@ certifi>=2026.10.19
 pwdlib[argon2]>=0.3.1,<0.4
 limits>=5.8,<6
 
-# pillow: 12.3.0 has 35 CVEs but docling-slim requires pillow<13 — the 13.x
-# fix is blocked until docling relaxes the bound. Repeated from
-# requirements-core.txt so both lockfiles agree.
-pillow>=12.3.0,<13.0
+# pillow: 12.x has 35 CVEs (OOB reads, heap overflows, UAF), fixed in 13.x;
+# docling-slim 2.142+ allows pillow<14. Repeated from requirements-core.txt
+# so both lockfiles agree.
+pillow>=13.0.0,<14.0
 
 # Optional: FastEmbed local CPU embeddings
 # FastEmbed is NOT wired into the current provider factory (only voyage/cohere/ollama/openai

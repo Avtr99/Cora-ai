@@ -476,7 +476,7 @@ def _build_docling_converter():
 
         # VCM documents are English. Docling's default is Chinese, which would
         # download Chinese PP-OCRv4 models and produce worse OCR on English text.
-        pipeline_options.ocr_options = RapidOcrOptions(lang=["english"])
+        pipeline_options.ocr_options = RapidOcrOptions(lang=["en"])
     elif engine == "tesseract":
         from docling.datamodel.pipeline_options import TesseractOcrOptions
 
@@ -503,6 +503,29 @@ def _build_docling_converter():
         pipeline_options.table_structure_options.mode = TableFormerMode.FAST
     else:
         pipeline_options.table_structure_options.mode = TableFormerMode.ACCURATE
+
+    # Layout inference engine. OnnxRuntime runs the same Heron weights ~30%
+    # faster on CPU with byte-identical markdown (benchmarked on VCM docs).
+    layout_engine = settings.DOCUMENT_DOCLING_LAYOUT_ENGINE.lower()
+    if layout_engine in ("onnxruntime", "transformers"):
+        from docling.datamodel.object_detection_engine_options import (
+            OnnxRuntimeObjectDetectionEngineOptions,
+            TransformersObjectDetectionEngineOptions,
+        )
+        from docling.datamodel.pipeline_options import LayoutObjectDetectionOptions
+
+        layout_options = LayoutObjectDetectionOptions()
+        layout_options.engine_options = (
+            OnnxRuntimeObjectDetectionEngineOptions()
+            if layout_engine == "onnxruntime"
+            else TransformersObjectDetectionEngineOptions()
+        )
+        pipeline_options.layout_options = layout_options
+    else:
+        logger.warning(
+            "Unknown DOCUMENT_DOCLING_LAYOUT_ENGINE '%s'; using Docling default.",
+            layout_engine,
+        )
 
     # Pre-baked model artifacts (offline / Docker volume). When set, Docling loads
     # models from here instead of fetching on first use.
