@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.1.1](https://github.com/Avtr99/Cora-ai/compare/v4.1.0...v4.1.1) (2026-10-25)
+
+
+### Bug Fixes
+
+* **deps:** bump vite, dompurify, happy-dom for audit alerts ([174b608](https://github.com/Avtr99/Cora-ai/commit/174b60854a71ba605b20e40685c170d41af64ee4))
+* security hardening and review fixes across LLM, auth, uploads, and search ([94e147e](https://github.com/Avtr99/Cora-ai/commit/94e147ec52472eb5a4cec6b12c1b68931b4361ea))
+
 # [4.1.0](https://github.com/Avtr99/Cora-ai/compare/v4.0.1...v4.1.0) (2026-10-19)
 
 
