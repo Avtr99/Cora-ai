@@ -2,10 +2,11 @@ import uuid
 import logging
 from typing import Optional, List, Literal
 from pydantic import BaseModel, Field
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Request
 import sqlite3
 
 from ..db.database import get_connection
+from .auth.login_limiter import require_attempt
 from fastapi.concurrency import run_in_threadpool
 
 logger = logging.getLogger(__name__)
@@ -54,6 +55,11 @@ def _insert_feedback(payload: FeedbackPayload) -> str:
                 json.dumps(metadata) if metadata else None
             )
         )
+        # Rolling prune: bound the table on the persistent volume.
+        conn.execute(
+            "DELETE FROM feedback WHERE rowid NOT IN ("
+            "  SELECT rowid FROM feedback ORDER BY rowid DESC LIMIT 10000)"
+        )
         conn.commit()
         return feedback_id
     except sqlite3.Error as e:
@@ -67,8 +73,10 @@ def _insert_feedback(payload: FeedbackPayload) -> str:
 
 @router.post("/submit-feedback", status_code=201)
 @router.post("/feedback", status_code=201) # also support cleaner URL
-async def submit_feedback(payload: FeedbackPayload, background_tasks: BackgroundTasks):
+async def submit_feedback(payload: FeedbackPayload, background_tasks: BackgroundTasks, request: Request):
     """Submit user feedback for an AI response."""
+    # Unauthenticated write path: bound persistent DB writes per source.
+    require_attempt("feedback", request.client.host if request.client else "unknown")
     try:
         # Run DB operation in threadpool to avoid blocking event loop
         feedback_id = await run_in_threadpool(_insert_feedback, payload)

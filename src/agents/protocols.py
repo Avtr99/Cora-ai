@@ -115,7 +115,6 @@ class WebSearchProtocol(Protocol):
     async def search(
         self,
         query: str,
-        context: str = "",
         timeout_ms: Optional[int] = None,
     ) -> WebSearchResult:
         """Perform web search and return results."""

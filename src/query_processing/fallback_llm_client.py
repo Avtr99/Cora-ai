@@ -20,15 +20,20 @@ _QUOTA_PATTERNS = [
     re.compile(r"\b429\b"),
     re.compile(r"resource_exhausted"),
     re.compile(r"rate[_\s]limit"),
-    re.compile(r"quota"),
-    re.compile(r"circuit is open"),
+    # NOTE: 'circuit is open' is deliberately NOT a quota signal -- the circuit
+    # opens after ANY sustained failure (local endpoint down, DNS, TLS, 5xx),
+    # and falling back on outage would silently send private prompts to a
+    # third-party provider the operator did not select.
 ]
 
 
 def _is_quota_error(exception: Exception) -> bool:
     """Return True if the exception signals a quota/rate-limit error."""
     msg = str(exception).lower()
-    return any(pattern.search(msg) for pattern in _QUOTA_PATTERNS)
+    if any(pattern.search(msg) for pattern in _QUOTA_PATTERNS):
+        return True
+    # Bare 'quota' only when paired with a provider error shape.
+    return "insufficient" in msg and "quota" in msg
 
 
 class FallbackLLMClient(BaseRAGClient):
@@ -119,6 +124,7 @@ class FallbackLLMClient(BaseRAGClient):
         model: Optional[str] = None,
         temperature: float = 0.3,
         top_p: float = 0.9,
+        usage_out: Optional[list] = None,
     ) -> AsyncIterator[str]:
         """Stream text using the primary provider, falling back on the first quota error."""
         primary_iter = self.primary.generate_text_stream(
@@ -126,6 +132,7 @@ class FallbackLLMClient(BaseRAGClient):
             model=model,
             temperature=temperature,
             top_p=top_p,
+            usage_out=usage_out,
         )
         try:
             first_chunk = await primary_iter.__anext__()
@@ -137,6 +144,7 @@ class FallbackLLMClient(BaseRAGClient):
                     model=self.fallback.model_main,
                     temperature=temperature,
                     top_p=top_p,
+                    usage_out=usage_out,
                 ):
                     yield chunk
                 return

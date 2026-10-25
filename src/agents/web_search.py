@@ -5,6 +5,7 @@ Uses pluggable SearchProvider (default Tavily) and an LLM to answer web queries.
 """
 
 import asyncio
+import html
 import logging
 import re
 import copy
@@ -215,7 +216,11 @@ class WebSearchAgent:
         """
         self.llm = llm_client
         self.model_name = model_name
-        self.search_provider = search_provider or TavilySearchProvider()
+        # Explicit None check — a disabled provider (NoopSearchProvider) must
+        # not fall back to Tavily just because it is falsy-shaped.
+        self.search_provider = (
+            TavilySearchProvider() if search_provider is None else search_provider
+        )
         
         self._search_cache: TTLCache = TTLCache(maxsize=200, ttl=3600)
         self._timeout_cache: TTLCache = TTLCache(maxsize=100, ttl=120)
@@ -276,8 +281,8 @@ class WebSearchAgent:
             logger.warning("Scope gate check failed (%s); allowing query", e)
             return True
 
-    async def search(self, query: str, context: str = "", timeout_ms: int | None = None) -> WebSearchResult:
-        cache_key = self._cache_key("web_search", {"query": (query or "").strip().lower(), "context": (context or "").strip().lower()})
+    async def search(self, query: str, timeout_ms: int | None = None) -> WebSearchResult:
+        cache_key = self._cache_key("web_search", {"query": (query or "").strip().lower()})
 
         cached = self._get_cached(cache_key)
         if cached is not None:
@@ -293,7 +298,6 @@ class WebSearchAgent:
             return result
 
         try:
-            sanitized_context = sanitize_query(context) if context else ""
 
             # Fetch search results
             search_results = await self.search_provider.search(sanitized_query, max_results=5)
@@ -302,7 +306,7 @@ class WebSearchAgent:
             valid_source_ids = []
             search_results_text = "<search_results>\n"
             for res in search_results:
-                search_results_text += f"[{res.id}]\nTitle: {res.title}\nURL: {res.url}\nContent: {res.content}\n\n"
+                search_results_text += f"[{res.id}]\nTitle: {html.escape(res.title)}\nURL: {html.escape(res.url)}\nContent: {html.escape(res.content)}\n\n"
                 web_sources.append({"title": res.title, "url": res.url, "snippet": res.content, "type": "web_search", "id": res.id})
                 valid_source_ids.append(res.id)
             search_results_text += "</search_results>"
@@ -326,20 +330,17 @@ You are a helpful assistant with access to web search results.
 </system_role>
 
 <instructions>
-1. Answer directly and authoritatively. NEVER use introductory phrases like 'Based on web results' or 'According to search.'
-2. Rely entirely on the provided search results to answer the query.
-3. Cite your sources using the [Web, cite: N] format where N is the source number from the search results (e.g., [Web, cite: 1]). Do NOT invent new sources.
-4. Answer concisely for simple questions under 150 words.
-5. When the user asks for detail, provide a structured answer using markdown headers and bullet points up to 300-500 words.
-6. {quiz_instruction}
-7. {suggested_prompts_instruction}
+- Answer directly. Do not open with phrases like 'Based on web results' or 'According to search'.
+- Rely entirely on the provided search results to answer the query.
+- Cite your sources using the [Web, cite: N] format where N is the source number from the search results (e.g., [Web, cite: 1]). Do NOT invent new sources.
+- Write for a carbon market professional: precise, comprehensive, specific, with descriptive markdown headers and bullets.
+- Include every relevant concrete detail you find: figures, percentages, dates, programmes, standards. Prefer a specific fact over a general statement.
+- Simple questions: one focused paragraph. Detailed, comparative, or analytical questions: 300-550 words.
+- {quiz_instruction}
+- {suggested_prompts_instruction}
 </instructions>
 
 {search_results_text}
-
-<reference_data>
-{sanitized_context}
-</reference_data>
 
 <user_query>
 {sanitized_query}
@@ -443,7 +444,7 @@ You are a helpful assistant with access to web search results.
             valid_source_ids = []
             search_results_text = "<search_results>\n"
             for res in search_results:
-                search_results_text += f"[{res.id}]\nTitle: {res.title}\nURL: {res.url}\nContent: {res.content}\n\n"
+                search_results_text += f"[{res.id}]\nTitle: {html.escape(res.title)}\nURL: {html.escape(res.url)}\nContent: {html.escape(res.content)}\n\n"
                 web_sources.append({"title": res.title, "url": res.url, "snippet": res.content, "type": "web_search", "id": res.id})
                 valid_source_ids.append(res.id)
             search_results_text += "</search_results>"
@@ -460,17 +461,17 @@ You are an expert VCM assistant with access to web search results.
 </system_role>
 
 <instructions>
-1. Synthesis: Answer directly and authoritatively. Seamlessly merge the <reference_data> information with your web search results.
-2. No Preambles: NEVER use introductory phrases.
-3. Silent Sourcing:
+- Answer directly. Do not open with phrases like 'Based on web results' or 'According to search'.
+- Merge the <reference_data> with your search results into one answer, weaving reference facts in naturally without labelling where they came from.
+- Silent sourcing:
    - Cite web sources using the [Web, cite: N] format where N is the source number from the search results (e.g., [Web, cite: 1]).
    - Cite knowledge base sources using the [cite_kb: N] format where N is the source index from the <reference_data> <source index="N"> tags.
    - Do NOT invent new sources and do NOT combine KB and web citations into a single bracket.
-4. Formatting & Word Limits:
-   - Simple questions: Maximum 150 words.
-   - Detailed questions: MAXIMUM 600 words using markdown.
-5. {quiz_instruction}
-6. {suggested_prompts_instruction}
+- Write for a carbon market professional: precise, comprehensive, specific, with descriptive markdown headers and bullets.
+- Include every relevant concrete detail you find: figures, percentages, dates, programmes, standards. Prefer a specific fact over a general statement.
+- Simple questions: one focused paragraph. Detailed, comparative, or analytical questions: 300-550 words.
+- {quiz_instruction}
+- {suggested_prompts_instruction}
 </instructions>
 
 {search_results_text}

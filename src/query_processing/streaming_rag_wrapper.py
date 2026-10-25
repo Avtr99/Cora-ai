@@ -40,15 +40,20 @@ class StreamingRAGWrapper:
         """Delegate cache check to the base client."""
         return await self._base.check_query_cache(query)
 
-    async def generate_stream(self, prompt: str) -> AsyncGenerator[str, None]:
+    async def generate_stream(
+        self, prompt: str, usage_out: Optional[list] = None
+    ) -> AsyncGenerator[str, None]:
         """Stream content from a prompt, yielding text chunks.
 
         Prepends the VCM system instruction (same as the non-streaming path).
+        When ``usage_out`` is given, the underlying client appends a
+        normalized ``{"tokens_in", "tokens_out"}`` usage dict when it can
+        report one.
         """
         formatted_instruction = get_system_instruction().replace("{current_date}", _today_utc())
         full_prompt = f"{formatted_instruction}\n\n{prompt}"
 
-        async for chunk in self._base.generate_text_stream(full_prompt):
+        async for chunk in self._base.generate_text_stream(full_prompt, usage_out=usage_out):
             if chunk:
                 yield chunk
 
@@ -127,7 +132,11 @@ class StreamingRAGWrapper:
 
             accumulated_answer = ""
             chars_out = 0
-            async for chunk in self.generate_stream(prompt):
+            # The final stream chunk carries usage_metadata; it is captured
+            # into usage_out by generate_stream so the result can report real
+            # token counts (including gemini-3.x thought tokens).
+            usage_out: list = []
+            async for chunk in self.generate_stream(prompt, usage_out=usage_out):
                 accumulated_answer += chunk
                 chars_out += len(chunk)
                 yield {"type": "token", "chunk": chunk}
@@ -167,6 +176,16 @@ class StreamingRAGWrapper:
                 )
             )
 
+            usage = usage_out[0] if usage_out else None
+            if usage is not None:
+                tokens_in = usage["tokens_in"]
+                tokens_out = usage["tokens_out"]
+            else:
+                # No usage reported by the provider: fall back to the
+                # character-count proxy so meta stays meaningful.
+                tokens_in = None
+                tokens_out = chars_out
+
             result = {
                 "answer": answer_text,
                 "sources": sources if sources else ["knowledge_base"],
@@ -175,8 +194,8 @@ class StreamingRAGWrapper:
                 "context_citations": [c.to_dict() for c in ctx.citations],
                 "meta": {
                     "model": self._base.model_main,
-                    "tokens_in": None,
-                    "tokens_out": chars_out,
+                    "tokens_in": tokens_in,
+                    "tokens_out": tokens_out,
                 },
             }
 

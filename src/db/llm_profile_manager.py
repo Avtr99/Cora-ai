@@ -152,10 +152,10 @@ def resolve_default_models(provider: str, base_url: Optional[str], env_settings)
             host = ""
 
         if host == "openrouter.ai":
-            main = getattr(env_settings, "OPENROUTER_MODEL", None) or "google/gemini-2.5-flash"
+            main = getattr(env_settings, "OPENROUTER_MODEL", None) or "openai/gpt-6-luna"
             lite = getattr(env_settings, "OPENROUTER_MODEL_LITE", None) or main
         else:
-            main = getattr(env_settings, "OPENAI_MODEL", None) or "gpt-4.1-mini"
+            main = getattr(env_settings, "OPENAI_MODEL", None) or "gpt-6-luna"
             lite = getattr(env_settings, "OPENAI_MODEL_LITE", None) or main
         return main, lite
 
@@ -188,7 +188,7 @@ def detect_env_providers(env_settings) -> List[dict]:
             "model_main": main, "model_lite": lite,
         })
     if env_settings.OPENAI_API_KEY:
-        base_url = "https://api.openai.com/v1"
+        base_url = getattr(env_settings, "OPENAI_BASE_URL", None) or "https://api.openai.com/v1"
         main, lite = resolve_default_models("openai_compatible", base_url, env_settings)
         found.append({
             "label": "OpenAI", "slug": "openai", "provider": "openai_compatible",

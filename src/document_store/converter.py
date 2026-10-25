@@ -391,7 +391,7 @@ def _resolve_llm_provider() -> dict[str, Any]:
     api_key = llm_settings.get("api_key")
 
     if provider == "gemini" and api_key:
-        model = llm_settings.get("model_main") or "gemini-2.5-flash"
+        model = llm_settings.get("model_main") or "gemini-3.8-flash"
         return {
             "provider": "gemini",
             "api_key": api_key,
@@ -404,7 +404,7 @@ def _resolve_llm_provider() -> dict[str, Any]:
         base_url = llm_settings.get("base_url") or "https://api.openai.com/v1"
         if not base_url.endswith("/chat/completions"):
             base_url = base_url.rstrip("/") + "/chat/completions"
-        model = llm_settings.get("model_main") or "gpt-4.1-mini"
+        model = llm_settings.get("model_main") or "gpt-6-luna"
         return {
             "provider": "openai",
             "api_key": api_key,
@@ -455,10 +455,10 @@ def get_conversion_capabilities() -> dict[str, Any]:
     settings = get_settings()
     llm = _resolve_llm_provider()
 
-    # Cost estimates (verified June 2026):
-    #   Gemini 2.5 Flash:  $0.30/M input, $2.50/M output → ~$0.002/page
-    #   GPT-4.1-mini:      $0.40/M input, $1.60/M output → ~$0.002/page
-    llm_cost = "~$0.002 per page" if llm["available"] else "—"
+    # Cost estimates (verified October 2026):
+    #   Gemini 3.8 Flash:  $0.825/M input, $4.125/M output → ~$0.004/page
+    #   GPT-6 Luna:        $0.10/M input, $0.50/M output → ~$0.001/page
+    llm_cost = "~$0.001-0.004 per page (model-dependent)" if llm["available"] else "—"
 
     # ponytail: surface the server's actual upload constraints so the frontend
     # doesn't have to hardcode a parallel list. Single source of truth.
@@ -562,11 +562,11 @@ async def _convert_pdf_with_llm_api(path: Path) -> ConversionResult:
         reraise=True,
     )
     async def _convert_page(client: httpx.AsyncClient, img_b64: str) -> str:
-        # Reasoning models (GPT-5.x, o1/o3/o4) reject temperature and max_tokens.
-        # Detect by model name and adapt the payload accordingly.
+        # Reasoning models (GPT-5.x/6.x, o1/o3/o4, gemini-3.x) reject
+        # temperature and max_tokens — detect by model name and adapt.
         lower_model = (model or "").lower()
         bare_model = lower_model.rsplit("/", 1)[-1]
-        is_reasoning = any(bare_model.startswith(p) for p in ("gpt-5", "o1", "o3", "o4"))
+        is_reasoning = any(bare_model.startswith(p) for p in ("gpt-5", "gpt-6", "o1", "o3", "o4", "gemini-3"))
         payload: dict[str, Any] = {
             "model": model,
             "messages": [

@@ -5,6 +5,7 @@ Validates that generated answers are grounded in the provided sources.
 This is an optional step that can be skipped for speed when confidence is high.
 """
 
+import html
 import json
 import logging
 import re
@@ -108,7 +109,7 @@ class AnswerValidator:
         """
         self.llm = llm_client
         
-        # Use main model (2.5 Flash) for deep validation - requires higher accuracy.
+        # Use main model (3.x Flash) for deep validation - requires higher accuracy.
         # None means use the client's default main model.
         self.model_name = model_name
         
@@ -157,11 +158,11 @@ class AnswerValidator:
         try:
             # Format sources for prompt
             sources_text = "\n\n".join([
-                f"Source {i+1}:\n{src[:SOURCE_SNIPPET_MAX_CHARS]}"  # Limit each source
+                f"Source {i+1}:\n{html.escape(src[:SOURCE_SNIPPET_MAX_CHARS])}"  # Limit each source
                 for i, src in enumerate(sources[:MAX_VALIDATION_SOURCES])  # Max 5 sources
             ])
 
-            truncated_answer = answer[:ANSWER_VALIDATION_MAX_CHARS]
+            truncated_answer = html.escape(answer[:ANSWER_VALIDATION_MAX_CHARS])
             base_prompt = (
                 f"{VALIDATION_INSTRUCTIONS}\n\n"
                 f"<user_query>\n"
@@ -347,7 +348,7 @@ class AnswerValidator:
                     )
 
             if source_titles:
-                titles = "\n".join(f"- {t[:150]}" for t in source_titles[:MAX_SOURCE_TITLES] if t)
+                titles = "\n".join(f"- {html.escape(t[:150])}" for t in source_titles[:MAX_SOURCE_TITLES] if t)
                 if titles:
                     source_parts.append(f"Source document titles:\n{titles}")
 
@@ -356,8 +357,10 @@ class AnswerValidator:
                 sources_section = "\n" + "\n\n".join(source_parts) + "\n"
 
             prompt = RELEVANCE_CHECK_PROMPT.format(
-                query=query[:RELEVANCE_QUERY_MAX_CHARS],
-                answer=answer[:ANSWER_VALIDATION_MAX_CHARS],
+                query=html.escape(query[:RELEVANCE_QUERY_MAX_CHARS]),
+                answer=html.escape(answer[:ANSWER_VALIDATION_MAX_CHARS]),
+                # chunks arrive escaped from extract_source_chunks; titles
+                # escaped above -- escaping the section again would double-escape.
                 sources_section=sources_section,
             )
 

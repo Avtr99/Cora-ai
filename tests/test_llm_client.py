@@ -18,13 +18,24 @@ class TestGeminiClientModelSanitization:
 
     @patch("src.query_processing.gemini_client.get_settings", return_value=_empty_settings())
     def test_uses_valid_short_model(self, _mock):
-        client = GeminiClient(api_key="test", model_main="gemini-2.5-flash")
-        assert client.model_main == "gemini-2.5-flash"
+        client = GeminiClient(api_key="test", model_main="gemini-3.8-flash")
+        assert client.model_main == "gemini-3.8-flash"
 
     @patch("src.query_processing.gemini_client.get_settings", return_value=_empty_settings())
     def test_uses_valid_models_path(self, _mock):
-        client = GeminiClient(api_key="test", model_main="models/gemini-2.5-flash")
-        assert client.model_main == "models/gemini-2.5-flash"
+        client = GeminiClient(api_key="test", model_main="models/gemini-3.8-flash")
+        assert client.model_main == "models/gemini-3.8-flash"
+
+    @patch("src.query_processing.gemini_client.get_settings", return_value=_empty_settings())
+    def test_falls_back_for_retired_model(self, _mock):
+        """Retired gemini-1.x/2.x IDs are rejected and fall back to the env default."""
+        client = GeminiClient(
+            api_key="test",
+            model_main="gemini-2.5-flash",
+            model_lite="gemini-2.5-flash-lite",
+        )
+        assert client.model_main == "gemini-3.8-flash"
+        assert client.model_lite == "gemini-3.5-flash-lite"
 
     @patch("src.query_processing.gemini_client.get_settings", return_value=_empty_settings())
     def test_falls_back_for_openrouter_prefixed_model(self, _mock):
@@ -33,13 +44,13 @@ class TestGeminiClientModelSanitization:
             model_main="google/gemini-2.5-flash",
             model_lite="google/gemini-2.5-flash",
         )
-        assert client.model_main == "gemini-2.5-flash"
-        assert client.model_lite == "gemini-2.5-flash-lite"
+        assert client.model_main == "gemini-3.8-flash"
+        assert client.model_lite == "gemini-3.5-flash-lite"
 
     @patch("src.query_processing.gemini_client.get_settings", return_value=_empty_settings())
     def test_falls_back_for_gpt_model(self, _mock):
         client = GeminiClient(api_key="test", model_main="gpt-4.1-mini")
-        assert client.model_main == "gemini-2.5-flash"
+        assert client.model_main == "gemini-3.8-flash"
 
 
 class TestOpenAICompatibleClientModelSanitization:
@@ -66,7 +77,7 @@ class TestOpenAICompatibleClientModelSanitization:
             base_url="https://openrouter.ai/api/v1",
             model_main="gemini-2.5-flash",
         )
-        assert client.model_main == "google/gemini-2.5-flash"
+        assert client.model_main == "openai/gpt-6-luna"
 
     @patch("src.query_processing.openai_client.get_settings", return_value=_empty_settings())
     def test_falls_back_for_bare_gemini_on_openai(self, _mock):
@@ -75,7 +86,7 @@ class TestOpenAICompatibleClientModelSanitization:
             base_url="https://api.openai.com/v1",
             model_main="gemini-2.5-flash",
         )
-        assert client.model_main == "gpt-4.1-mini"
+        assert client.model_main == "gpt-6-luna"
 
 
 class TestLLMFactoryModelSanitization:
@@ -94,8 +105,8 @@ class TestLLMFactoryModelSanitization:
                 "organization": None,
             }
         )
-        assert client.model_main == "gemini-2.5-flash"
-        assert client.model_lite == "gemini-2.5-flash-lite"
+        assert client.model_main == "gemini-3.8-flash"
+        assert client.model_lite == "gemini-3.5-flash-lite"
 
     @patch("src.query_processing.openai_client.get_settings", return_value=_empty_settings())
     def test_create_single_client_sanitizes_openai_bare_gemini_model(self, _mock):
@@ -110,5 +121,5 @@ class TestLLMFactoryModelSanitization:
                 "organization": None,
             }
         )
-        assert client.model_main == "google/gemini-2.5-flash"
-        assert client.model_lite == "google/gemini-2.5-flash"
+        assert client.model_main == "openai/gpt-6-luna"
+        assert client.model_lite == "openai/gpt-6-luna"

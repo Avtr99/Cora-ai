@@ -63,6 +63,13 @@ def create_job(document_id: str, action: str, message: Optional[str] = None) -> 
                 "INSERT INTO document_store_jobs (id, document_id, action, status, message) VALUES (?, ?, ?, ?, ?)",
                 (job.id, job.document_id, job.action, job.status, job.message),
             )
+            # Rolling prune: bound the table on the persistent volume.
+            conn.execute(
+                "DELETE FROM document_store_jobs WHERE status IN ('completed', 'failed') "
+                "AND rowid NOT IN ("
+                "  SELECT rowid FROM document_store_jobs "
+                "  WHERE status IN ('completed', 'failed') ORDER BY rowid DESC LIMIT 1000)"
+            )
     finally:
         conn.close()
     return job

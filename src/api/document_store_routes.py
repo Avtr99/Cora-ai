@@ -4,11 +4,12 @@ import uuid
 from pathlib import Path
 from typing import Literal
 
-from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 from loguru import logger
 
 from ..config import get_settings
+from .auth.session_auth import require_owner_for_writes
 from ..document_store.jobs import (
     delete_document_job,
     process_document_job,
@@ -29,7 +30,11 @@ from ..document_store.storage import (
     update_document,
 )
 
-router = APIRouter(prefix="/documents", tags=["documents"])
+router = APIRouter(
+    prefix="/documents",
+    tags=["documents"],
+    dependencies=[Depends(require_owner_for_writes)],
+)
 
 
 class DocumentResponse(BaseModel):

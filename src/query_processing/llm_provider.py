@@ -89,6 +89,7 @@ class LLMClient(Protocol):
         model: Optional[str] = None,
         temperature: float = 0.3,
         top_p: float = 0.9,
+        usage_out: Optional[list] = None,
     ) -> AsyncIterator[str]:
         """Stream text chunks from a prompt.
 
@@ -99,6 +100,12 @@ class LLMClient(Protocol):
             model: Model name override. Defaults to ``self.model_main``.
             temperature: Sampling temperature.
             top_p: Nucleus sampling parameter.
+            usage_out: Optional mutable list. Providers that can report usage
+                replace its contents with a single normalized dict
+                ``{"tokens_in": int, "tokens_out": int}`` once the stream
+                finishes (reasoning/thought tokens are included in
+                ``tokens_out``). Providers without usage reporting leave it
+                empty.
 
         Yields:
             Text chunks as they arrive from the model.

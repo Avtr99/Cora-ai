@@ -261,7 +261,8 @@ class QueryRewriterAgent:
         Args:
             llm_client: LLMClient instance used to generate text
             model_name: Optional model to use for rewriting; if None the
-                client's default model is used
+                client's lite model is used (rewrites — acronym expansion,
+                filter extraction, sub-queries — are low-latency work)
         """
         self.llm = llm_client
         self.model_name = model_name
@@ -352,10 +353,12 @@ class QueryRewriterAgent:
                 allowed_fields=", ".join(sanitized_fields) if sanitized_fields else "(none)"
             )
             
-            # Generate rewritten query via LLM client
+            # Generate rewritten query via LLM client. model=None resolves to
+            # the client's lite model (rewriting is lite-tier work like routing).
+            resolved_model = self.model_name or getattr(self.llm, "model_lite", None)
             result_text = await self.llm.generate_text(
                 prompt,
-                model=self.model_name,
+                model=resolved_model,
                 temperature=0.1,
                 top_p=0.8,
                 json_mode=True,

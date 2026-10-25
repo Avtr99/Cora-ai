@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     VOYAGE_API_KEY: Optional[str] = None  # .env fallback (LLM env detection)
     COHERE_API_KEY: Optional[str] = None  # .env fallback (LLM env detection)
     OPENAI_API_KEY: Optional[str] = None  # .env fallback (LLM env detection)
+    OPENAI_BASE_URL: Optional[str] = None  # e.g. http://localhost:8001/v1 for local vLLM
     OPENROUTER_API_KEY: Optional[str] = None  # OpenRouter multi-provider gateway
 
     # Scoped API keys — written by the embeddings/reranker Settings UI routes and
@@ -38,7 +39,7 @@ class Settings(BaseSettings):
     # --- OpenAI-compatible model overrides (optional; defaults are tested recommendations) ---
     # When set, these override the hardcoded defaults used by env-provider detection
     # and the fallback client builder. Users can point OpenRouter at any model the
-    # gateway serves (e.g. "openai/gpt-4.1-mini", "anthropic/claude-3.5-sonnet").
+    # gateway serves (e.g. "openai/gpt-6-luna", "anthropic/claude-3.5-sonnet").
     OPENAI_MODEL: Optional[str] = None
     OPENAI_MODEL_LITE: Optional[str] = None
     OPENROUTER_MODEL: Optional[str] = None
@@ -58,8 +59,16 @@ class Settings(BaseSettings):
     RERANK_MODEL: str = "rerank-2.5"
 
     # --- LLM models (main for answers, lite for routing/validation) ---
-    GEMINI_MODEL_MAIN: str = "gemini-2.5-flash"
-    GEMINI_MODEL_LITE: str = "gemini-2.5-flash-lite"
+    # Note: gemini-2.5-flash/flash-lite were retired on 2026-10-20.
+    # gemini-3.x models reject temperature/top_p/top_k; reasoning effort is set
+    # via GEMINI_THINKING_LEVEL (see src/utils/gemini_config.py).
+    GEMINI_MODEL_MAIN: str = "gemini-3.8-flash"  # Main model for answer generation
+    GEMINI_MODEL_LITE: str = "gemini-3.5-flash-lite"  # Lite model for routing, validation, classification
+    # Typed per-model constraints: 3.8 Flash rejects MINIMAL (HTTP 400); 3.5
+    # Flash-Lite defaults to MINIMAL, so None sends no ThinkingConfig and stays
+    # valid for any GEMINI_MODEL_LITE.
+    GEMINI_THINKING_LEVEL: Literal["LOW", "MEDIUM", "HIGH"] = "LOW"
+    GEMINI_THINKING_LEVEL_LITE: Optional[Literal["MINIMAL", "LOW", "MEDIUM", "HIGH"]] = None
 
     # --- Qdrant (local Docker; no API key needed) ---
     QDRANT_URL: Optional[str] = None  # Required for vector store, validated on use
@@ -165,6 +174,11 @@ class Settings(BaseSettings):
     AUTH_COOKIE_SECURE: bool = True  # Set false only for plain-HTTP testing (Safari on http://localhost, LAN IPs)
     ENABLE_TEST_ENDPOINT: bool = False  # Dev-only test query endpoint
     MAX_REQUEST_BODY_SIZE_BYTES: int = 5 * 1024 * 1024
+    # Comma-separated proxy IPs whose X-Forwarded-For headers are trusted
+    # (uvicorn `forwarded_allow_ips`). Set to the Docker bridge gateway or the
+    # proxy's IP when a reverse proxy fronts the app — otherwise rate limits
+    # and auth logs see the proxy IP, not the client.
+    FORWARDED_ALLOW_IPS: str = "127.0.0.1"
 
     # --- Logging ---
     LOG_LEVEL: str = "INFO"
@@ -172,8 +186,10 @@ class Settings(BaseSettings):
 
     # --- Conversational handler ---
     CONVERSATIONAL_INTENT_CACHE_SIZE: int = 512
-    CONVERSATIONAL_INTENT_MAX_TOKENS: int = 5
-    CONVERSATIONAL_MAX_OUTPUT_TOKENS: int = 150
+    # Token caps are upper bounds and must cover gemini-3.x thought tokens,
+    # which count toward max_output_tokens even at LOW thinking level.
+    CONVERSATIONAL_INTENT_MAX_TOKENS: int = 512
+    CONVERSATIONAL_MAX_OUTPUT_TOKENS: int = 512
 
     # --- Web search ---
     SEARCH_PROVIDER: str = "tavily"
@@ -188,6 +204,8 @@ class Settings(BaseSettings):
     ALLOWED_DOCUMENT_DIRS: str = "./data,./uploads"  # Comma-separated allowed base directories
     DOCUMENT_STORE_ROOT: str = "./data/documents"
     DOCUMENT_UPLOAD_MAX_BYTES: int = 50 * 1024 * 1024
+    DOCUMENT_STORE_MAX_BYTES: int = 20 * 1024 * 1024 * 1024  # corpus ceiling
+    DOCUMENT_STORE_MAX_DOCUMENTS: int = 10000  # document-count ceiling
     DOCUMENT_ALLOWED_EXTENSIONS: str = ".pdf,.md,.txt,.csv,.json,.jsonl"
     # Used by `llm_api` mode only; `standard` mode extracts text directly. 200 = accuracy/speed trade-off.
     DOCUMENT_PDF_RENDER_DPI: int = 200

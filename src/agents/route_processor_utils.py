@@ -9,6 +9,7 @@ Utility functions for route processing:
 """
 
 import asyncio
+import html
 import logging
 import time
 from typing import Any, AsyncGenerator, Dict, List, Optional, Union
@@ -421,7 +422,9 @@ def extract_source_chunks(
     for i, doc in enumerate(documents[:max_chunks]):
         if not doc:
             continue
-        text = str(doc)[:max_chars_per_chunk]
+        # Escaped at the producer so corpus text can never forge prompt
+        # delimiters in the relevance-judge prompt downstream.
+        text = html.escape(str(doc)[:max_chars_per_chunk])
         metadata = metadatas[i] if i < len(metadatas) else {}
         source_name = ""
         if isinstance(metadata, dict):
@@ -429,7 +432,7 @@ def extract_source_chunks(
             source_name = clean_source_display_name(source_name)
         prefix = f"Source {i + 1}"
         if source_name:
-            prefix += f" ({source_name})"
+            prefix += f" ({html.escape(source_name)})"
         chunks.append(f"{prefix}:\n{text}")
     return chunks
 

@@ -95,7 +95,7 @@ fits your budget, latency, and sovereignty requirements — from all-cloud to fu
 
 | Layer | Default | Alternatives | Config |
 |---|---|---|---|
-| **LLM** (answers, routing, rewriting) | Google Gemini (`gemini-2.5-flash`) | OpenAI `gpt-4.1-mini`, OpenRouter (any model), Ollama / vLLM / LM Studio (local). Override Gemini models with `GEMINI_MODEL_MAIN` / `GEMINI_MODEL_LITE`; set local/base URL and model through the `/setup` UI. | `GEMINI_API_KEY`, `OPENAI_API_KEY`, `OPENROUTER_API_KEY` |
+| **LLM** (answers, routing, rewriting) | Google Gemini (`gemini-3.8-flash`) | OpenAI `gpt-6-luna`, OpenRouter (any model), Ollama / vLLM / LM Studio (local). Override Gemini models with `GEMINI_MODEL_MAIN` / `GEMINI_MODEL_LITE`; set local/base URL and model through the `/setup` UI. | `GEMINI_API_KEY`, `OPENAI_API_KEY`, `OPENROUTER_API_KEY` |
 | **Embeddings** | Voyage AI (`voyage-4-lite`, 1024d) | Cohere `embed-v4.0`, OpenAI `text-embedding-3-small`, Ollama (`bge-large-en-v1.5`, `nomic-embed-text`, …). The Voyage 4 series (`voyage-4-large`, `voyage-4`, `voyage-4-lite`, `voyage-4-nano`) shares one embedding space, so you can mix models without re-indexing. | `EMBEDDING_PROVIDER`, `EMBEDDING_MODEL`, `EMBEDDING_DIM` |
 | **Reranker** | Voyage AI (`rerank-2.5`) | Cohere rerank models, `none` (skip — fully offline) | `RERANK_PROVIDER`, `RERANK_MODEL` |
 | **Web search** | Tavily | Disable with `ENABLE_WEB_SEARCH=false` | `SEARCH_PROVIDER`, `ENABLE_WEB_SEARCH` |
@@ -118,7 +118,7 @@ VOYAGE_API_KEY=...
 TAVILY_API_KEY=...
 ```
 When `OPENAI_API_KEY` is set, the backend defaults to the official OpenAI endpoint and the
-`gpt-4.1-mini` model. You can override the endpoint or model via **Settings → AI Model** in the UI.
+`gpt-6-luna` model. You can override the endpoint or model via **Settings → AI Model** in the UI.
 
 **OpenRouter (multi-provider routing):**
 ```env
@@ -126,10 +126,10 @@ OPENROUTER_API_KEY=...
 VOYAGE_API_KEY=...
 TAVILY_API_KEY=...
 ```
-OpenRouter is auto-detected and defaults to `google/gemini-2.5-flash`. You can switch to any
+OpenRouter is auto-detected and defaults to `openai/gpt-6-luna`. You can switch to any
 OpenRouter model through **Settings → AI Model** in the UI. Browse the full catalog at
 https://openrouter.ai/models — the model slug is the provider-prefixed ID shown there
-(e.g. `openai/gpt-4.1-mini`). Model availability changes frequently, so pick a current slug
+(e.g. `openai/gpt-6-luna`). Model availability changes frequently, so pick a current slug
 from the catalog rather than relying on a fixed example.
 
 **Fully offline (no API keys, no data leaves the machine):**
@@ -473,11 +473,11 @@ every option. The most important ones:
 | Variable | Why you need it |
 |---|---|
 | `GEMINI_API_KEY` | Use Google Gemini (default). Models configurable via `GEMINI_MODEL_MAIN` / `GEMINI_MODEL_LITE`. |
-| `OPENAI_API_KEY` | Use the OpenAI API. Defaults to `gpt-4.1-mini`; override model/base URL in the AI Model settings. |
-| `OPENROUTER_API_KEY` | Use OpenRouter. Defaults to `google/gemini-2.5-flash`; switch models in the AI Model settings. |
+| `OPENAI_API_KEY` | Use the OpenAI API. Defaults to `gpt-6-luna`; override model/base URL in the AI Model settings. |
+| `OPENROUTER_API_KEY` | Use OpenRouter. Defaults to `openai/gpt-6-luna`; switch models in the AI Model settings. |
 | `EMBEDDING_PROVIDER` | `voyage` (default), `cohere`, `openai`, or `ollama` (local). |
 | `RERANK_PROVIDER` | `voyage` (default), `cohere`, or `none`. |
-| `SEARCH_PROVIDER` | `tavily` (default) or `none`. `none` falls back to Tavily when `ENABLE_WEB_SEARCH=true`; set `ENABLE_WEB_SEARCH=false` to disable web search entirely. |
+| `SEARCH_PROVIDER` | `tavily` (default) or `none`. `none` disables web search entirely (no provider egress); `ENABLE_WEB_SEARCH=false` does the same. |
 | `DATABASE_URL` | SQLite database path. `sqlite:///data/cora.db` for local dev, `sqlite:////app/db/cora.db` in Docker (named volume). |
 | `SQLITE_JOURNAL_MODE` | `WAL` (default) for both local dev and Docker. The Docker named volume supports WAL's shared-memory requirement. |
 | `QDRANT_COLLECTION_NAME` | Name of the Qdrant collection. Default is `cora_dense_only`. |

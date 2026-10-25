@@ -37,6 +37,9 @@ jobs:
           pip install --require-hashes -r requirements-ci.lock \
             --extra-index-url https://download.pytorch.org/whl/cpu
 
+      - name: Check lockfile floor/pin consistency
+        run: python scripts/ci/check_lock_consistency.py
+
       - name: Run pre-commit hooks
         uses: pre-commit/action@646c83fcd040023954eafda54b4db0192ce70507 # v3.0.0
 

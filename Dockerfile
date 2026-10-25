@@ -42,7 +42,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     libglib2.0-0 \
     libgl1 \
-    libmagic1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies first (better layer caching)
@@ -72,7 +71,8 @@ ARG INSTALL_INGESTION=true
 COPY requirements-ingestion.lock .
 RUN if [ "$INSTALL_INGESTION" != "false" ]; then \
         pip install --no-cache-dir --require-hashes -r requirements-ingestion.lock \
-            --extra-index-url https://download.pytorch.org/whl/cpu; \
+            --extra-index-url https://download.pytorch.org/whl/cpu && \
+        pip check; \
     fi
 
 # Create non-root user and writable data/model directories.

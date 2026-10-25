@@ -73,7 +73,12 @@ async def _build_orchestrator(client):
         kb_min_top_relevance_score=get_collection_threshold(
             settings, "KB_MIN_TOP_RELEVANCE_SCORE"
         ),
-        enable_web_search=settings.ENABLE_WEB_SEARCH,
+        # SEARCH_PROVIDER=none means no provider exists: web routing is off
+        # entirely, not just "search returns nothing".
+        enable_web_search=(
+            settings.ENABLE_WEB_SEARCH
+            and settings.SEARCH_PROVIDER.strip().lower() != "none"
+        ),
         enable_web_supplement_relevance_check=settings.ENABLE_WEB_SUPPLEMENT_RELEVANCE_CHECK,
         web_supplement_relevance_confidence_threshold=getattr(
             settings,
