@@ -10,7 +10,7 @@
   },
   "devDependencies": {
     "@release-it/conventional-changelog": "^11.0.1",
-    "release-it": "^20.2.1"
+    "release-it": "^21.1.2"
   },
   "overrides": {
     "basic-ftp": "^6.2.2",
