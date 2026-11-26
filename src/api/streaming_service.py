@@ -16,14 +16,18 @@ from loguru import logger
 from ..config import get_settings
 from ..db.chats import answer_id
 from ..db.revisions import get_revisions
-from ..agents.reasoning_formatter import create_timeout_response
+from ..agents.reasoning_formatter import (
+    AgentStep,
+    create_timeout_response,
+    format_reasoning_steps,
+)
 from .lifespan import (
     get_gemini_client,
     get_rag_orchestrator,
     get_retriever,
 )
 from .middleware import ThreatLevel, get_input_sanitizer, get_output_sanitizer, OutputSanitizer
-from .query_history import TurnContext, close_turn
+from .query_history import TurnContext, close_turn, is_storable
 from .query_models import Query, Response
 from .query_sanitization import (
     log_blocked_threat,
@@ -35,10 +39,62 @@ from .query_sanitization import (
 )
 
 
+def _sanitize_reasoning_steps(
+    formatted_steps: List[Dict[str, Any]],
+    output_sanitizer: OutputSanitizer,
+    include_duration_ms: bool,
+) -> List[Dict[str, Any]]:
+    """Sanitize formatted reasoning steps for the wire.
+
+    Shared by the ``result`` payload and terminal ``error`` events so both
+    carry identically-shaped partial traces.
+    """
+    sanitized_steps = []
+    for step in formatted_steps:
+        sanitized_step = {
+            "name": step.get("name") or "unknown",
+            "status": step.get("status") or "completed",
+            "details": sanitize_value(step.get("details", {}), output_sanitizer),
+        }
+        if include_duration_ms:
+            sanitized_step["duration_ms"] = step.get("duration_ms")
+        sanitized_steps.append(sanitized_step)
+    return sanitized_steps
+
+
+def _terminal_error_event(
+    message: str,
+    *,
+    error_id: str,
+    steps: List[AgentStep],
+    include_reasoning: bool,
+    include_duration_ms: bool,
+    output_sanitizer: OutputSanitizer,
+) -> Dict[str, Any]:
+    """Build a terminal SSE error event.
+
+    Attaches the partial reasoning trace (formatted and sanitized exactly like
+    the ``result`` path) so the client can show which stage failed.
+    """
+    event: Dict[str, Any] = {
+        "event": "error",
+        "error_id": error_id,
+        "message": message,
+    }
+    if include_reasoning and steps:
+        sanitized_steps = _sanitize_reasoning_steps(
+            format_reasoning_steps(steps), output_sanitizer, include_duration_ms
+        )
+        if sanitized_steps:
+            event["reasoning_steps"] = sanitized_steps
+    return event
+
+
 async def _drain_orchestrator_stream(
     stream_gen: AsyncGenerator[Dict[str, Any], None],
     output_sanitizer: OutputSanitizer,
     final_result_holder: List[Optional[Dict[str, Any]]],
+    terminal_error: Optional[List[bool]] = None,
     emit_tokens: bool = True,
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """Consume orchestrator stream events and yield SSE-formatted dict events.
@@ -46,13 +102,17 @@ async def _drain_orchestrator_stream(
     Translates the orchestrator's internal ``{"type": ...}`` events into the
     SSE event dicts emitted by the streaming endpoint. The final result, if
     produced, is stored into ``final_result_holder[0]`` so the caller can
-    access it after the stream is exhausted.
+    access it after the stream is exhausted. ``{"type": "error"}`` events are
+    captured the same way as finals and flagged via ``terminal_error`` so the
+    caller can end the stream with an error event.
 
     Args:
         stream_gen: Async generator from ``rag_orchestrator.process_stream``.
         output_sanitizer: Output sanitizer used to redact token chunks.
         final_result_holder: Single-element list used as a mutable out-param
             for the final result dict.
+        terminal_error: Single-element list set to True when the stream ends
+            with an internal ``error`` event rather than ``final``.
         emit_tokens: When False, skip ``token`` and ``replace`` events (the
             orchestrator still consumes its internal stream to produce the
             ``final`` result, but no token events are forwarded to the client).
@@ -73,8 +133,10 @@ async def _drain_orchestrator_stream(
                 sanitized_chunk, _ = output_sanitizer.sanitize(chunk)
                 if sanitized_chunk:
                     yield {"event": "token", "chunk": sanitized_chunk}
-        elif etype == "final":
+        elif etype in ("final", "error"):
             final_result_holder[0] = event.get("result", {}) or {}
+            if terminal_error is not None:
+                terminal_error[0] = etype == "error"
 
 
 async def process_query_core_stream(
@@ -158,32 +220,38 @@ async def process_query_core_stream(
     output_sanitizer = get_output_sanitizer()
     final_result: Optional[Dict[str, Any]] = None
 
-    stream_gen = rag_orchestrator.process_stream(emit_tokens=emit_tokens, **orchestrator_kwargs)
+    # Caller-owned step list: the orchestrator appends pipeline steps as they
+    # complete, so a terminal error event or exception can still carry the
+    # partial trace.
+    steps: List[AgentStep] = []
+    stream_gen = rag_orchestrator.process_stream(
+        emit_tokens=emit_tokens, steps=steps, **orchestrator_kwargs
+    )
     final_result_holder: List[Optional[Dict[str, Any]]] = [None]
+    terminal_error = [False]
     try:
         if timeout_seconds > 0:
             async with asyncio.timeout(timeout_seconds):
                 async for sse_event in _drain_orchestrator_stream(
-                    stream_gen, output_sanitizer, final_result_holder, emit_tokens=emit_tokens
+                    stream_gen, output_sanitizer, final_result_holder,
+                    terminal_error, emit_tokens=emit_tokens,
                 ):
                     yield sse_event
         else:
             async for sse_event in _drain_orchestrator_stream(
-                stream_gen, output_sanitizer, final_result_holder, emit_tokens=emit_tokens
+                stream_gen, output_sanitizer, final_result_holder,
+                terminal_error, emit_tokens=emit_tokens,
             ):
                 yield sse_event
         final_result = final_result_holder[0]
 
     except TimeoutError:
         logger.warning("Streaming query hard timeout reached", extra={"timeout_ms": timeout_ms})
-        # steps=[] is intentional: the orchestrator's internal step list is
-        # not accessible at this scope.  The orchestrator's own check_timeout
-        # normally catches timeouts first and emits a final event with steps;
-        # this is only the degenerate backstop when the outer asyncio.timeout
-        # fires before the inner check runs.
+        # Backstop for when the outer asyncio.timeout fires before the
+        # orchestrator's own check_timeout emits a final event with steps.
         final_result = create_timeout_response(
             safe_query,
-            steps=[],
+            steps=steps,
             total_time_ms=timeout_ms,
         )
     except asyncio.CancelledError:
@@ -192,19 +260,51 @@ async def process_query_core_stream(
     except Exception as e:
         error_id = str(uuid.uuid4())[:8]
         logger.exception(f"Error processing streaming query [error_id={error_id}]: {e}")
-        yield {"event": "error", "error_id": error_id,
-               "message": "Internal server error processing query"}
+        yield _terminal_error_event(
+            "Internal server error processing query",
+            error_id=error_id,
+            steps=steps,
+            include_reasoning=include_reasoning,
+            include_duration_ms=include_duration_ms,
+            output_sanitizer=output_sanitizer,
+        )
         return
     finally:
         await stream_gen.aclose()
+
+    if terminal_error[0]:
+        # The orchestrator classified this result as a handled failure. Surface
+        # it as an error event carrying the sanitized answer text and trace.
+        error_id = str(uuid.uuid4())[:8]
+        logger.warning(f"Streaming query ended with a terminal error result [error_id={error_id}]")
+        error_answer = str((final_result or {}).get("answer") or "")
+        sanitized_error_answer, error_redacted = (
+            output_sanitizer.sanitize(error_answer) if error_answer else ("", [])
+        )
+        log_output_redaction(request, error_redacted)
+        yield _terminal_error_event(
+            sanitized_error_answer or "Internal server error processing query",
+            error_id=error_id,
+            steps=steps,
+            include_reasoning=include_reasoning,
+            include_duration_ms=include_duration_ms,
+            output_sanitizer=output_sanitizer,
+        )
+        return
 
     if final_result is None:
         # The stream ended without a final result — a failure, not an empty
         # answer. Storing it would persist a blank turn as if it succeeded.
         error_id = str(uuid.uuid4())[:8]
         logger.warning(f"Streaming query ended with no result [error_id={error_id}]")
-        yield {"event": "error", "error_id": error_id,
-               "message": "Internal server error processing query"}
+        yield _terminal_error_event(
+            "Internal server error processing query",
+            error_id=error_id,
+            steps=steps,
+            include_reasoning=include_reasoning,
+            include_duration_ms=include_duration_ms,
+            output_sanitizer=output_sanitizer,
+        )
         return
 
     answer = str(final_result.get("answer", "") or "")
@@ -226,16 +326,9 @@ async def process_query_core_stream(
 
     sanitized_reasoning_steps = None
     if include_reasoning and final_result.get("reasoning_steps"):
-        sanitized_reasoning_steps = []
-        for step in final_result["reasoning_steps"]:
-            sanitized_step = {
-                "name": step.get("name") or "unknown",
-                "status": step.get("status") or "completed",
-                "details": sanitize_value(step.get("details", {}), output_sanitizer),
-            }
-            if include_duration_ms:
-                sanitized_step["duration_ms"] = step.get("duration_ms")
-            sanitized_reasoning_steps.append(sanitized_step)
+        sanitized_reasoning_steps = _sanitize_reasoning_steps(
+            final_result["reasoning_steps"], output_sanitizer, include_duration_ms
+        )
 
     response = Response(
         answer=sanitized_answer,
@@ -253,12 +346,13 @@ async def process_query_core_stream(
             final_result.get("suggested_prompts"), output_sanitizer
         ),
         truncated=final_result.get("truncated", False),
+        error_fallback=not is_storable(final_result),
         config_version=config_version,
     )
 
     # Store the turn just before the result event: a client that leaves
     # earlier stores nothing; one that leaves after still gets a stored turn.
-    await close_turn(ctx, query.text, response, final_result)
+    await close_turn(ctx, query.text, response)
 
     payload = response.model_dump() if hasattr(response, "model_dump") else dict(response)
     yield {"event": "result", "payload": payload}

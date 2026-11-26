@@ -1,6 +1,8 @@
+import asyncio
 import json
 import pytest
 from fastapi.testclient import TestClient
+from httpx import ASGITransport, AsyncClient
 from unittest.mock import AsyncMock, MagicMock, patch
 import uuid
 from types import SimpleNamespace
@@ -635,7 +637,7 @@ class TestServerChatHistory:
             [
                 {"answer": "", "error": "Request timeout", "sources": []},
                 {"answer": "", "error": "Internal processing error", "sources": []},
-                {"answer": "fallback", "sources": ["error_fallback"], "confidence": 0.0},
+                {"answer": "fallback", "sources": ["web_search"], "error_fallback": True, "confidence": 0.0},
             ]
         ):
             await self._run_core("hi", conversation_id=f"c-{i}", message_id=f"m-{i}", result=raw)
@@ -730,7 +732,9 @@ class TestServerChatHistory:
         assert chats.get_chat_owner("c1") is None
 
     async def test_stream_error_result_stores_nothing(self, db):
-        """An error event path stores nothing — failure-shape final result."""
+        """A failure-shape final result stays a result event (the degraded-
+        result contract), carries the typed flag to the wire, and stores
+        nothing."""
         events, _, _ = await self._run_stream(
             "hi",
             conversation_id="c1",
@@ -739,11 +743,18 @@ class TestServerChatHistory:
                 {"type": "status", "status": "processing"},
                 {
                     "type": "final",
-                    "result": {"answer": "", "error": "Request timeout", "sources": []},
+                    "result": {
+                        "answer": "",
+                        "error": "Request timeout",
+                        "sources": [],
+                        "error_fallback": True,
+                    },
                 },
             ],
         )
 
+        result_event = next(e for e in events if e["event"] == "result")
+        assert result_event["payload"]["error_fallback"] is True
         assert events[-1] == {"event": "done"}
         assert self._turn_rows("c1") == []
 
@@ -761,6 +772,86 @@ class TestServerChatHistory:
         assert "result" not in [e["event"] for e in events]
         assert self._turn_rows("c1") == []
         assert chats.get_chat_owner("c1") is None
+
+    async def test_stream_internal_error_event_yields_error_and_stores_nothing(self, db):
+        """An orchestrator ``{"type": "error"}`` event surfaces as an SSE error
+        event (not a stored result turn)."""
+        events, _, _ = await self._run_stream(
+            "hi",
+            conversation_id="c1",
+            message_id="m1",
+            stream_events=[
+                {"type": "status", "status": "processing"},
+                {
+                    "type": "error",
+                    "result": {
+                        "answer": "I encountered an error processing your query.",
+                        "sources": [],
+                        "error": "Internal processing error",
+                    },
+                },
+            ],
+        )
+
+        assert events[-1]["event"] == "error"
+        assert events[-1]["message"] == "I encountered an error processing your query."
+        assert "result" not in [e["event"] for e in events]
+        assert "done" not in [e["event"] for e in events]
+        assert self._turn_rows("c1") == []
+        assert chats.get_chat_owner("c1") is None
+
+    async def test_stream_error_event_carries_partial_reasoning_steps(self, db):
+        """Steps appended to the caller-owned list reach the SSE error event."""
+        from src.api.query_history import open_turn
+        from src.api.query_models import Query
+        from src.api.streaming_service import process_query_core_stream
+        from src.agents.reasoning_formatter import AgentStep
+
+        async def fake_stream(**kwargs):
+            kwargs["steps"].append(
+                AgentStep(name="Query Routing", status="completed", duration_ms=5.0)
+            )
+            kwargs["steps"].append(
+                AgentStep(name="Answer Generation", status="failed", duration_ms=3.0)
+            )
+            yield {"type": "status", "status": "processing"}
+            yield {"type": "error", "result": {"answer": "boom", "sources": []}}
+
+        orchestrator = MagicMock()
+        orchestrator.process_stream = MagicMock(
+            side_effect=lambda **kwargs: fake_stream(**kwargs)
+        )
+        input_sanitizer, output_sanitizer = self._sanitizers()
+        request = self._request()
+        query = Query(text="hi", conversation_id="c1", message_id="m1")
+
+        with patch("src.api.streaming_service.get_input_sanitizer", return_value=input_sanitizer), \
+             patch("src.api.streaming_service.get_output_sanitizer", return_value=output_sanitizer), \
+             patch("src.api.streaming_service.get_retriever", return_value=MagicMock()), \
+             patch("src.api.streaming_service.get_gemini_client", return_value=MagicMock()), \
+             patch("src.api.streaming_service.get_rag_orchestrator", return_value=orchestrator):
+            ctx = await open_turn(query, request)
+            events = [
+                event
+                async for event in process_query_core_stream(
+                    query,
+                    request,
+                    ctx,
+                    include_reasoning=True,
+                    include_metadata=True,
+                    include_duration_ms=True,
+                )
+            ]
+
+        assert events[-1]["event"] == "error"
+        steps = events[-1]["reasoning_steps"]
+        assert [s["details"]["title"] for s in steps] == [
+            "Route the question",
+            "Compose the answer",
+        ]
+        assert steps[1]["status"] == "failed"
+        assert "duration_ms" in steps[0]
+        assert self._turn_rows("c1") == []
 
     async def test_blocked_stream_query_stores_nothing(self, db):
         """A blocked query emits an error event and returns before saving."""
@@ -799,6 +890,92 @@ class TestServerChatHistory:
             ]
 
         assert [e["event"] for e in events] == ["error"]
+        assert self._turn_rows("c1") == []
+
+    async def test_stream_provider_failure_after_partial_output_emits_terminal_error(self, db):
+        """KBStreamingHandler failure after streaming partial answer tokens propagates
+        through StreamingRAGOrchestrator and streaming_service as a terminal SSE error."""
+        from src.agents.orchestrator_config import OrchestratorConfig
+        from src.agents.router import RouteDecision
+        from src.agents.streaming_handler import KBStreamingHandler
+        from src.agents.streaming_orchestrator import StreamingRAGOrchestrator
+        from src.api.query_history import open_turn
+        from src.api.query_models import Query
+        from src.api.streaming_service import process_query_core_stream
+        from src.citations import CitationManager
+
+        partial_text = (
+            "VM0048 is a Verra methodology for reducing emissions from deforestation "
+            "and forest degradation across jurisdictional baselines."
+        )
+
+        class FailingStreamGenerator:
+            async def search_and_process_stream(self, query, vector_results, resolved_query=None):
+                yield {"type": "token", "chunk": partial_text}
+                raise RuntimeError("provider stream broke mid-generation")
+
+        retriever = MagicMock()
+        retriever.retrieve = AsyncMock(
+            return_value={
+                "documents": ["VM0048 covers REDD+ project activities."],
+                "metadatas": [{"title": "VM0048", "rerank_score": 0.92}],
+                "distances": [0.1],
+            }
+        )
+        config = OrchestratorConfig(
+            enable_rewriting=False,
+            enable_routing=False,
+            enable_web_search=False,
+            enable_validation=False,
+            default_route=RouteDecision.KNOWLEDGE_BASE,
+        )
+        kb_handler = KBStreamingHandler(
+            retriever=retriever,
+            answer_generator=FailingStreamGenerator(),
+            citation_manager=CitationManager(),
+            config=config,
+        )
+
+        orchestrator = StreamingRAGOrchestrator.__new__(StreamingRAGOrchestrator)
+        orchestrator.config = config
+        orchestrator.citation_manager = CitationManager()
+        orchestrator.route_processor = MagicMock()
+        orchestrator.conversational_handler = MagicMock()
+        orchestrator.conversational_handler.is_conversational.return_value = False
+        orchestrator.conversational_handler.classify_intent = AsyncMock(return_value=False)
+        orchestrator.answer_generator = MagicMock(check_query_cache=None)
+        orchestrator._streaming_handler = kb_handler
+
+        input_sanitizer, output_sanitizer = self._sanitizers()
+        request = self._request()
+        query = Query(text="Explain VM0048", conversation_id="c1", message_id="m1")
+
+        with patch("src.api.streaming_service.get_input_sanitizer", return_value=input_sanitizer), \
+             patch("src.api.streaming_service.get_output_sanitizer", return_value=output_sanitizer), \
+             patch("src.api.streaming_service.get_retriever", return_value=retriever), \
+             patch("src.api.streaming_service.get_gemini_client", return_value=MagicMock()), \
+             patch("src.api.streaming_service.get_rag_orchestrator", return_value=orchestrator):
+            ctx = await open_turn(query, request)
+            events = [
+                event
+                async for event in process_query_core_stream(
+                    query,
+                    request,
+                    ctx,
+                    include_reasoning=True,
+                    include_metadata=True,
+                    include_duration_ms=True,
+                    emit_tokens=True,
+                )
+            ]
+
+        event_types = [e["event"] for e in events]
+        assert "token" in event_types
+        assert events[-1]["event"] == "error"
+        assert events[-1]["message"] == "I encountered an error generating the answer. Please try again."
+        assert "result" not in event_types
+        assert "done" not in event_types
+        assert any(s["status"] == "failed" for s in events[-1].get("reasoning_steps", []))
         assert self._turn_rows("c1") == []
 
     async def test_test_query_saves_turn_like_any_query(self, db, monkeypatch):
@@ -866,6 +1043,42 @@ class TestServerChatHistory:
         assert result["message_id"] == "am1"
         assert chats.get_chat_owner("ac1") == "m1"
         assert len(self._turn_rows("ac1")) == 1
+
+    async def test_async_query_retries_a_handled_failure_with_the_same_key(self, db):
+        from src.api.async_query_jobs import AsyncQueryJobManager
+        from src.api.main import _process_async_query_job
+
+        manager = AsyncQueryJobManager()
+        manager.register_processor(_process_async_query_job)
+        await manager.start()
+        try:
+            with patch("src.api.main.get_async_query_job_manager", return_value=manager), \
+                 patch(
+                     "src.api.main.process_query_core",
+                     new=AsyncMock(side_effect=[
+                         _mock_response_dict(answer="Query timed out", error_fallback=True),
+                         _mock_response_dict(),
+                     ]),
+                 ):
+                async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as client:
+                    payload = {"text": "What are carbon credits?", "client_request_id": "retry-key"}
+                    accepted = await client.post("/v1/query/async", json=payload)
+                    assert accepted.status_code == 202
+                    first_id = accepted.json()["job_id"]
+                    await asyncio.wait_for(manager._queue.join(), timeout=3)
+
+                    first = (await client.get(f"/v1/query/async/{first_id}")).json()
+                    assert first["status"] == "failed"
+                    assert first["result"]["answer"] == "Query timed out"
+
+                    retry = await client.post("/v1/query/async", json=payload)
+                    assert retry.status_code == 202
+                    retry_id = retry.json()["job_id"]
+                    assert retry_id != first_id
+                    await asyncio.wait_for(manager._queue.join(), timeout=3)
+                    assert (await client.get(f"/v1/query/async/{retry_id}")).json()["status"] == "completed"
+        finally:
+            await manager.stop()
 
     def test_foreign_chat_returns_404_on_query(self, test_client):
         """A conversation_id owned by another user 404s on /v1/query."""
@@ -1001,7 +1214,7 @@ class TestQuerySecurityBoundaries:
 
         assert not is_storable({"error": "Request timeout", "sources": []})
         assert not is_storable({"error": "Internal processing error", "sources": []})
-        assert not is_storable({"answer": "x", "sources": ["error_fallback"]})
+        assert not is_storable({"answer": "x", "sources": ["knowledge_base"], "error_fallback": True})
         assert is_storable(
             {"answer": "x", "sources": ["knowledge_base"],
              "metadata": {"timeout_exceeded": True}}

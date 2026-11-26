@@ -7,6 +7,7 @@ Provides queue-backed, SQLite-persistent execution for long-running query reques
 import asyncio
 import json
 import re
+import sqlite3
 import time
 import uuid
 from datetime import datetime, timezone
@@ -14,13 +15,29 @@ from typing import Any, Awaitable, Callable, Dict, Optional
 
 from fastapi import HTTPException
 from loguru import logger
+from tenacity import (
+    AsyncRetrying,
+    retry,
+    retry_if_exception,
+    retry_if_exception_type,
+    wait_exponential,
+)
 
 from ..db import async_query_jobs as job_store
+from ..query_processing.fallback_answers import is_error_fallback_result
 
 
 JobProcessor = Callable[[Dict[str, Any], str, str], Awaitable[Dict[str, Any]]]
 MAX_PAYLOAD_BYTES = 32 * 1024
 _DEFAULT_INTERNAL_ERROR_MESSAGE = "Internal error processing query"
+_QUERY_FALLBACK_ERROR = "The query did not produce an answer."
+
+
+def _is_sqlite_lock_error(exc: BaseException) -> bool:
+    # Extended SQLite result codes keep their primary code in the low byte.
+    return isinstance(exc, sqlite3.OperationalError) and (
+        getattr(exc, "sqlite_errorcode", 0) & 0xFF
+    ) in (sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED)
 
 
 def _utc_now_iso() -> str:
@@ -59,9 +76,12 @@ class AsyncQueryJobManager:
     in SQLite, so queued and in-flight jobs survive restarts and can be resumed.
     """
 
-    def __init__(self, max_queue_size: int = 100, job_ttl_seconds: int = 3600) -> None:
+    def __init__(self, max_queue_size: int = 100, job_ttl_seconds: int = 3600, per_caller_queue_max: int = 20) -> None:
         self._max_queue_size = max_queue_size
         self._job_ttl_seconds = job_ttl_seconds
+        self._per_caller_queue_max = per_caller_queue_max
+        self._job_callers: Dict[str, str] = {}
+        self._retry_tasks: set[asyncio.Task] = set()
         self._queue: asyncio.Queue[str] = asyncio.Queue()
         self._processor: Optional[JobProcessor] = None
         self._lock = asyncio.Lock()
@@ -74,7 +94,7 @@ class AsyncQueryJobManager:
         """Register async processor used by worker tasks."""
         self._processor = processor
 
-    async def configure(self, max_queue_size: int, job_ttl_seconds: int) -> None:
+    async def configure(self, max_queue_size: int, job_ttl_seconds: int, per_caller_queue_max: int = 20) -> None:
         """Configure queue and TTL before workers are started."""
         async with self._lock:
             if self._running:
@@ -83,6 +103,8 @@ class AsyncQueryJobManager:
 
             self._max_queue_size = max_queue_size
             self._job_ttl_seconds = job_ttl_seconds
+            self._per_caller_queue_max = per_caller_queue_max
+            self._job_callers.clear()
             self._queue = asyncio.Queue()
 
     async def start(self, worker_count: int = 1) -> None:
@@ -97,7 +119,7 @@ class AsyncQueryJobManager:
             self._shutdown_event.clear()
             await self._recover_jobs()
             self._workers = [
-                asyncio.create_task(self._worker_loop(worker_id=i + 1))
+                self._spawn_worker(worker_id=i + 1)
                 for i in range(max(worker_count, 1))
             ]
             self._cleanup_task = asyncio.create_task(self._periodic_cleanup())
@@ -112,6 +134,25 @@ class AsyncQueryJobManager:
             },
         )
 
+    def _spawn_worker(self, worker_id: int) -> asyncio.Task:
+        """Create a worker task that replaces itself if it dies while running."""
+        task = asyncio.create_task(self._worker_loop(worker_id=worker_id))
+        task.add_done_callback(lambda t: self._on_worker_done(worker_id, t))
+        return task
+
+    def _on_worker_done(self, worker_id: int, task: asyncio.Task) -> None:
+        """Respawn a worker that terminated unexpectedly (any cause, not just job failures)."""
+        if task.cancelled() or self._shutdown_event.is_set() or not self._running:
+            return
+
+        exc = task.exception()
+        logger.error(
+            f"Async query worker died unexpectedly: worker-{worker_id}: {exc!r}",
+        )
+        replacement = self._spawn_worker(worker_id)
+        self._workers = [replacement if t is task else t for t in self._workers]
+        logger.info(f"Respawned async query worker: worker-{worker_id}")
+
     async def stop(self) -> None:
         """Stop workers and release queue resources."""
         async with self._lock:
@@ -125,26 +166,37 @@ class AsyncQueryJobManager:
             self._cleanup_task = None
             self._running = False
 
-        for worker in workers:
-            worker.cancel()
+        for task in (*workers, *self._retry_tasks, cleanup_task):
+            if task is not None:
+                task.cancel()
 
-        if cleanup_task is not None:
-            cleanup_task.cancel()
+        worker_tasks = [t for t in (*workers, cleanup_task) if t is not None]
+        if worker_tasks:
+            await asyncio.gather(*worker_tasks, return_exceptions=True)
 
-        tasks = [t for t in (*workers, cleanup_task) if t is not None]
-        if tasks:
-            await asyncio.gather(*tasks, return_exceptions=True)
+        retry_tasks = list(self._retry_tasks)
+        self._retry_tasks.clear()
+        for retry_task in retry_tasks:
+            retry_task.cancel()
+        if retry_tasks:
+            await asyncio.gather(*retry_tasks, return_exceptions=True)
 
         logger.info("Async query job manager stopped")
 
-    async def enqueue(self, payload: Dict[str, Any], user_id: str) -> Dict[str, Any]:
-        """Enqueue a new async query job for ``user_id``, or return an existing one by idempotency key."""
+    async def enqueue(self, payload: Dict[str, Any], user_id: str, caller: Optional[str] = None) -> Dict[str, Any]:
+        """Enqueue a new async query job for ``user_id``, or return an existing one by idempotency key.
+
+        ``caller`` identifies the submitting client (e.g. request IP). A per-caller
+        bound prevents one caller from holding every queued slot, which matters
+        because all callers share the single-owner ``user_id``.
+        """
         if not self._running:
             raise RuntimeError("Async query service is not ready")
 
         validated_payload = self._validate_payload(payload)
 
         client_request_id: Optional[str] = validated_payload.get("client_request_id")
+        caller_key = caller or user_id
 
         async with self._lock:
             if client_request_id:
@@ -162,6 +214,10 @@ class AsyncQueryJobManager:
             if queue_depth >= self._max_queue_size:
                 raise asyncio.QueueFull
 
+            caller_queued = sum(key == caller_key for key in self._job_callers.values())
+            if caller_queued >= self._per_caller_queue_max:
+                raise asyncio.QueueFull
+
             job_id = uuid.uuid4().hex
             submitted_at = _utc_now_iso()
             await asyncio.to_thread(
@@ -171,7 +227,9 @@ class AsyncQueryJobManager:
                 submitted_at,
                 user_id,
                 client_request_id,
+                caller_key,
             )
+            self._job_callers[job_id] = caller_key
             self._queue.put_nowait(job_id)
 
             return {
@@ -201,72 +259,108 @@ class AsyncQueryJobManager:
         if interrupted:
             logger.warning(f"Marked {interrupted} interrupted processing job(s) as failed")
 
-        queued_ids = await asyncio.to_thread(job_store.load_queued_job_ids)
-        if queued_ids:
-            logger.info(f"Resuming {len(queued_ids)} queued async query job(s)")
-            for job_id in queued_ids:
+        self._job_callers.clear()
+        queued_jobs = await asyncio.to_thread(job_store.load_queued_jobs)
+        if queued_jobs:
+            logger.info(f"Resuming {len(queued_jobs)} queued async query job(s)")
+            for job in queued_jobs:
+                job_id = job["job_id"]
+                self._job_callers[job_id] = job["caller"]
                 self._queue.put_nowait(job_id)
 
     async def _worker_loop(self, worker_id: int) -> None:
         """Process jobs sequentially from the queue."""
         logger.info(f"Async query worker started: worker-{worker_id}")
+        queue = self._queue
 
         while not self._shutdown_event.is_set():
-            job_id: Optional[str] = None
             try:
-                job_id = await asyncio.wait_for(self._queue.get(), timeout=1.0)
+                job_id = await asyncio.wait_for(queue.get(), timeout=1.0)
             except asyncio.TimeoutError:
                 continue
             except asyncio.CancelledError:
                 break
 
+            self._job_callers.pop(job_id, None)
+
             try:
-                started_at = _utc_now_iso()
-                claimed = await asyncio.to_thread(job_store.claim_job, job_id, started_at)
-                if not claimed:
-                    continue
+                try:
+                    claimed = await asyncio.to_thread(job_store.claim_job, job_id, _utc_now_iso())
+                    if not claimed:
+                        queue.task_done()
+                        continue
 
-                job = await asyncio.to_thread(job_store.get_job_with_payload, job_id)
-                if job is None:
-                    continue
+                    job = await asyncio.to_thread(job_store.get_job_with_payload, job_id)
+                    if job is None:
+                        queue.task_done()
+                        continue
 
-                payload = job["payload"]
-                if not isinstance(payload, dict):
-                    continue
+                    payload = job["payload"]
+                    if not isinstance(payload, dict):
+                        raise ValueError("Stored async query payload is not an object")
 
-                result = await self._processor(payload, job_id, job["user_id"])  # type: ignore[misc]
+                    result = self._normalize_result(
+                        await self._processor(payload, job_id, job["user_id"])  # type: ignore[misc]
+                    )
+                except Exception as exc:
+                    logger.exception(
+                        f"Async query job failed [job_id={job_id}]: {type(exc).__name__}",
+                    )
+                    result = None
+                    error = _format_exception(exc)
+                else:
+                    error = _QUERY_FALLBACK_ERROR if is_error_fallback_result(result) else None
 
-                completed_at = _utc_now_iso()
-                expires_at = time.time() + self._job_ttl_seconds
-                await asyncio.to_thread(
-                    job_store.complete_job,
-                    job_id,
-                    result,
-                    completed_at,
-                    expires_at,
-                )
-
+                try:
+                    await self._finish_job(job_id, result=result, error=error)
+                except Exception:
+                    logger.exception(
+                        f"Failed to persist terminal state for async query job [job_id={job_id}]; scheduling retry"
+                    )
+                    task = asyncio.create_task(
+                        self._retry_finish_job(job_id, queue, result=result, error=error)
+                    )
+                    self._retry_tasks.add(task)
+                    task.add_done_callback(self._retry_tasks.discard)
+                else:
+                    queue.task_done()
             except asyncio.CancelledError:
                 break
-            except Exception as exc:
-                logger.exception(
-                    f"Async query job failed [job_id={job_id}]: {type(exc).__name__}",
-                )
-                completed_at = _utc_now_iso()
-                expires_at = time.time() + self._job_ttl_seconds
-                error = _format_exception(exc)
-                await asyncio.to_thread(
-                    job_store.fail_job,
-                    job_id,
-                    error,
-                    completed_at,
-                    expires_at,
-                )
-            finally:
-                if job_id is not None:
-                    self._queue.task_done()
 
         logger.info(f"Async query worker stopped: worker-{worker_id}")
+
+    async def _retry_finish_job(
+        self,
+        job_id: str,
+        queue: asyncio.Queue[str],
+        *,
+        result: Optional[Dict[str, Any]],
+        error: Optional[str],
+    ) -> None:
+        await asyncio.sleep(0.1)
+        async for attempt in AsyncRetrying(
+            retry=retry_if_exception_type(Exception),
+            wait=wait_exponential(multiplier=0.1, max=5),
+        ):
+            if self._shutdown_event.is_set():
+                return
+            with attempt:
+                await self._finish_job(job_id, result=result, error=error)
+        queue.task_done()
+
+    @retry(retry=retry_if_exception(_is_sqlite_lock_error), wait=wait_exponential(multiplier=0.1, max=5))
+    async def _finish_job(
+        self, job_id: str, *, result: Optional[Dict[str, Any]], error: Optional[str]
+    ) -> None:
+        """Wait out SQLite lock contention without running the query again."""
+        await asyncio.to_thread(
+            job_store.finish_job,
+            job_id,
+            _utc_now_iso(),
+            time.time() + self._job_ttl_seconds,
+            result=result,
+            error=error,
+        )
 
     async def _periodic_cleanup(self) -> None:
         """Run expired-job cleanup every minute while the manager is active.
@@ -301,6 +395,14 @@ class AsyncQueryJobManager:
             )
 
         return json.loads(serialized_payload)
+
+    @staticmethod
+    def _normalize_result(result: Dict[str, Any]) -> Dict[str, Any]:
+        if not isinstance(result, dict):
+            raise ValueError("Async query result must be an object")
+        return json.loads(
+            json.dumps(result, ensure_ascii=True, allow_nan=False, default=str)
+        )
 
     async def _cleanup_expired_jobs(self) -> None:
         """Delete terminal jobs whose TTL has expired.

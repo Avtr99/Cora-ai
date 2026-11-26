@@ -1,118 +1,179 @@
 import { AgentReasoningStep, QueryResponse } from './types';
 
-const truncateText = (value: string, max: number = 120): string => {
-  const trimmed = value.trim();
-  if (!trimmed) return '';
-  return trimmed.length > max ? `${trimmed.substring(0, max).trim()}…` : trimmed;
+const STEP_STATES: Record<string, AgentReasoningStep['status']> = {
+  started: 'running', running: 'running', in_progress: 'running', completed: 'complete',
+  failed: 'error', error: 'error', cancelled: 'cancelled',
+  skipped: 'skipped', cached: 'cached', fallback: 'fallback',
 };
 
-export function buildAgentReasoning(response: QueryResponse): AgentReasoningStep[] {
+/**
+ * Name → kind fallback for responses stored before details.kind existed.
+ * This is one of exactly two legacy normalizers — the other is
+ * upgrade_reasoning_steps at the backend cache read (src/utils/cache.py).
+ * This one is required because chat_turns history rows bypass that cache
+ * path. Do not add a third normalization point.
+ */
+const KIND_BY_NAME: Record<string, string> = {
+  'query rewriting': 'understand',
+  'query routing': 'route',
+  'knowledge base retrieval': 'search_kb',
+  'hybrid retrieval': 'search_kb',
+  'web search': 'search_web',
+  'web supplementation': 'search_web',
+  'fallback decision': 'fallback',
+  'answer generation': 'compose',
+  'answer synthesis': 'compose',
+  'answer validation': 'verify',
+};
+
+const GENERIC_DETAILS = new Set([
+  'Prepared the query for the next steps',
+  'Collected evidence to answer the question',
+  'Composed a response based on retrieved information',
+  'Processing step completed',
+  'Step finished',
+]);
+
+/** details.source / details.method on compose steps → display phrase. */
+const COMPOSE_SOURCE_LABELS: Record<string, string> = {
+  knowledge_base: 'the knowledge base',
+  kb_fallback: 'the knowledge base',
+  web_answer: 'web results',
+  web_only: 'web results',
+};
+
+/** Strip metadata parameters like methodology_code="..." registry="..." */
+const cleanRewrittenQuery = (value: string): string =>
+  value.replace(/\s+\w+="[^"]*"/g, '').trim();
+
+const str = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
+
+const num = (v: unknown): number | null =>
+  typeof v === 'number' && Number.isFinite(v) ? v : null;
+
+/** Document ID surfaced in rewrite_info filters when the router matched one. */
+const documentIdFromResponse = (response: Pick<QueryResponse, 'metadata'>): string => {
+  const filters = response.metadata?.rewrite_info?.filters;
+  return str(filters?.document_id) || str(filters?.registry_document_id);
+};
+
+const routeMessage = (
+  details: Record<string, unknown>,
+  response: Pick<QueryResponse, 'metadata'>,
+): string => {
+  const route = str(details.route).toLowerCase();
+  const reason = str(details.reason);
+  const docId = reason === 'Document ID detected' ? documentIdFromResponse(response) : '';
+  const checking =
+    route === 'knowledge_base' || route === 'vector_store'
+      ? 'Checking the knowledge base'
+      : route === 'web_search' || route === 'web'
+        ? 'Checking the web'
+        : route === 'hybrid'
+          ? 'Checking the knowledge base and web'
+          : '';
+  if (docId && checking) return `Matched the document ${docId}: ${checking.toLowerCase()}`;
+  if (checking) return checking;
+  return str(details.summary) || 'Finding the best source';
+};
+
+const fallbackMessage = (details: Record<string, unknown>): string => {
+  const reason = str(details.reason);
+  if (/cach/i.test(reason)) return 'No knowledge base results. Using a recent answer';
+  if (/web/i.test(reason)) return 'The knowledge base did not have enough. Checking the web';
+  return reason || 'Adjusted the retrieval strategy';
+};
+
+const verifyMessage = (details: Record<string, unknown>): string => {
+  const grounded = details.is_grounded;
+  if (grounded === true) return 'Answer grounded in facts';
+  if (grounded === false) return 'Some claims are not fully supported by the sources';
+  return str(details.summary) || 'Answer grounded in facts';
+};
+
+export function buildAgentReasoning(
+  response: Pick<QueryResponse, 'reasoning_steps' | 'metadata'>,
+): AgentReasoningStep[] {
   if (!Array.isArray(response.reasoning_steps) || response.reasoning_steps.length === 0) {
     return [];
   }
 
   const results: (AgentReasoningStep | null)[] = response.reasoning_steps.map((step, index) => {
-    if (!step) {
-      return null;
-    }
+    if (!step) return null;
 
-    const details = step.details ?? {};
+    const details = (step.details ?? {}) as Record<string, unknown>;
+    const statusRaw = (step.status || '').toLowerCase();
+    const status = STEP_STATES[statusRaw];
     const name = (step.name || '').toLowerCase();
-    const status = (step.status || '').toLowerCase();
-    const messages: string[] = [];
+    const kind = str(details.kind) || KIND_BY_NAME[name] || 'step';
+    const title = str(details.title) || step.name || 'Processing';
 
-    if (name.includes('rewrite') || name.includes('rewrit') || name.includes('clarif')) {
-      // Show a clean message instead of raw rewritten_query with metadata
-      if (details.rewritten_query) {
-        // Strip metadata parameters like methodology_code="..." registry="..."
-        const cleanQuery = typeof details.rewritten_query === 'string'
-          ? details.rewritten_query.replace(/\s+\w+="[^"]*"/g, '')
-          : '';
-        if (cleanQuery) {
-          messages.push(`Refined: "${truncateText(cleanQuery, 100)}"`);
-        } else {
-          messages.push('Query refined for better search');
-        }
+    // Skipped steps carry no user value — hide them entirely.
+    if (status === 'skipped') return null;
+
+    const messages: string[] = [];
+    let sources: string[] = [];
+    const summary = str(details.summary);
+
+    if (kind === 'understand') {
+      const refined = cleanRewrittenQuery(str(details.rewritten_query));
+      if (refined) {
+        messages.push(`Refined: "${refined}"`);
+      } else if (summary && !GENERIC_DETAILS.has(summary)) {
+        messages.push(summary);
       }
-    } else if (name.includes('rout')) {
-      if (details.route === 'knowledge_base' || details.route === 'vector_store') {
-        messages.push('Checking knowledge base for information');
-      } else if (details.route === 'web_search' || details.route === 'web') {
-        messages.push('Checking web sources for information');
-      } else if (details.route) {
-        const routeStr = String(details.route);
-        messages.push(`Information found via ${routeStr.replace(/_/g, ' ')}`);
+    } else if (kind === 'route') {
+      messages.push(routeMessage(details, response));
+    } else if (kind === 'search_kb' || kind === 'search_web') {
+      const count =
+        num(details.documents_retrieved) ?? num(details.results_count) ?? num(details.sources_found) ?? num(details.count);
+      if (status === 'fallback' || status === 'error') {
+        messages.push(
+          summary && !GENERIC_DETAILS.has(summary)
+            ? summary
+            : 'The search did not return a usable answer.',
+        );
+      } else if (name.includes('supplement')) {
+        messages.push('The knowledge base did not have enough. Checking the web');
+      } else if (count !== null) {
+        messages.push(`Found ${count} relevant source${count === 1 ? '' : 's'}`);
+      } else if (summary && !GENERIC_DETAILS.has(summary)) {
+        messages.push(summary);
       }
-    } else if (name.includes('retriev') || name.includes('search') || name.includes('kb')) {
-      const count = details.documents_retrieved ?? details.results_count ?? details.count;
-      if (typeof count === 'number') {
-        messages.push(`Found ${count} relevant source(s)`);
+      const excerpts = details.sources ?? details.highlights;
+      if (Array.isArray(excerpts)) {
+        sources = excerpts.map(str).filter(
+          (source) => source && !/^(found \d+ relevant|retrieved supporting information)/i.test(source),
+        );
       }
-      // Only show snippets/highlights if we actually found documents (count > 0)
-      // and filter out generic placeholder messages
-      const isEmptyResult = typeof count === 'number' && count === 0;
-      if (!isEmptyResult) {
-        const possibleSnippets = details.highlights ?? details.snippets ?? details.results ?? details.documents ?? details.sources;
-        if (Array.isArray(possibleSnippets)) {
-          possibleSnippets
-            .filter((h): h is string => typeof h === 'string' && h.trim().length > 0)
-            .filter(h => !/^found \d+ relevant/i.test(h))
-            .filter(h => !/^retrieved supporting information/i.test(h)) // Filter out generic placeholder
-            .slice(0, 3)
-            .forEach(h => {
-              const snippet = truncateText(h, 100);
-              if (snippet) {
-                messages.push(snippet);
-              }
-            });
-        }
-      }
-    } else if (
-      (name.includes('answer') || name.includes('generat') || name.includes('draft')) &&
-      !name.includes('validat') &&
-      !name.includes('quality') &&
-      !name.includes('check')
-    ) {
-      const ANSWER_PREVIEW_MAX_CHARS = 220;
-      if (details.answer_preview && typeof details.answer_preview === 'string') {
-        const snippet = truncateText(details.answer_preview, ANSWER_PREVIEW_MAX_CHARS);
-        if (snippet) {
-          messages.push(snippet);
-        }
-      } else if (details.summary && typeof details.summary === 'string' && !/^generated answer from/i.test(details.summary.trim())) {
-        const snippet = truncateText(details.summary, ANSWER_PREVIEW_MAX_CHARS);
-        if (snippet) {
-          messages.push(snippet);
-        }
-      } else if (response.answer && response.answer.trim()) {
-        const snippet = truncateText(response.answer, ANSWER_PREVIEW_MAX_CHARS);
-        if (snippet) {
-          messages.push(snippet);
-        }
-      } else {
-        messages.push('Generated final answer');
-      }
-    } else if (name.includes('validat') || name.includes('quality') || name.includes('check')) {
-      if (status === 'skipped') {
-        return null;
-      }
-      const summary = typeof details.summary === 'string' ? details.summary.toLowerCase() : '';
-      if (summary.includes('skip') || summary.includes('skipped')) {
-        return null;
-      }
-      messages.push((typeof details.summary === 'string' && details.summary) || 'Answer grounded in facts');
-    } else {
-      if (details.summary && typeof details.summary === 'string') {
-        messages.push(details.summary);
-      }
+    } else if (kind === 'fallback') {
+      messages.push(fallbackMessage(details));
+    } else if (kind === 'compose') {
+      const source = str(details.source) || str(details.method);
+      messages.push(
+        status === 'error'
+          ? 'Answer generation failed'
+          : `Generated answer from ${COMPOSE_SOURCE_LABELS[source] ?? 'the retrieved sources'}`,
+      );
+    } else if (kind === 'verify') {
+      messages.push(verifyMessage(details));
+    } else if (summary && !GENERIC_DETAILS.has(summary)) {
+      messages.push(summary);
     }
 
-    if (!messages.length) return null;
+    // Drop empty generic steps; keep every named kind and any step carrying a
+    // non-complete status such as failed.
+    const hasContent = messages.length > 0 || sources.length > 0;
+    const isMeaningful = kind !== 'step' || (status !== undefined && status !== 'complete');
+    if (!hasContent && !isMeaningful) return null;
 
     return {
-      agentName: step.name,
+      agentName: title,
       nodeName: step.name,
+      kind,
+      status,
       messages,
+      sources: sources.length ? sources : undefined,
       nodeId: `step-${index}`,
     };
   });

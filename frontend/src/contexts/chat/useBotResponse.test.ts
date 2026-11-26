@@ -124,14 +124,86 @@ describe('requestBotResponse', () => {
     expect(chats[0].updatedAt.getTime()).toBeGreaterThan(new Date('2024-01-01').getTime());
   });
 
-  it('marks the placeholder as an error message on error_fallback', async () => {
+  it('keeps the query trace when a result is marked as an error fallback', async () => {
     useChatStore.setState({ chats: [seedChat()] });
-    mockStream.mockResolvedValueOnce(coraResult({ sources: ['error_fallback'], text: 'Could not answer' }));
+    const agentReasoning = [{ agentName: 'Search the web', nodeName: 'Web Search' }];
+    mockStream.mockResolvedValueOnce(coraResult({ errorFallback: true, text: 'Could not answer', agentReasoning }));
 
     await runRequest();
 
     const bot = getCurrentChat('chat-1')?.messages.find((m) => m.sender === 'bot');
     expect(bot?.status).toBe('error');
     expect(bot?.content).toBe('Could not answer');
+    expect(bot?.agentReasoning).toEqual(agentReasoning);
+  });
+
+  it('shows the backend message and partial reasoning on CoraStreamError', async () => {
+    useChatStore.setState({ chats: [seedChat()] });
+    const { CoraStreamError } = await import('@/services/coraApi');
+    const steps = [
+      {
+        agentName: 'Route the question',
+        nodeName: 'Query Routing',
+        kind: 'route',
+        status: 'complete' as const,
+        messages: ['Finding the best source'],
+        nodeId: 'step-0',
+      },
+      {
+        agentName: 'Compose the answer',
+        nodeName: 'Answer Generation',
+        kind: 'compose',
+        status: 'error' as const,
+        messages: ['Answer generation failed'],
+        nodeId: 'step-1',
+      },
+    ];
+    mockStream.mockRejectedValueOnce(
+      new CoraStreamError('abc12345', 'I encountered an error processing your query.', steps)
+    );
+
+    await runRequest();
+
+    const bot = getCurrentChat('chat-1')?.messages.find((m) => m.sender === 'bot');
+    expect(bot?.status).toBe('error');
+    expect(bot?.content).toBe('I encountered an error processing your query.');
+    expect(bot?.agentReasoning).toHaveLength(2);
+    expect(bot?.agentReasoning?.[1].status).toBe('error');
+  });
+
+  it('maps CoraApiError status to friendly copy', async () => {
+    useChatStore.setState({ chats: [seedChat()] });
+    const { CoraApiError } = await import('@/services/coraApi');
+    mockStream.mockRejectedValueOnce(new CoraApiError('http', 'API request failed with status 500', 500));
+
+    await runRequest();
+
+    const bot = getCurrentChat('chat-1')?.messages.find((m) => m.sender === 'bot');
+    expect(bot?.status).toBe('error');
+    expect(bot?.content).toBe('The AI service had an internal error. Please try again in a moment.');
+    expect(bot?.agentReasoning).toBeUndefined();
+  });
+
+  it('maps CoraApiError timeout to friendly copy', async () => {
+    useChatStore.setState({ chats: [seedChat()] });
+    const { CoraApiError } = await import('@/services/coraApi');
+    mockStream.mockRejectedValueOnce(new CoraApiError('timeout', 'API request timeout'));
+
+    await runRequest();
+
+    const bot = getCurrentChat('chat-1')?.messages.find((m) => m.sender === 'bot');
+    expect(bot?.content).toBe('The request timed out before a response was ready. Please retry, or try a shorter/more focused question.');
+  });
+
+  it('falls back to generic copy for untyped failures', async () => {
+    useChatStore.setState({ chats: [seedChat()] });
+    mockStream.mockRejectedValueOnce(new Error('internal server error'));
+
+    await runRequest();
+
+    const bot = getCurrentChat('chat-1')?.messages.find((m) => m.sender === 'bot');
+    expect(bot?.status).toBe('error');
+    expect(bot?.content).toBe("I'm sorry, I encountered an error. Please try again.");
+    expect(bot?.agentReasoning).toBeUndefined();
   });
 });

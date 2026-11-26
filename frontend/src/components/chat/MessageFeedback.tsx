@@ -164,7 +164,7 @@ export const MessageFeedback: React.FC<MessageFeedbackProps> = ({
   return (
     <div className="flex flex-col gap-1.5 3xl:gap-2">
       {/* Thumbs row */}
-      <div className="flex items-center gap-0.5">
+      <div className="flex items-center gap-1 max-md:gap-1.5">
         {/* Thumbs Up */}
         <button
           type="button"
@@ -173,7 +173,7 @@ export const MessageFeedback: React.FC<MessageFeedbackProps> = ({
           aria-label="Good response"
           aria-pressed={isPositiveActive}
           title="Good response"
-          className={`flex items-center justify-center w-6 h-6 3xl:w-7 3xl:h-7 4xl:w-8 4xl:h-8 rounded transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2
+          className={`flex items-center justify-center max-md:w-8 max-md:h-8 w-6 h-6 3xl:w-7 3xl:h-7 4xl:w-8 4xl:h-8 rounded transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2
             ${isPositiveActive
               ? 'text-semantic-success-icon'
               : isSubmitted || isSubmitting
@@ -208,7 +208,7 @@ export const MessageFeedback: React.FC<MessageFeedbackProps> = ({
           aria-label="Bad response"
           aria-pressed={isNegativeSelected}
           title="Bad response"
-          className={`flex items-center justify-center w-6 h-6 3xl:w-7 3xl:h-7 4xl:w-8 4xl:h-8 rounded transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2
+          className={`flex items-center justify-center max-md:w-8 max-md:h-8 w-6 h-6 3xl:w-7 3xl:h-7 4xl:w-8 4xl:h-8 rounded transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2
             ${isNegativeSelected
               ? 'text-semantic-error-icon'
               : isSubmitted || isSubmitting

@@ -215,9 +215,10 @@ class KBStreamingHandler:
                     duration_ms=round(duration, 2),
                     details={"error": "internal_error", "error_id": error_id, "source": "knowledge_base"}
                 ))
-                yield {"type": "final", "result": {
+                yield {"type": "error", "result": {
                     "answer": "I encountered an error generating the answer. Please try again.",
-                    "sources": ["error_fallback"],
+                    "sources": ["knowledge_base"],
+                    "error_fallback": True,
                     "citations": None,
                     "confidence": 0.0,
                 }}
@@ -352,9 +353,10 @@ class KBStreamingHandler:
                 duration_ms=round(duration, 2),
                 details={"error": "internal_error", "error_id": error_id, "source": "knowledge_base"}
             ))
-            yield {"type": "final", "result": {
+            yield {"type": "error", "result": {
                 "answer": "I encountered an error generating the answer. Please try again.",
-                "sources": ["error_fallback"],
+                "sources": ["knowledge_base"],
+                "error_fallback": True,
                 "citations": None,
                 "confidence": 0.0,
             }}

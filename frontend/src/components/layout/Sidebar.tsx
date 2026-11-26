@@ -25,27 +25,28 @@ interface NavItemProps {
   Icon: React.FC<React.SVGProps<SVGSVGElement>>;
   isActive: boolean;
   isCollapsed: boolean;
+  iconSize: number;
   onClick?: () => void;
 }
 
-const NavItem: React.FC<NavItemProps> = ({ to, label, Icon, isActive, isCollapsed, onClick }) => (
+const NavItem: React.FC<NavItemProps> = ({ to, label, Icon, isActive, isCollapsed, iconSize, onClick }) => (
   <Link
     to={to}
     className={`flex items-center rounded-lg transition-colors ${isActive ? 'bg-brand-100 hover:bg-brand-100/80' : 'hover:bg-muted'
-      } ${isCollapsed ? 'justify-center w-10 h-10 3xl:w-11 3xl:h-11 4xl:w-12 4xl:h-12 shrink-0' : 'gap-2.5 3xl:gap-3 px-3 3xl:px-3.5 h-9 3xl:h-10 4xl:h-11 w-full shrink-0'}`}
+      } ${isCollapsed ? 'justify-center w-10 h-10 3xl:w-11 3xl:h-11 4xl:w-13 4xl:h-13 shrink-0' : 'gap-2.5 3xl:gap-3 4xl:gap-3.5 px-3 3xl:px-3.5 4xl:px-4 h-9 3xl:h-11 4xl:h-12 w-full shrink-0'}`}
     aria-label={label}
     onClick={onClick}
   >
-    <span className="flex h-5 w-5 shrink-0 items-center justify-center">
+    <span className="flex h-5 w-5 3xl:h-5.5 3xl:w-5.5 4xl:h-6 4xl:w-6 shrink-0 items-center justify-center">
       <IconWrapper
         Icon={Icon}
-        size={isCollapsed ? 20 : 18}
+        size={iconSize}
         state={isActive ? 'active' : 'default'}
         aria-hidden={true}
       />
     </span>
     {!isCollapsed && (
-      <span className={`font-inter text-ui 3xl:text-base 4xl:text-[19px] min-w-0 flex-1 truncate ${isActive ? 'text-brand-secondary font-semibold' : 'text-text-muted font-medium'}`}>
+      <span className={`font-inter text-ui 3xl:text-base 4xl:text-lg min-w-0 flex-1 truncate ${isActive ? 'text-brand-secondary font-semibold' : 'text-text-muted font-medium'}`}>
         {label}
       </span>
     )}
@@ -60,8 +61,14 @@ export const Sidebar: React.FC = () => {
   const wideBreakpoint = useWideBreakpoint();
   // Sidebar widths match the --sidebar-width / --sidebar-collapsed-width CSS
   // vars declared in Index.tsx so the composer stays aligned at every tier.
-  const expandedWidth = wideBreakpoint === '4xl' ? 336 : wideBreakpoint === '3xl' ? 272 : 224;
+  const expandedWidth = wideBreakpoint === '4xl' ? 340 : wideBreakpoint === '3xl' ? 280 : 224;
   const collapsedWidth = wideBreakpoint === '4xl' ? 80 : wideBreakpoint === '3xl' ? 68 : 60;
+  const navIconSize = wideBreakpoint === '4xl' ? 22 : wideBreakpoint === '3xl' ? 20 : 18;
+  const collapsedIconSize = wideBreakpoint === '4xl' ? 24 : wideBreakpoint === '3xl' ? 22 : 20;
+  const toggleIconSize = wideBreakpoint === '4xl' ? 24 : wideBreakpoint === '3xl' ? 22 : 20;
+  const trashIconSize = wideBreakpoint === '4xl' ? 18 : wideBreakpoint === '3xl' ? 16 : 14;
+  const chatRowHeight = wideBreakpoint === '4xl' ? 44 : wideBreakpoint === '3xl' ? 40 : 36;
+  const itemIconSize = isCollapsed ? collapsedIconSize : navIconSize;
   const [focusedChatIndex, setFocusedChatIndex] = React.useState<number>(-1);
   const [isHamburgerVisible, setIsHamburgerVisible] = React.useState(true);
   const lastScrollY = React.useRef(0);
@@ -75,9 +82,13 @@ export const Sidebar: React.FC = () => {
   const chatVirtualizer = useVirtualizer({
     count: chats.length,
     getScrollElement: () => chatListRef.current,
-    estimateSize: () => 36, // Increased to 36px for proper, even breathing room
+    estimateSize: () => chatRowHeight,
     overscan: 5,
   });
+
+  React.useEffect(() => {
+    chatVirtualizer.measure();
+  }, [chatRowHeight, chatVirtualizer]);
 
   const virtualItems = chatVirtualizer.getVirtualItems();
   const firstVisibleIndex = virtualItems.length > 0 ? virtualItems[0].index : 0;
@@ -196,13 +207,13 @@ export const Sidebar: React.FC = () => {
         }}
       >
         {/* Header: Cora Logo + Toggle Button */}
-        <div className={`flex items-center shrink-0 ${isCollapsed ? 'justify-center px-2.5 pt-4' : 'justify-between px-3 pt-4'} pb-2`}>
+        <div className={`flex items-center shrink-0 ${isCollapsed ? 'justify-center px-2.5 3xl:px-3 4xl:px-3.5 pt-4 3xl:pt-5 4xl:pt-6' : 'justify-between px-3 3xl:px-4 4xl:px-5 pt-4 3xl:pt-5 4xl:pt-6'} pb-2 3xl:pb-2.5 4xl:pb-3`}>
           <button
             onClick={() => {
               if (isMobile) return setMobileOpen(false);
               if (isCollapsed) toggleSidebar();
             }}
-            className="flex items-center justify-center cursor-pointer bg-surface-card rounded-xl w-9 h-9 3xl:w-10 3xl:h-10 overflow-hidden shrink-0"
+            className="flex items-center justify-center cursor-pointer bg-surface-card rounded-xl w-9 h-9 3xl:w-11 3xl:h-11 4xl:w-12 4xl:h-12 overflow-hidden shrink-0"
             aria-label="Cora Logo"
           >
             <img
@@ -214,50 +225,51 @@ export const Sidebar: React.FC = () => {
           {!isCollapsed && (
             <button
               aria-label="Toggle Sidebar"
-              className="hover:bg-muted transition-all duration-200 flex items-center justify-center w-9 h-9 3xl:w-10 3xl:h-10 rounded-xl shrink-0"
+              className="hover:bg-muted transition-all duration-200 flex items-center justify-center w-9 h-9 3xl:w-11 3xl:h-11 4xl:w-12 4xl:h-12 rounded-xl shrink-0"
               onClick={() => {
                 if (isMobile) return setMobileOpen(false);
                 toggleSidebar();
               }}
             >
-              <IconWrapper Icon={SidebarCloseIcon} size={20} aria-hidden={true} />
+              <IconWrapper Icon={SidebarCloseIcon} size={toggleIconSize} aria-hidden={true} />
             </button>
           )}
         </div>
 
         {/* New Chat Button */}
-        <div className={`shrink-0 ${isCollapsed ? 'flex justify-center px-2.5 mt-2 pb-2' : 'px-3 mt-2 pb-2'}`}>
+        <div className={`shrink-0 ${isCollapsed ? 'flex justify-center px-2.5 3xl:px-3 4xl:px-3.5 mt-2 3xl:mt-2.5 4xl:mt-3 pb-2 3xl:pb-2.5 4xl:pb-3' : 'px-3 3xl:px-4 4xl:px-5 mt-2 3xl:mt-2.5 4xl:mt-3 pb-2 3xl:pb-2.5 4xl:pb-3'}`}>
           {isCollapsed ? (
             <motion.button
-              className="flex items-center justify-center w-10 h-10 3xl:w-11 3xl:h-11 bg-surface-card border border-border-ui rounded-full hover:bg-surface-subtle transition-colors shrink-0"
+              className="flex items-center justify-center w-10 h-10 3xl:w-11 3xl:h-11 4xl:w-13 4xl:h-13 bg-surface-card border border-border-ui rounded-full hover:bg-surface-subtle transition-colors shrink-0"
               onClick={handleNewChat}
               aria-label="New chat"
               whileTap={shouldReduceMotion ? undefined : { scale: 0.92 }}
               transition={shouldReduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 500, damping: 22 }}
             >
-              <IconWrapper Icon={PlusCircleIcon} size={20} aria-hidden={true} />
+              <IconWrapper Icon={PlusCircleIcon} size={collapsedIconSize} aria-hidden={true} />
             </motion.button>
           ) : (
             <motion.button
-              className="font-inter w-full h-10 3xl:h-11 bg-surface-card border border-border-ui hover:bg-surface-subtle transition-colors duration-200 gap-2.5 text-body-sm font-medium flex items-center justify-center px-4 rounded-full"
+              className="font-inter w-full h-10 3xl:h-11 4xl:h-13 bg-surface-card border border-border-ui hover:bg-surface-subtle transition-colors duration-200 gap-2.5 3xl:gap-3 text-body-sm 3xl:text-base 4xl:text-lg font-medium flex items-center justify-center px-4 3xl:px-5 rounded-full"
               onClick={handleNewChat}
               whileTap={shouldReduceMotion ? undefined : { scale: 0.97 }}
               transition={shouldReduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 500, damping: 22 }}
             >
-              <IconWrapper Icon={PlusCircleIcon} size={18} aria-hidden={true} />
+              <IconWrapper Icon={PlusCircleIcon} size={navIconSize} aria-hidden={true} />
               <span className="text-foreground">New chat</span>
             </motion.button>
           )}
         </div>
 
         {/* Navigation Items */}
-        <nav className={`flex flex-col shrink-0 ${isCollapsed ? 'items-center gap-1 px-2.5 mt-1' : 'px-3 gap-1 mt-1'}`}>
+        <nav className={`flex flex-col shrink-0 ${isCollapsed ? 'items-center gap-1 3xl:gap-1.5 4xl:gap-2 px-2.5 3xl:px-3 4xl:px-3.5 mt-1 3xl:mt-1.5' : 'px-3 3xl:px-4 4xl:px-5 gap-1 3xl:gap-1.5 4xl:gap-2 mt-1 3xl:mt-1.5'}`}>
           <NavItem
             to="/case-studies/"
             label="Case studies"
             Icon={BookIcon}
             isActive={location.pathname.includes('/case-study') || location.pathname === '/case-studies/'}
             isCollapsed={isCollapsed}
+            iconSize={itemIconSize}
             onClick={() => isMobile && setMobileOpen(false)}
           />
 
@@ -267,6 +279,7 @@ export const Sidebar: React.FC = () => {
             Icon={PricingIcon}
             isActive={location.pathname === '/pricing/'}
             isCollapsed={isCollapsed}
+            iconSize={itemIconSize}
             onClick={() => isMobile && setMobileOpen(false)}
           />
 
@@ -276,6 +289,7 @@ export const Sidebar: React.FC = () => {
             Icon={ExploreIcon}
             isActive={location.pathname === '/projects/'}
             isCollapsed={isCollapsed}
+            iconSize={itemIconSize}
             onClick={() => isMobile && setMobileOpen(false)}
           />
 
@@ -285,6 +299,7 @@ export const Sidebar: React.FC = () => {
             Icon={FileIcon}
             isActive={location.pathname === '/documents/'}
             isCollapsed={isCollapsed}
+            iconSize={itemIconSize}
             onClick={() => isMobile && setMobileOpen(false)}
           />
 
@@ -294,18 +309,20 @@ export const Sidebar: React.FC = () => {
             Icon={ChatIcon}
             isActive={location.pathname === '/'}
             isCollapsed={isCollapsed}
+            iconSize={itemIconSize}
             onClick={() => isMobile && setMobileOpen(false)}
           />
         </nav>
 
         {/* Separator between nav and chat history */}
         {!isCollapsed && (
-          <div className="mx-3 mt-4 border-t border-border-ui/60 shrink-0" />
+          <div className="mx-3 3xl:mx-4 4xl:mx-5 mt-4 3xl:mt-5 4xl:mt-6 border-t border-border-ui/60 shrink-0" />
         )}
 
         <ChatListSection
           chats={chats}
           activeChat={activeChat}
+          trashIconSize={trashIconSize}
           virtualState={{
             chatListRef,
             chatVirtualizer,
@@ -326,8 +343,8 @@ export const Sidebar: React.FC = () => {
         />
 
         {/* Footer: About & User Menu */}
-        <div className="mt-auto shrink-0 border-t border-border-ui/60 pt-2">
-          <div className={`${isCollapsed ? 'flex flex-col items-center gap-1 px-2.5' : 'px-3'} pb-3`}>
+        <div className="mt-auto shrink-0 border-t border-border-ui/60 pt-2 3xl:pt-2.5 4xl:pt-3">
+          <div className={`${isCollapsed ? 'flex flex-col items-center gap-1 px-2.5 3xl:px-3 4xl:px-3.5' : 'px-3 3xl:px-4 4xl:px-5'} pb-3 3xl:pb-4 4xl:pb-5`}>
             {/* User Menu */}
             <UserMenu
               isCollapsed={isCollapsed}

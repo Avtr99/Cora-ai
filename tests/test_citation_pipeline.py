@@ -10,6 +10,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from src.agents.reasoning_formatter import format_reasoning_steps
 from src.agents.search_providers import SearchResult
 from src.agents.web_search import WebSearchAgent, _hybrid_failure_result, parse_citations
 from src.citations.check import check_citations
@@ -667,7 +668,7 @@ class TestWebRouteNonAnswer:
         result = await handler.process("obscure query", steps=[])
 
         assert result["answer"] == NO_ANSWER_FOUND
-        assert "error_fallback" not in result["sources"]
+        assert not result.get("error_fallback")
 
     @pytest.mark.asyncio
     async def test_timeout_still_marks_error_fallback(self):
@@ -683,7 +684,8 @@ class TestWebRouteNonAnswer:
 
         result = await handler.process("obscure query", steps=[])
 
-        assert result["sources"] == ["error_fallback"]
+        assert result["error_fallback"] is True
+        assert result["sources"] == ["web_search"]
 
     @staticmethod
     def _supplement_handler(web_result):
@@ -720,11 +722,13 @@ class TestWebRouteNonAnswer:
         )
         kb_result = {"answer": NO_ANSWER_FOUND, "sources": [], "citations": []}
 
+        steps = []
         result = await handler.supplement(
-            "chocolate cake recipe", kb_result, _vector_results(["kb_doc"]), steps=[]
+            "chocolate cake recipe", kb_result, _vector_results(["kb_doc"]), steps=steps
         )
 
         assert result["answer"] == SCOPE_REFUSAL_ANSWER
+        assert format_reasoning_steps(steps)[0]["details"]["summary"] == "The question is outside the supported topic."
 
     @pytest.mark.asyncio
     async def test_scope_refusal_does_not_override_real_kb_answer(self):
@@ -744,11 +748,16 @@ class TestWebRouteNonAnswer:
         )
         kb_result = {"answer": kb_answer, "sources": ["kb_doc.pdf"], "citations": []}
 
+        steps = []
         result = await handler.supplement(
-            "borderline query", kb_result, _vector_results(["kb_doc"]), steps=[]
+            "borderline query", kb_result, _vector_results(["kb_doc"]), steps=steps
         )
 
         assert result["answer"] == kb_answer
+        step = format_reasoning_steps(steps)[0]
+        assert step["status"] == "fallback"
+        assert step["details"]["summary"] == "Kept the knowledge base answer."
+        assert "sources" not in step["details"]
 
 
 # ---------------------------------------------------------------------------

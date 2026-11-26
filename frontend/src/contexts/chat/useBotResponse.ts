@@ -1,20 +1,11 @@
 import { useCallback } from 'react';
-import { CoraResponse, queryCoraStream } from '@/services/coraApi';
+import { CoraApiError, CoraResponse, CoraStreamError, queryCoraStream } from '@/services/coraApi';
 import { Chat, Message } from '@/store/chatStore.types';
 import { useChatStore } from '@/store/chatStore.simple';
 import { detectTopics } from '@/store/chatStore.utils';
 import { friendlyStatusText } from './chatStatusHelpers';
 import { buildBotMessage } from './botMessage';
 import { getUnseenRecommendations } from '@/components/chat/recommendationSelection';
-
-/**
- * The backend marks unanswerable results by putting `error_fallback` in the
- * response sources. Those turns are never stored server-side, so this check
- * only matters for the live path.
- */
-function isErrorFallbackResponse(response: CoraResponse): boolean {
-  return Array.isArray(response.sources) && response.sources.includes('error_fallback');
-}
 
 export interface BotRequestDeps {
   getCurrentChat: (chatId: string) => Chat | null;
@@ -37,6 +28,24 @@ export async function requestBotResponse(
   placeholderId: string,
   { getCurrentChat, updateChat, signal }: BotRequestDeps
 ): Promise<void> {
+  const showError = (content: string, agentReasoning?: Message['agentReasoning']) => {
+    const chat = getCurrentChat(chatId);
+    if (!chat) return;
+
+    const errorMessage: Message = {
+      id: placeholderId,
+      content,
+      sender: 'bot',
+      timestamp: new Date(),
+      replyToMessageId: userMessageId,
+      status: 'error',
+      agentReasoning,
+    };
+    updateChat(chatId, {
+      messages: chat.messages.map(m => m.id === placeholderId ? errorMessage : m),
+    });
+  };
+
   try {
     const chat = getCurrentChat(chatId);
     if (!chat) return;
@@ -89,22 +98,8 @@ export async function requestBotResponse(
 
     // If the backend returned an error fallback, treat the message as an error
     // and do not show recommendations or source badges.
-    if (isErrorFallbackResponse(finalResponse)) {
-      const latestChat = getCurrentChat(chatId);
-      if (latestChat) {
-        const errorMessage: Message = {
-          id: placeholderId,
-          content: finalResponse.text,
-          sender: 'bot',
-          timestamp: new Date(),
-          replyToMessageId: userMessageId,
-          status: 'error',
-        };
-        const updatedMessages = latestChat.messages.map(m =>
-          m.id === placeholderId ? errorMessage : m
-        );
-        updateChat(chatId, { messages: updatedMessages });
-      }
+    if (finalResponse.errorFallback) {
+      showError(finalResponse.text, finalResponse.agentReasoning);
       return;
     }
 
@@ -127,65 +122,47 @@ export async function requestBotResponse(
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {
       if (import.meta.env.DEV) console.log('Request cancelled by user');
-      const chat = getCurrentChat(chatId);
-      if (chat) {
-        const cancelledMessage: Message = {
-          id: placeholderId,
-          content: 'Request cancelled.',
-          sender: 'bot',
-          timestamp: new Date(),
-          replyToMessageId: userMessageId,
-          status: 'error',
-        };
-        const updatedMessages = chat.messages.map(m =>
-          m.id === placeholderId ? cancelledMessage : m
-        );
-        updateChat(chatId, { messages: updatedMessages });
-      }
+      showError('Request cancelled.');
       return;
     }
 
     console.error('Error getting bot response:', error);
 
-    const rawErrorMessage = error instanceof Error ? error.message : '';
-    const loweredErrorMessage = rawErrorMessage.toLowerCase();
-
+    // CoraStreamError carries a backend-authored message that is already
+    // safe to show verbatim (e.g. security blocks, "service initializing").
+    // CoraApiError carries a typed status/kind — map it to copy instead of
+    // pattern-matching on message text. Unknown errors get the generic text.
     let userFacingError = "I'm sorry, I encountered an error. Please try again.";
-    if (loweredErrorMessage.includes('403') || loweredErrorMessage.includes('security verification')) {
-      userFacingError = 'Security verification failed. Please refresh the page and try again.';
-    } else if (loweredErrorMessage.includes('504') || loweredErrorMessage.includes('upstream request timeout')) {
-      userFacingError = 'This question is taking too long for the server right now (gateway timeout). Please retry in a moment.';
-    } else if (loweredErrorMessage.includes('request timeout') || loweredErrorMessage.includes('timed out')) {
-      userFacingError = 'The request timed out before a response was ready. Please retry, or try a shorter/more focused question.';
-    } else if (loweredErrorMessage.includes('500') || loweredErrorMessage.includes('internal server error')) {
-      userFacingError = 'The AI service had an internal error. Please try again in a moment.';
-    } else if (loweredErrorMessage.includes('502') || loweredErrorMessage.includes('bad gateway')) {
-      userFacingError = 'The AI service is temporarily unavailable (bad gateway). Please try again in a moment.';
-    } else if (loweredErrorMessage.includes('503') || loweredErrorMessage.includes('service unavailable')) {
-      userFacingError = 'The AI service is temporarily unavailable. Please try again in a moment.';
-    } else if (loweredErrorMessage.includes('server error')) {
-      userFacingError = 'The AI service encountered an error. Please try again in a moment.';
+    if (error instanceof CoraStreamError) {
+      userFacingError = error.message;
+    } else if (error instanceof CoraApiError) {
+      if (error.kind === 'timeout') {
+        userFacingError = 'The request timed out before a response was ready. Please retry, or try a shorter/more focused question.';
+      } else {
+        switch (error.status) {
+          case 403:
+            userFacingError = 'Security verification failed. Please refresh the page and try again.';
+            break;
+          case 500:
+            userFacingError = 'The AI service had an internal error. Please try again in a moment.';
+            break;
+          case 502:
+            userFacingError = 'The AI service is temporarily unavailable (bad gateway). Please try again in a moment.';
+            break;
+          case 503:
+            userFacingError = 'The AI service is temporarily unavailable. Please try again in a moment.';
+            break;
+          case 504:
+            userFacingError = 'This question is taking too long for the server right now (gateway timeout). Please retry in a moment.';
+            break;
+        }
+      }
     }
 
-    const chat = getCurrentChat(chatId);
-    if (!chat) {
-      if (import.meta.env.DEV) console.log('Chat was deleted during request, skipping error message');
-      return;
-    }
-
-    const errorMessage: Message = {
-      id: placeholderId,
-      content: userFacingError,
-      sender: 'bot',
-      timestamp: new Date(),
-      replyToMessageId: userMessageId,
-      status: 'error',
-    };
-
-    const updatedMessages = chat.messages.map(m =>
-      m.id === placeholderId ? errorMessage : m
+    showError(
+      userFacingError,
+      error instanceof CoraStreamError ? error.reasoningSteps : undefined,
     );
-    updateChat(chatId, { messages: updatedMessages });
   }
 }
 

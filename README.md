@@ -308,7 +308,7 @@ Use this when you want to run the backend and frontend separately.
 
 ### Backend
 
-Requirements: Python 3.11+, a running Qdrant instance.
+Requirements: Python 3.11.5+, a running Qdrant instance.
 
 ```bash
 pip install -r requirements.txt           # runtime + ingestion

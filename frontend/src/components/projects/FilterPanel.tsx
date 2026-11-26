@@ -67,7 +67,7 @@ export const FilterPanel: React.FC<FilterPanelProps> = ({
 
   const handleTabKeyDown = (e: React.KeyboardEvent, currentIndex: number) => {
     const tabs = filterDefs.map(f => f.key);
-    let newIndex = currentIndex;
+    let newIndex: number;
 
     switch (e.key) {
       case 'ArrowLeft':

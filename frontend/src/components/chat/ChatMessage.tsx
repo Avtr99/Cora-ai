@@ -140,9 +140,11 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAgentReas
       .filter((rec): rec is Recommendation => Boolean(rec));
   }, [shouldShowRecommendations, message.triggeredRecommendationIds]);
 
+  const hasReasoning = !isUser && steps.length > 0;
+
   return (
     <div className="flex w-full justify-center">
-      <div className="flex flex-col w-full max-w-2xl 3xl:max-w-3xl 4xl:max-w-4xl">
+      <div className="flex flex-col w-full max-w-[680px] 3xl:max-w-[850px] 4xl:max-w-[960px]">
         {/* User message comes first */}
         {isUser && (
           <div>
@@ -150,11 +152,11 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAgentReas
           </div>
         )}
 
-        {!isUser && steps.length > 0 && <AgentReasoningSection steps={steps} />}
+        {hasReasoning && <AgentReasoningSection steps={steps} status={message.status} />}
 
         {/* Bot Message Content */}
         {!isUser && (
-          <div className="flex flex-col w-full pb-2">
+          <div className={`flex flex-col w-full ${!hasReasoning && !isPending ? 'mt-2 md:mt-3 3xl:mt-3.5 4xl:mt-5' : ''}`}>
             <div
               ref={bubbleRef}
               tabIndex={-1}
@@ -171,7 +173,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAgentReas
                   <RetryButton onClick={handleRetry} disabled={isRetrying} />
                 </div>
               ) : isPending ? (
-                <div className="flex items-center gap-2 3xl:gap-3 py-2 3xl:py-3 mt-1 3xl:mt-2">
+                <div className="flex items-center gap-2 3xl:gap-3 py-1.5 3xl:py-2">
                   <span className="relative flex h-4 w-4 3xl:h-5 3xl:w-5 4xl:h-6 4xl:w-6 items-center justify-center">
                     <span className="animate-pulse-dot absolute inline-flex h-2 w-2 3xl:h-2.5 3xl:w-2.5 4xl:h-3 4xl:w-3 rounded-full bg-text-muted opacity-50"></span>
                     <span className="relative inline-flex h-2 w-2 3xl:h-2.5 3xl:w-2.5 4xl:h-3 4xl:w-3 rounded-full bg-text-muted"></span>
@@ -193,7 +195,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAgentReas
 
             {/* Action bar: feedback (left) + copy (right) */}
             {!isErrorMessage && !isCancelledMessage && !isPending && (
-              <div className="flex items-start justify-between mt-1 3xl:mt-2 gap-2 3xl:gap-3">
+              <div className="flex items-start justify-between mt-3 md:mt-3.5 3xl:mt-4 4xl:mt-5 gap-2 3xl:gap-3">
                 <MessageFeedback
                   messageId={message.id}
                   chatId={activeChat?.id}
@@ -263,7 +265,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAgentReas
 
         {/* Recommendations based solely on triggeredRecommendations (deduped by ChatContext) */}
         {shouldShowRecommendations && recommendationsToShow.length > 0 && (
-          <div className="mt-4 w-full mb-4">
+          <div className="mt-4 3xl:mt-5 4xl:mt-6 w-full">
             <p className="font-inter text-xs 3xl:text-sm 4xl:text-base font-normal text-text-muted mb-2 3xl:mb-3 4xl:mb-4">You might also be interested in</p>
             <div className="flex flex-col gap-2">
               {recommendationsToShow.map(recommendation => (
@@ -284,7 +286,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAgentReas
 export const TypingIndicator: React.FC = () => {
   return (
     <div className="flex w-full justify-center mb-4 mt-4">
-      <div className="flex max-w-2xl 3xl:max-w-3xl 4xl:max-w-4xl w-full">
+      <div className="flex max-w-[680px] 3xl:max-w-[850px] 4xl:max-w-[960px] w-full">
         <div className="pl-2" aria-live="polite" aria-atomic="true">
           <div className="flex items-center">
             <div className="flex space-x-1 3xl:space-x-1.5 4xl:space-x-2">

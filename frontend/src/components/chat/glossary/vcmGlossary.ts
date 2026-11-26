@@ -989,6 +989,17 @@ export const GLOSSARY_MAP = new Map<string, GlossaryEntry>(
 );
 
 /**
+ * Lower-cased keys of pure-acronym variants (TREES, ART, CDM, CAR…).
+ * These only annotate their literal uppercase form — a lowercase "trees"
+ * is the common word, not the TREES standard.
+ */
+export const ACRONYM_TERMS = new Set(
+  _expanded
+    .filter((item) => /^[A-Z0-9+.]+$/.test(item.term))
+    .map((item) => item.term.toLowerCase()),
+);
+
+/**
  * Pre-compiled regex that matches any glossary term (longest-first,
  * case-insensitive, whole-word). The `u` flag ensures Unicode safety.
  */

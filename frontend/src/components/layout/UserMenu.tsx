@@ -127,30 +127,31 @@ export const UserMenu: React.FC<UserMenuProps> = ({ isCollapsed, isMobile, setMo
   };
 
   const menuItemClass =
-    "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 font-inter text-sm text-text-primary transition-colors hover:bg-surface-subtle text-left";
+    "flex w-full items-center gap-2.5 3xl:gap-3 rounded-lg px-2.5 3xl:px-3 4xl:px-3.5 py-2 3xl:py-2.5 4xl:py-3 font-inter text-sm 3xl:text-base 4xl:text-lg text-text-primary transition-colors hover:bg-surface-subtle text-left";
+  const menuIconClass = "h-4 w-4 3xl:h-4.5 3xl:w-4.5 4xl:h-5 4xl:w-5 shrink-0 text-text-muted";
 
   const menuItems = (
     <>
       {authStatus === 'authenticated' && (
         <button type="button" onClick={handleAccount} className={menuItemClass}>
-          <User className="h-4 w-4 text-text-muted" strokeWidth={1.75} />
+          <User className={menuIconClass} strokeWidth={1.75} />
           Account
         </button>
       )}
       <button type="button" onClick={handleSettings} className={menuItemClass}>
-        <Settings className="h-4 w-4 text-text-muted" strokeWidth={1.75} />
+        <Settings className={menuIconClass} strokeWidth={1.75} />
         Settings
       </button>
       <button type="button" onClick={handleAbout} className={menuItemClass}>
-        <Info className="h-4 w-4 text-text-muted" strokeWidth={1.75} />
+        <Info className={menuIconClass} strokeWidth={1.75} />
         About
       </button>
       <button type="button" onClick={handleGettingStarted} className={menuItemClass}>
-        <BookOpen className="h-4 w-4 text-text-muted" strokeWidth={1.75} />
+        <BookOpen className={menuIconClass} strokeWidth={1.75} />
         Getting started guide
       </button>
       {authUser && (
-        <div className="px-2.5 py-2 font-inter text-xs text-text-muted truncate">
+        <div className="px-2.5 3xl:px-3 4xl:px-3.5 py-2 3xl:py-2.5 font-inter text-xs 3xl:text-sm 4xl:text-base text-text-muted truncate">
           Signed in as {authUser.username}
         </div>
       )}
@@ -160,7 +161,7 @@ export const UserMenu: React.FC<UserMenuProps> = ({ isCollapsed, isMobile, setMo
           onClick={() => void handleSignOut()}
           className={menuItemClass}
         >
-          <LogOut className="h-4 w-4 text-text-muted" strokeWidth={1.75} />
+          <LogOut className={menuIconClass} strokeWidth={1.75} />
           Sign out
         </button>
       )}
@@ -181,19 +182,19 @@ export const UserMenu: React.FC<UserMenuProps> = ({ isCollapsed, isMobile, setMo
             open ? 'bg-muted/80' : 'hover:bg-muted'
           } ${
             isCollapsed
-              ? 'justify-center w-10 h-10 shrink-0'
-              : 'gap-2.5 px-3 h-9 w-full shrink-0'
+              ? 'justify-center w-10 h-10 3xl:w-11 3xl:h-11 4xl:w-13 4xl:h-13 shrink-0'
+              : 'gap-2.5 3xl:gap-3 4xl:gap-3.5 px-3 3xl:px-3.5 4xl:px-4 h-9 3xl:h-11 4xl:h-12 w-full shrink-0'
           }`}
         >
-          <span className="flex h-5 w-5 shrink-0 items-center justify-center">
+          <span className="flex h-5 w-5 3xl:h-5.5 3xl:w-5.5 4xl:h-6 4xl:w-6 shrink-0 items-center justify-center">
             <Settings
-              className={`${isCollapsed ? 'h-5 w-5' : 'h-4.5 w-4.5'} text-text-muted`}
+              className={`${isCollapsed ? 'h-5 w-5 3xl:h-5.5 3xl:w-5.5 4xl:h-6 4xl:w-6' : 'h-4.5 w-4.5 3xl:h-5 3xl:w-5 4xl:h-5.5 4xl:w-5.5'} text-text-muted`}
               strokeWidth={1.75}
               aria-hidden={true}
             />
           </span>
           {!isCollapsed && (
-            <span className="font-inter text-ui font-medium text-text-muted">
+            <span className="font-inter text-ui 3xl:text-base 4xl:text-lg font-medium text-text-muted min-w-0 flex-1 truncate text-left">
               About & Settings
             </span>
           )}
@@ -202,7 +203,7 @@ export const UserMenu: React.FC<UserMenuProps> = ({ isCollapsed, isMobile, setMo
         {open && !isCollapsed && (
           <div
             role="menu"
-            className="absolute z-50 left-0 bottom-full mb-2 w-full rounded-xl border border-border-ui bg-surface-card p-1.5 shadow-modal origin-bottom-left animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-1 duration-150 ease-[cubic-bezier(0.16,1,0.3,1)]"
+            className="absolute z-50 left-0 bottom-full mb-2 w-full rounded-xl border border-border-ui bg-surface-card p-1.5 3xl:p-2 shadow-modal origin-bottom-left animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-1 duration-150 ease-[cubic-bezier(0.16,1,0.3,1)]"
           >
             {menuItems}
           </div>
@@ -213,7 +214,7 @@ export const UserMenu: React.FC<UserMenuProps> = ({ isCollapsed, isMobile, setMo
             ref={popupRef}
             role="menu"
             style={{ position: 'fixed', left: popupPos.left, bottom: popupPos.bottom }}
-            className="z-50 w-56 rounded-xl border border-border-ui bg-surface-card p-1.5 shadow-modal max-h-[calc(100dvh-16px)] overflow-y-auto origin-bottom-left animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-1 duration-150 ease-[cubic-bezier(0.16,1,0.3,1)]"
+            className="z-50 w-56 3xl:w-64 4xl:w-72 rounded-xl border border-border-ui bg-surface-card p-1.5 3xl:p-2 shadow-modal max-h-[calc(100dvh-16px)] overflow-y-auto origin-bottom-left animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-1 duration-150 ease-[cubic-bezier(0.16,1,0.3,1)]"
           >
             {menuItems}
           </div>,

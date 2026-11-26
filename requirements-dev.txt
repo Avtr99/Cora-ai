@@ -18,3 +18,9 @@ datasets>=5.0.0,<6.0
 
 # Load Testing
 locust>=2.44.4,<3.0
+
+# --- Security: pin critical transitive deps to fix CVEs ---
+# These only affect requirements-ci.lock (dev deps are not in the image).
+werkzeug>=3.1.9,<4.0           # PYSEC-2026-4312 in 3.1.8 (transitive via locust/flask)
+msgpack>=1.2.3,<2.0            # CVE-2026-114613 in 1.2.1 (transitive)
+Brotli>=1.2.1,<2.0             # PYSEC-2026-4322 in 1.2.0 (transitive)

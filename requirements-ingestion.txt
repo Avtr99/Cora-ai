@@ -43,6 +43,10 @@ websockets>=14,<16
 # top of requirements-core.lock in the same image and must not resolve below it.
 certifi>=2026.10.19
 
+# --- Security: pin critical transitive deps to fix CVEs ---
+mail-parser>=4.6.3,<5.0        # 5 CVEs in 4.5.0 (transitive via docling-slim)
+setuptools>=84.1.0             # GHSA-xmj3-9gf7-h52w in 83.0.0 (transitive)
+
 # Auth deps, repeated from requirements-core.txt so the standalone
 # ingestion lockfile carries the same pins (it installs on top of
 # requirements-core.lock in the same image).

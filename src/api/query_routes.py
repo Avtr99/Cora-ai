@@ -7,6 +7,7 @@ from fastapi import HTTPException, Request
 from loguru import logger
 
 from ..config import get_settings
+from ..db.chats import ChatNotFound
 from .query_history import open_turn
 from .query_models import (
     Message,
@@ -82,6 +83,8 @@ async def test_query(request: Request, test_request: TestQueryRequest) -> TestQu
         
     except HTTPException:
         raise
+    except ChatNotFound:
+        raise HTTPException(status_code=404, detail="Chat not found")
     except Exception as e:
         error_id = str(uuid.uuid4())[:8]
         logger.error(f"Test query error [error_id={error_id}]: {type(e).__name__}")

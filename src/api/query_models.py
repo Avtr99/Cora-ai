@@ -2,8 +2,12 @@
 
 from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field, ValidationInfo, field_validator
-
+from pydantic import (
+    BaseModel,
+    Field,
+    ValidationInfo,
+    field_validator,
+)
 
 class Message(BaseModel):
     """Conversation message for short-term history window."""
@@ -151,11 +155,11 @@ class Response(BaseModel):
     quiz: Optional[QuizResponse] = None
     suggested_prompts: Optional[List[str]] = None
     truncated: bool = False
+    error_fallback: bool = False
     config_version: int = Field(
         0,
         description="Config generation at request start (observability stamp, not a consistency guarantee).",
     )
-
 
 class TestQueryRequest(BaseModel):
     """Test query request for direct testing."""

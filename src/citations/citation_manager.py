@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional
 from loguru import logger
 
 from ..query_processing.conversational_classifier import is_conversational_query
-from ..query_processing.fallback_answers import has_error_source_marker
+from ..query_processing.fallback_answers import is_error_fallback_result
 from .check import drop_markers, marker_type, select_cited
 from .config import (
     CitationConfig,
@@ -96,7 +96,7 @@ class CitationManager:
                     if cleaned_name and cleaned_name.strip():
                         sources.append(cleaned_name)
             result["sources"] = sources
-        elif not has_error_source_marker(result.get("sources")):
+        elif not is_error_fallback_result(result):
             result["sources"] = []
 
     def _sanitize_snippet(self, snippet: str) -> str:

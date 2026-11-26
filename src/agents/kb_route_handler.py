@@ -254,7 +254,8 @@ class KBRouteHandler:
             ))
             return {
                 "answer": "I encountered an error generating the answer. Please try again.",
-                "sources": ["error_fallback"],
+                "sources": ["knowledge_base"],
+                "error_fallback": True,
                 "citations": [],
                 "confidence": 0.0
             }

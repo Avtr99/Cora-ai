@@ -214,6 +214,7 @@ async def _finalize_initialization() -> None:
         await async_job_manager.configure(
             max_queue_size=settings.ASYNC_QUERY_QUEUE_MAX_SIZE,
             job_ttl_seconds=settings.ASYNC_QUERY_JOB_TTL_SECONDS,
+            per_caller_queue_max=settings.ASYNC_QUERY_PER_CALLER_QUEUE_MAX_SIZE,
         )
         await async_job_manager.start(worker_count=settings.ASYNC_QUERY_WORKERS)
 
@@ -428,11 +429,19 @@ def get_citation_manager():
 
 
 def get_initialization_status():
-    """Get initialization status for health checks."""
+    """Get initialization status for health checks.
+
+    Raw exception details stay in server logs; the public payload only names
+    the failed component so health endpoints don't leak internals (paths,
+    connection strings, library versions).
+    """
     return {
         "complete": initialization_complete,
         "setup_required": setup_required,
-        "errors": initialization_errors,
+        "errors": [
+            {"component": error["component"], "error": "Initialization failed"}
+            for error in initialization_errors
+        ],
         "components": {
             "retriever": retriever is not None,
             "llm_client": llm_client is not None,

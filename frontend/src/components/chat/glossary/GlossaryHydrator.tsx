@@ -9,7 +9,7 @@ import {
   PopoverTrigger,
   PopoverContent,
 } from '@/components/ui/popover';
-import { GLOSSARY_MAP, GLOSSARY_REGEX, type GlossaryEntry } from './vcmGlossary';
+import { ACRONYM_TERMS, GLOSSARY_MAP, GLOSSARY_REGEX, type GlossaryEntry } from './vcmGlossary';
 
 /**
  * Touch-device detection used to decide whether glossary definitions should
@@ -171,6 +171,10 @@ function splitByGlossaryTerms(text: string): TextSegment[] {
 
   while ((match = GLOSSARY_REGEX.exec(text)) !== null) {
     const termLower = match[1].toLowerCase();
+
+    // Acronym variants only annotate their literal uppercase form —
+    // a lowercase "trees" is the common word, not the TREES standard.
+    if (ACRONYM_TERMS.has(termLower) && match[0] !== match[0].toUpperCase()) continue;
 
     // Skip duplicates within the same paragraph
     if (hydratedTerms.has(termLower)) continue;

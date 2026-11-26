@@ -41,8 +41,12 @@ export interface CitationResponse {
 }
 
 export interface ReasoningStepDetails {
+  /** Stable step kind for icon/message mapping (understand|route|search_kb|search_web|compose|verify|fallback|step). */
+  kind?: string;
   original_query?: string;
+  rewritten?: string;
   rewritten_query?: string;
+  intent?: string;
   route?: string;
   reason?: string;
   title?: string;
@@ -55,14 +59,19 @@ export interface ReasoningStepDetails {
   results_count?: number;
   count?: number;
   source?: string;
+  method?: string;
   sources?: string[];
   corrections?: string[];
   answer_preview?: string;
+  is_grounded?: boolean;
+  confidence?: number;
+  filters?: Record<string, unknown>;
 }
 
 export interface ReasoningStep {
   name: string;
-  status: 'completed' | 'in_progress' | 'skipped';
+  /** Backend statuses: completed, in_progress, skipped, cached, failed, fallback. */
+  status: string;
   duration_ms: number;
   details: Record<string, unknown>;
 }
@@ -79,6 +88,9 @@ export interface ResponseMetadata {
   };
   timeout_reason?: string | null;
   total_time_ms: number;
+  rewrite_info?: {
+    filters?: { document_id?: string; registry_document_id?: string };
+  };
   // True when the KB route retrieved zero documents and web search was disabled.
   kb_empty?: boolean;
 }
@@ -103,6 +115,8 @@ export interface QueryResponse {
   metadata?: ResponseMetadata;
   quiz: QuizResponse | null;
   suggested_prompts?: string[];
+  /** True when the pipeline produced a failure fallback instead of an answer. */
+  error_fallback?: boolean;
 }
 
 export interface CoraResponse {
@@ -118,6 +132,7 @@ export interface CoraResponse {
   metadata?: ResponseMetadata;
   quiz?: QuizResponse;
   suggestedPrompts?: string[];
+  errorFallback?: boolean;
 }
 
 export interface QueryCoraOptions {
@@ -157,6 +172,8 @@ export interface SSEErrorEvent {
   event: 'error';
   error_id: string;
   message: string;
+  /** Sanitized partial trace emitted on terminal failures (when requested). */
+  reasoning_steps?: ReasoningStep[] | null;
 }
 
 export type SSEEvent =

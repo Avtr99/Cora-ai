@@ -1,110 +1,132 @@
-import React from 'react';
-import { BRAND } from '@/lib/colors';
-import { MessageSquare, Pencil, Route, Search, FileText, CheckCircle } from 'lucide-react';
+import type { ReactElement } from 'react';
+import {
+  ChevronDown,
+  CircleAlert,
+  CircleHelp,
+  Database,
+  GitBranch,
+  Globe,
+  PenLine,
+  Repeat,
+  ShieldCheck,
+  Workflow,
+} from 'lucide-react';
 import type { AgentReasoningStep } from '@/types/reasoning';
+import type { Message } from '@/store/chatStore.types';
 
 const isNonEmptyString = (m: unknown): m is string => typeof m === 'string' && m.trim().length > 0;
 
-/** Normalize step.messages into an array of non-empty strings. */
-const normalizeStepMessages = (messages: unknown[] | string | undefined): string[] => {
-  if (Array.isArray(messages)) return messages.filter(isNonEmptyString);
-  if (typeof messages === 'string') return [messages];
-  return [];
+const STEP_ICONS: Record<string, typeof CircleHelp> = {
+  understand: CircleHelp,
+  route: GitBranch,
+  search_kb: Database,
+  search_web: Globe,
+  compose: PenLine,
+  verify: ShieldCheck,
+  fallback: Repeat,
+  step: Workflow,
 };
 
-const friendlyLabel = (name?: string) => name || 'Processing';
+const STEP_STATUS_LABELS: Record<NonNullable<AgentReasoningStep['status']>, string> = {
+  running: 'Not finished',
+  complete: 'Complete',
+  error: 'Failed',
+  cancelled: 'Cancelled',
+  skipped: 'Skipped',
+  cached: 'Cached',
+  fallback: 'Fallback',
+};
 
-const friendlyMessage = (m: string) => m.trim();
-
-const renderStepIcon = (name?: string) => {
-  const n = (name || '').toLowerCase();
-  if (n.includes('intent') || n.includes('query')) return <MessageSquare className="h-3.5 w-3.5 3xl:h-4 3xl:w-4 4xl:h-5 4xl:w-5 text-brand-500" />;
-  if (n.includes('clarify') || n.includes('rewrit')) return <Pencil className="h-3.5 w-3.5 3xl:h-4 3xl:w-4 4xl:h-5 4xl:w-5 text-brand-500" />;
-  if (n.includes('route')) return <Route className="h-3.5 w-3.5 3xl:h-4 3xl:w-4 4xl:h-5 4xl:w-5 text-brand-500" />;
-  if (n.includes('retriev') || n.includes('search')) return <Search className="h-3.5 w-3.5 3xl:h-4 3xl:w-4 4xl:h-5 4xl:w-5 text-brand-500" />;
-  if (n.includes('summarize') || n.includes('findings')) return <FileText className="h-3.5 w-3.5 3xl:h-4 3xl:w-4 4xl:h-5 4xl:w-5 text-brand-500" />;
-  if (n.includes('validat') || n.includes('quality') || n.includes('check')) return <CheckCircle className="h-3.5 w-3.5 3xl:h-4 3xl:w-4 4xl:h-5 4xl:w-5 text-brand-500" />;
-  if (n.includes('answer') || n.includes('generat') || n.includes('draft')) return <Pencil className="h-3.5 w-3.5 3xl:h-4 3xl:w-4 4xl:h-5 4xl:w-5 text-brand-500" />;
-  return <FileText className="h-3.5 w-3.5 3xl:h-4 3xl:w-4 4xl:h-5 4xl:w-5 text-brand-500" />;
+const stepIcon = (step: AgentReasoningStep, isFailedStep: boolean) => {
+  if (isFailedStep) return CircleAlert;
+  return STEP_ICONS[step.kind ?? 'step'] ?? Workflow;
 };
 
 interface AgentReasoningSectionProps {
   steps: AgentReasoningStep[];
+  status?: Message['status'];
 }
 
-export const AgentReasoningSection: React.FC<AgentReasoningSectionProps> = ({ steps }) => {
-  const visibleSteps = steps.filter((step) => {
-    const stepName = (step.agentName || '').toLowerCase();
-    const isValidationStep = stepName.includes('validat') || stepName.includes('quality') || stepName.includes('check');
-    if (!isValidationStep) return true;
-    const messages = normalizeStepMessages(step.messages);
-    return !messages.some((msg) => /\bskipp?ed\b/i.test(msg));
-  });
-
+/**
+ * Collapsible "How this answer was formed" trace.
+ *
+ * Renders the backend's formatted reasoning_steps as an icon timeline:
+ * one imperative title per step (details.title), one prod-style message line
+ * (details.summary / derived), and clean source names under retrieval steps.
+ */
+export function AgentReasoningSection({ steps, status }: AgentReasoningSectionProps): ReactElement | null {
+  const interrupted = status === 'error' || status === 'cancelled';
+  // Skipped steps are dropped upstream in buildAgentReasoning.
+  const visibleSteps = steps;
   if (visibleSteps.length === 0) return null;
 
   return (
-    <details className="-mt-1 mb-3 3xl:mb-4 text-xs 3xl:text-sm 4xl:text-base cursor-pointer group">
-      <summary className="font-inter font-normal text-xs 3xl:text-sm 4xl:text-base leading-[1.4] text-text-secondary outline-hidden flex items-center gap-1.5 3xl:gap-2 hover:text-brand-500 transition-colors list-none select-none rounded-xs focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2">
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
-          <path d="M6.5 2L3 6.5L6.5 6.5L6.5 10L10 5.5L6.5 5.5L6.5 2Z" fill={BRAND.primary500} stroke={BRAND.primary500} strokeWidth="0.5" />
-        </svg>
-        <span>How this answer was formed</span>
-        <svg className="transition-transform duration-200 group-open:rotate-180" width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+    <details className="group mb-4 md:mb-5 3xl:mb-6 4xl:mb-8 font-inter text-xs 3xl:text-base 4xl:text-xl">
+      <summary className="inline-flex min-h-6 cursor-pointer items-center gap-1.5 py-0.5 text-text-muted hover:text-text-secondary list-none select-none rounded focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2">
+        <span>{interrupted ? 'Request workflow' : 'How this answer was formed'}</span>
+        <ChevronDown
+          aria-hidden="true"
+          className="h-3 w-3 3xl:h-3.5 3xl:w-3.5 4xl:h-4 4xl:w-4 shrink-0 -rotate-90 transition-transform duration-150 group-open:rotate-0 motion-reduce:transition-none"
+        />
       </summary>
-      <div className="mt-2.5 3xl:mt-3.5 space-y-1.5 3xl:space-y-2 4xl:space-y-2.5 reasoning-content">
+      <div className="mt-2.5 md:mt-3 3xl:mt-3.5 4xl:mt-4 flex flex-col">
         {visibleSteps.map((step, idx) => {
-          const msgs = normalizeStepMessages(step.messages);
-          const primaryMsg = msgs[0] || '';
-          const detailMsgs = msgs.slice(1);
-          const stepName = (step.agentName || '').toLowerCase();
-          const isRetrievalStep = stepName.includes('retriev') || stepName.includes('search') || stepName.includes('kb');
+          let stepStatus = step.status ?? 'complete';
+          const isLast = idx === visibleSteps.length - 1;
+          if (!step.status && isLast && (status === 'error' || status === 'cancelled')) {
+            stepStatus = status;
+          }
+          const isFailedStep = stepStatus === 'error' || stepStatus === 'cancelled';
+          const Icon = stepIcon(step, isFailedStep);
+          const msgs = (step.messages ?? []).filter(isNonEmptyString);
+          const sources = (step.sources ?? []).filter(isNonEmptyString);
 
           return (
-            <div key={idx} className="rounded-md border border-border-ui bg-surface-card p-2.5 3xl:p-3 4xl:p-3.5">
-              <div className="flex items-center gap-1.5 3xl:gap-2 mb-1.5 3xl:mb-2">
-                <span className="flex items-center justify-center w-5 h-5 3xl:w-6 3xl:h-6 4xl:w-7 4xl:h-7 rounded bg-brand-100">
-                  {renderStepIcon(step.agentName)}
-                </span>
-                <span className="font-poppins font-medium text-xs 3xl:text-sm text-text-primary">
-                  {friendlyLabel(step.agentName)}
-                </span>
+            <div key={step.nodeId ?? idx} data-reasoning-step className="relative pb-3 3xl:pb-4 4xl:pb-5 pl-7 3xl:pl-8 4xl:pl-10 last:pb-0">
+              {!isLast && (
+                <span aria-hidden="true" className="absolute bottom-0 left-2 3xl:left-2.5 4xl:left-3 top-5 3xl:top-6 4xl:top-7 w-px bg-border-ui" />
+              )}
+              <span
+                aria-hidden="true"
+                className={`absolute left-0 top-[1px] flex h-[17px] w-[17px] 3xl:h-[21px] 3xl:w-[21px] 4xl:h-[25px] 4xl:w-[25px] items-center justify-center ${
+                  isFailedStep ? 'text-semantic-error-icon' : 'text-text-muted'
+                }`}
+              >
+                <Icon className="h-[15px] w-[15px] 3xl:h-[18px] 3xl:w-[18px] 4xl:h-[22px] 4xl:w-[22px]" strokeWidth={2} />
+              </span>
+              <div className="flex items-center gap-1.5 leading-normal">
+                <span className="font-medium text-text-primary">{step.agentName || 'Processing'}</span>
+                {stepStatus !== 'complete' && (
+                  <span
+                    className={`rounded-full border px-1.5 py-px text-[11px] 3xl:text-sm font-medium ${
+                      isFailedStep
+                        ? 'border-semantic-error-border text-semantic-error-text'
+                        : 'border-border-ui text-text-muted'
+                    }`}
+                  >
+                    {STEP_STATUS_LABELS[stepStatus]}
+                  </span>
+                )}
               </div>
-              {primaryMsg && (
-                <p className="font-inter font-normal text-sm 3xl:text-base 4xl:text-lg leading-[1.45] text-text-secondary mb-1 3xl:mb-1.5">
-                  {friendlyMessage(primaryMsg)}
+              {msgs.map((msg, index) => (
+                <p key={index} className="mt-0.5 leading-relaxed text-text-secondary wrap-break-word">
+                  {msg.trim()}
                 </p>
-              )}
-              {detailMsgs.length > 0 && (
-                <div className="pl-1">
-                  {isRetrievalStep ? (
-                    <ul className="space-y-1 3xl:space-y-1.5 4xl:space-y-2">
-                      {detailMsgs.map((msg: string, i: number) => (
-                        <li key={i} className="flex items-start gap-2">
-                          <span className="w-1 h-1 3xl:w-1.5 3xl:h-1.5 rounded-full bg-brand-500 mt-1.5 3xl:mt-2 shrink-0"></span>
-                          <span className="font-inter font-normal text-xs 3xl:text-sm leading-[1.45] text-text-secondary">
-                            {friendlyMessage(msg)}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <div className="space-y-0.5">
-                      {detailMsgs.map((msg: string, i: number) => (
-                        <p key={i} className="font-inter font-normal text-xs 3xl:text-sm leading-[1.45] text-text-secondary">
-                          {friendlyMessage(msg)}
-                        </p>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
+              ))}
+              {sources.map((name, index) => (
+                <p
+                  key={`src-${index}`}
+                  className={`mt-0.5 leading-relaxed wrap-break-word ${
+                    name.startsWith('…') ? 'text-text-disabled' : 'text-text-muted'
+                  }`}
+                >
+                  {name}
+                </p>
+              ))}
             </div>
           );
         })}
       </div>
     </details>
   );
-};
+}

@@ -2,11 +2,13 @@ import { apiFetch } from '../apiFetch';
 import { sanitizeInput } from '@/lib/security';
 import { API_STREAM_ENDPOINT, API_TIMEOUT_MS, ENABLE_DEBUG_REASONS, IS_PROD } from './config';
 import { buildAgentReasoning } from './agentReasoning';
+import { CoraApiError, CoraStreamError } from './errors';
 import {
   CoraResponse,
   QueryCoraOptions,
   QueryRequest,
   QueryResponse,
+  SSEErrorEvent,
   SSEEvent,
   StreamingCallbacks,
 } from './types';
@@ -49,6 +51,7 @@ export function validateQueryResponse(value: unknown): QueryResponse {
     metadata: obj.metadata as QueryResponse['metadata'],
     quiz: (obj.quiz as QueryResponse['quiz']) ?? null,
     suggested_prompts: ensureArray('suggested_prompts'),
+    error_fallback: obj.error_fallback === true,
   };
 }
 
@@ -70,6 +73,7 @@ export function toCoraResponse(result: QueryResponse): CoraResponse {
     metadata: result.metadata,
     quiz: result.quiz,
     suggestedPrompts: result.suggested_prompts,
+    errorFallback: result.error_fallback === true,
   };
 }
 
@@ -178,7 +182,11 @@ export async function queryCoraStream(
         };
       }
 
-      throw new Error(`API request failed with status ${response.status}: ${errorData.message || errorData.detail || 'Unknown error'}`);
+      throw new CoraApiError(
+        'http',
+        `API request failed with status ${response.status}: ${errorData.message || errorData.detail || 'Unknown error'}`,
+        response.status
+      );
     }
 
     const contentType = response.headers.get('Content-Type') || '';
@@ -314,6 +322,9 @@ export async function queryCoraStream(
                 event: 'error',
                 error_id: typeof parsed.error_id === 'string' ? parsed.error_id : 'stream',
                 message: typeof parsed.message === 'string' ? parsed.message : 'Streaming error',
+                reasoning_steps: Array.isArray(parsed.reasoning_steps)
+                  ? (parsed.reasoning_steps as SSEErrorEvent['reasoning_steps'])
+                  : undefined,
               };
             } else if (
               typeof parsed.status === 'string' ||
@@ -376,10 +387,14 @@ export async function queryCoraStream(
                 onDone?.();
                 break;
 
-              case 'error':
+              case 'error': {
                 console.error('[SSE] Error event:', normalizedEvent.error_id, normalizedEvent.message);
                 onError?.(normalizedEvent.error_id, normalizedEvent.message);
-                throw new Error(`Server error [${normalizedEvent.error_id}]: ${normalizedEvent.message}`);
+                const reasoningSteps = normalizedEvent.reasoning_steps?.length
+                  ? buildAgentReasoning({ reasoning_steps: normalizedEvent.reasoning_steps })
+                  : undefined;
+                throw new CoraStreamError(normalizedEvent.error_id, normalizedEvent.message, reasoningSteps);
+              }
             }
           } catch (parseError) {
             if (parseError instanceof SyntaxError) {
@@ -405,7 +420,7 @@ export async function queryCoraStream(
         throw error;
       }
       console.error(`[SSE] Request timed out after ${API_TIMEOUT_MS / 1000} seconds`);
-      throw new Error(`API request timeout after ${API_TIMEOUT_MS / 1000}s`);
+      throw new CoraApiError('timeout', `API request timeout after ${API_TIMEOUT_MS / 1000}s`);
     }
 
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';

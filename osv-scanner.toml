@@ -17,11 +17,14 @@ ecosystem = "PyPI"
 vulnerability.ignore = true
 reason = "False positive — requirements.txt floor is 3.14.4, lockfile pins the latest release (above fix versions). osv-scanner checks the floor, not the resolved version."
 
+# authlib override removed: floor is now >=1.9.1 and the lockfile pins 1.9.10,
+# above all fix versions — no false positive left to suppress.
+
 [[PackageOverrides]]
-name = "authlib"
+name = "ragas"
 ecosystem = "PyPI"
 vulnerability.ignore = true
-reason = "False positive — requirements.txt floor is 1.7.1, lockfile pins 1.7.2."
+reason = "No fix released — PYSEC-2026-3046 affects ragas 0.4.3, the latest published version. Dev-only evaluation dep (requirements-dev.txt), never installed into the Docker image."
 
 [[PackageOverrides]]
 name = "cachetools"

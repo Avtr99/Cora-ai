@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import HTTPException, Request
 
 from ..db.chats import get_chat_owner, load_history, record_turn
+from ..query_processing.fallback_answers import is_error_fallback_result
 from .auth.session_auth import current_user_id
 from .query_models import Message, Query, Response
 
@@ -71,21 +72,17 @@ def is_storable(raw_result: Dict[str, Any]) -> bool:
     empty ``sources`` with ``["knowledge_base"]`` and ``timeout_exceeded`` is
     set on complete-but-slow answers — neither is a failure signal here.
     """
-    return not raw_result.get("error") and "error_fallback" not in (
-        raw_result.get("sources") or []
-    )
+    return not raw_result.get("error") and not is_error_fallback_result(raw_result)
 
 
-async def close_turn(
-    ctx: TurnContext, user_text: str, response: Response, raw_result: Dict[str, Any]
-) -> None:
-    """Store the sanitized response as this turn's row when storable.
+async def close_turn(ctx: TurnContext, user_text: str, response: Response) -> None:
+    """Store the sanitized response only if the query did not fail.
 
     ``user_text`` is the exact text the client sent (``query.text``), as the
     old signing code used. A ``ChatNotFound`` from ``record_turn`` (ownership
     race) propagates — it must not be swallowed.
     """
-    if is_storable(raw_result):
+    if not response.error_fallback:
         await asyncio.to_thread(
             record_turn,
             ctx.user_id,

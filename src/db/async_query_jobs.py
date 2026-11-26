@@ -23,7 +23,7 @@ def _loads(value: Optional[str]) -> Any:
 def _dumps(value: Any) -> str:
     # default=str protects against any Pydantic dump that left a datetime object,
     # while still serializing the dict structure correctly.
-    return json.dumps(value, ensure_ascii=True, default=str)
+    return json.dumps(value, ensure_ascii=True, allow_nan=False, default=str)
 
 
 def _row_to_public(row: Any) -> Dict[str, Any]:
@@ -44,6 +44,7 @@ def create_job(
     submitted_at: str,
     user_id: str,
     client_request_id: Optional[str] = None,
+    caller: Optional[str] = None,
 ) -> None:
     """Insert a new queued job owned by ``user_id``."""
     conn = get_connection()
@@ -51,10 +52,10 @@ def create_job(
         conn.execute(
             """
             INSERT INTO async_query_jobs
-            (job_id, user_id, status, submitted_at, payload, client_request_id, expires_at)
-            VALUES (?, ?, 'queued', ?, ?, ?, NULL)
+            (job_id, user_id, status, submitted_at, payload, client_request_id, caller, expires_at)
+            VALUES (?, ?, 'queued', ?, ?, ?, ?, NULL)
             """,
-            (job_id, user_id, submitted_at, _dumps(payload), client_request_id),
+            (job_id, user_id, submitted_at, _dumps(payload), client_request_id, caller or user_id),
         )
         conn.commit()
     finally:
@@ -104,7 +105,7 @@ def find_active_job_by_client_request_id(
     client_request_id: str,
     now: float,
 ) -> Optional[Dict[str, Any]]:
-    """Return the most recent non-expired job for this user's idempotency key."""
+    """Return the most recent non-expired job that did not fail for this key."""
     conn = get_connection()
     try:
         row = conn.execute(
@@ -114,6 +115,7 @@ def find_active_job_by_client_request_id(
             FROM async_query_jobs
             WHERE user_id = ?
               AND client_request_id = ?
+              AND status != 'failed'
               AND (expires_at IS NULL OR expires_at > ?)
             ORDER BY submitted_at DESC
             LIMIT 1
@@ -155,50 +157,35 @@ def claim_job(job_id: str, started_at: str) -> bool:
         conn.close()
 
 
-def complete_job(
+def finish_job(
     job_id: str,
-    result: Dict[str, Any],
     completed_at: str,
     expires_at: float,
+    *,
+    result: Optional[Dict[str, Any]],
+    error: Optional[str],
 ) -> None:
+    """Store a terminal outcome, preserving the response on handled failures."""
     conn = get_connection()
     try:
         conn.execute(
             """
             UPDATE async_query_jobs
-            SET status = 'completed',
+            SET status = ?,
                 completed_at = ?,
                 result = ?,
-                error = NULL,
-                expires_at = ?
-            WHERE job_id = ?
-            """,
-            (completed_at, _dumps(result), expires_at, job_id),
-        )
-        conn.commit()
-    finally:
-        conn.close()
-
-
-def fail_job(
-    job_id: str,
-    error: str,
-    completed_at: str,
-    expires_at: float,
-) -> None:
-    conn = get_connection()
-    try:
-        conn.execute(
-            """
-            UPDATE async_query_jobs
-            SET status = 'failed',
-                completed_at = ?,
                 error = ?,
-                result = NULL,
                 expires_at = ?
-            WHERE job_id = ?
+            WHERE job_id = ? AND status IN ('queued', 'processing')
             """,
-            (completed_at, error, expires_at, job_id),
+            (
+                "failed" if error is not None else "completed",
+                completed_at,
+                _dumps(result) if result is not None else None,
+                error,
+                expires_at,
+                job_id,
+            ),
         )
         conn.commit()
     finally:
@@ -230,15 +217,15 @@ def mark_interrupted_processing(
         conn.close()
 
 
-def load_queued_job_ids() -> List[str]:
-    """Job IDs to re-enqueue on startup."""
+def load_queued_jobs() -> List[Dict[str, str]]:
+    """Queued jobs and their caller identities to re-enqueue on startup."""
     conn = get_connection()
     try:
         rows = conn.execute(
-            "SELECT job_id FROM async_query_jobs "
+            "SELECT job_id, caller FROM async_query_jobs "
             "WHERE status = 'queued' ORDER BY submitted_at"
         ).fetchall()
-        return [row["job_id"] for row in rows]
+        return [{"job_id": row["job_id"], "caller": row["caller"]} for row in rows]
     finally:
         conn.close()
 

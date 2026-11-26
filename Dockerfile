@@ -50,7 +50,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Lockfiles are generated with `uv pip compile --generate-hashes` and installed
 # with --require-hashes for supply-chain integrity (Scorecard Pinned-Dependencies).
 # To regenerate: uv pip compile --generate-hashes --python-platform x86_64-unknown-linux-gnu \
-#   --python-version 3.11 requirements-core.txt -o requirements-core.lock
+#   --python-version 3.11.5 requirements-core.txt -o requirements-core.lock
 COPY requirements-core.lock .
 RUN pip install --no-cache-dir --require-hashes -r requirements-core.lock
 
@@ -64,9 +64,9 @@ RUN pip install --no-cache-dir --require-hashes -r requirements-core.lock
 # features off), so they must be installed. CPU-only torch is ~123MB vs ~451MB
 # for the CUDA build.
 # To regenerate: uv pip compile --generate-hashes --python-platform x86_64-unknown-linux-gnu \
-#   --python-version 3.11 --index-strategy unsafe-best-match \
+#   --python-version 3.11.5 --index-strategy unsafe-best-match \
 #   --extra-index-url https://download.pytorch.org/whl/cpu \
-#   requirements-ingestion.txt -o requirements-ingestion.lock
+#   requirements-ingestion.txt -c requirements-core.lock -o requirements-ingestion.lock
 ARG INSTALL_INGESTION=true
 COPY requirements-ingestion.lock .
 RUN if [ "$INSTALL_INGESTION" != "false" ]; then \

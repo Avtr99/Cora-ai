@@ -27,7 +27,7 @@ from .suggested_prompts import (
     should_generate_suggested_prompts,
     split_answer_and_suggested_prompts,
 )
-from .fallback_answers import NO_ANSWER_FOUND, is_cacheable_answer
+from .fallback_answers import NO_ANSWER_FOUND, is_cacheable_answer, is_error_fallback_result
 
 
 class BaseRAGClient:
@@ -140,11 +140,12 @@ class BaseRAGClient:
             cached_result = await query_cache.get_result(query)
             if cached_result is not None:
                 cached_answer = ""
-                cached_sources = None
                 if isinstance(cached_result, dict):
                     cached_answer = str(cached_result.get("answer", "") or "")
-                    cached_sources = cached_result.get("sources")
-                if self._should_cache_answer(cached_answer, cached_sources):
+                if self._should_cache_answer(
+                    cached_answer,
+                    error_fallback=is_error_fallback_result(cached_result),
+                ):
                     logger.debug("Serving from query cache (no-fingerprint fallback)")
                     return cached_result
                 logger.info("Ignoring stale fallback answer from query cache (no-fingerprint)")
@@ -224,11 +225,12 @@ class BaseRAGClient:
             )
             if cached_result is not None:
                 cached_answer = ""
-                cached_sources = None
                 if isinstance(cached_result, dict):
                     cached_answer = str(cached_result.get("answer", "") or "")
-                    cached_sources = cached_result.get("sources")
-                if self._should_cache_answer(cached_answer, cached_sources):
+                if self._should_cache_answer(
+                    cached_answer,
+                    error_fallback=is_error_fallback_result(cached_result),
+                ):
                     logger.debug("Serving from query cache (context-aware)")
                     return cached_result
                 logger.info("Ignoring stale fallback answer from query cache; regenerating")
@@ -335,7 +337,9 @@ class BaseRAGClient:
             if suggested_prompts:
                 result["suggested_prompts"] = suggested_prompts
 
-            if self._should_cache_answer(answer_text, result.get("sources")):
+            if self._should_cache_answer(
+                answer_text, error_fallback=bool(result.get("error_fallback"))
+            ):
                 await query_cache.set_result(
                     query, result, context_fingerprint=context_fingerprint
                 )
@@ -406,9 +410,9 @@ class BaseRAGClient:
         return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
     @staticmethod
-    def _should_cache_answer(answer_text: str, sources: Optional[List[str]] = None) -> bool:
+    def _should_cache_answer(answer_text: str, error_fallback: bool = False) -> bool:
         """Return whether the generated answer should be persisted in query cache."""
-        return is_cacheable_answer(answer_text, sources)
+        return is_cacheable_answer(answer_text, error_fallback=error_fallback)
 
     def _calculate_coverage_score(
         self, context_length: int, answer_length: int, summaries_count: int

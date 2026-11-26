@@ -93,7 +93,7 @@ def main() -> int:
         print(
             "\nFix: regenerate with -c constraints, e.g.\n"
             "  uv pip compile --generate-hashes --python-platform x86_64-unknown-linux-gnu "
-            "--python-version 3.11 --index-strategy unsafe-best-match "
+            "--python-version 3.11.5 --index-strategy unsafe-best-match "
             "--extra-index-url https://download.pytorch.org/whl/cpu "
             "requirements-ingestion.txt -c requirements-core.lock -o requirements-ingestion.lock"
         )

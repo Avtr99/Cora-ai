@@ -28,5 +28,6 @@ export type {
 } from './cora/types';
 
 export { buildAgentReasoning } from './cora/agentReasoning';
+export { CoraApiError, CoraStreamError } from './cora/errors';
 export { queryCoraStream, toCoraResponse, validateQueryResponse } from './cora/streaming';
 export { checkHealth, getAppVersion } from './cora/healthCheck';

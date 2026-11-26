@@ -58,7 +58,7 @@ tenacity>=9.1.4,<10.0
 loguru==0.7.3
 cachetools>=7.1.4,<8.0
 nh3>=0.3.5,<0.4
-filelock>=3.29.4,<4.0
+filelock>=4.2.1,<5.0
 zstandard>=0.25.0
 
 # OpenAI embedding/LLM provider (lazy-imported by src/ when EMBEDDING_PROVIDER=openai
@@ -75,5 +75,10 @@ protobuf>=5.29.6               # 1 CVE in 5.29.5; let google packages pull compa
 jinja2>=3.1.6,<4.0             # 1 CVE in 3.1.5 (sandbox escape)
 pillow>=13.0.0,<14.0           # 12.x has 35 CVEs (OOB reads, heap overflows, UAF), fixed in 13.x;
                                # docling-slim 2.142+ allows pillow<14
-authlib>=1.7.1,<2.0            # 6 CVEs in 1.6.6 (transitive)
+authlib>=1.9.1,<2.0            # 10 advisories incl. CVE-2026-96760 / CVE-2026-116672 in <=1.7.2 (transitive)
+joserfc>=1.7.6,<2.0            # 2 CVEs in 1.7.4 (transitive via authlib)
+multidict>=6.9.1,<7.0          # PYSEC-2026-4244 in 6.7.1 (transitive via aiohttp)
+pyasn1>=0.6.5,<0.7             # 4 CVEs in 0.6.4 (transitive)
+soupsieve>=4.0.0,<5.0          # 4 CVEs in 2.9.1 (transitive via beautifulsoup4); needs py>=3.11.5
+langgraph-sdk>=0.4.6,<0.5      # 2 advisories in 0.4.2 (transitive via langchain->langgraph)
 

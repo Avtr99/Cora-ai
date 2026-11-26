@@ -184,16 +184,22 @@ class StreamingRAGOrchestrator(RAGOrchestrator):
         metadata_filters: Optional[Dict[str, Any]] = None,
         chat_history: Optional[List[Dict[str, str]]] = None,
         emit_tokens: bool = True,
+        steps: Optional[List[AgentStep]] = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """Stream-process a query through the RAG pipeline.
 
         Yields:
             - ``{"type": "status", "status": "..."}`` events
             - ``{"type": "token", "chunk": "..."}`` events (skipped when emit_tokens=False)
-            - ``{"type": "final", "result": {...}}`` event
+            - ``{"type": "final", "result": {...}}`` event, or
+            - ``{"type": "error", "result": {...}}`` for handled failures
+
+        ``steps`` may be a caller-provided list; pipeline steps are appended as
+        they complete so the API layer can report partial progress when the
+        stream ends in an error event or exception.
         """
         start_time = time.time()
-        steps: List[AgentStep] = []
+        steps: List[AgentStep] = steps if steps is not None else []
 
         deadline = None
         if self.config.max_total_time_ms > 0:
@@ -262,26 +268,21 @@ class StreamingRAGOrchestrator(RAGOrchestrator):
                 start_time=start_time,
             )
 
-            if isinstance(routing, dict) and (
-                routing.get("error") == "Request timeout"
-                or routing.get("metadata", {}).get("timeout_exceeded")
-            ):
+            if isinstance(routing, dict) and routing.get("error_fallback"):
                 # Timeout result returned directly by ``_prepare_routing``.
                 result = routing
                 yield {"type": "status", "status": "generating"}
                 async for ev in _emit_answer_tokens(result.get("answer", "")):
                     yield ev
-                result["reasoning_steps"] = format_reasoning_steps(steps)
                 yield {"type": "final", "result": result}
                 return
 
             if not isinstance(routing, dict):
                 logger.error("Routing returned unexpected type: %s", type(routing).__name__)
-                yield {"type": "final", "result": {
+                yield {"type": "error", "result": {
                     "answer": "I encountered an error processing your query. Please try again.",
                     "sources": [],
                     "error": "Internal processing error",
-                    "reasoning_steps": format_reasoning_steps(steps),
                 }}
                 return
 
@@ -314,6 +315,11 @@ class StreamingRAGOrchestrator(RAGOrchestrator):
                 ):
                     if event.get("type") == "final":
                         final_result = event.get("result", {}) or {}
+                    elif event.get("type") == "error":
+                        # Terminal by definition; the handler returned after
+                        # emitting it, so nothing here can still produce a result.
+                        yield event
+                        return
                     else:
                         yield event
 
@@ -421,9 +427,8 @@ class StreamingRAGOrchestrator(RAGOrchestrator):
 
         except Exception as e:
             logger.error("Streaming orchestrator error: %s", e, exc_info=True)
-            yield {"type": "final", "result": {
+            yield {"type": "error", "result": {
                 "answer": "I encountered an error processing your query. Please try again.",
                 "sources": [],
                 "error": "Internal processing error",
-                "reasoning_steps": format_reasoning_steps(steps),
             }}

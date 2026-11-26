@@ -158,7 +158,7 @@ export function useChatActions({
     const sanitizedContent = sanitizeInput(content);
     const userMessageId = generateId();
 
-    let targetChatId = activeChat?.id;
+    let targetChatId: string;
     let targetChat: Chat;
 
     if (!activeChat) {

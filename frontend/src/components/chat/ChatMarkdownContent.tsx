@@ -20,17 +20,36 @@ type MarkdownImgRendererProps = React.ImgHTMLAttributes<HTMLImageElement> & {
 };
 
 // ── Static renderers hoisted to module scope (never recreated) ─────────
+const HEADING_SPACING_CLASS = 'mt-5 md:mt-6 3xl:mt-7 4xl:mt-9 first:mt-0 mb-2 3xl:mb-2.5 4xl:mb-3 last:mb-0';
+const StaticH1 = (props: React.HTMLAttributes<HTMLHeadingElement>) => (
+  <h1 className={HEADING_SPACING_CLASS} {...props} />
+);
+const StaticH2 = (props: React.HTMLAttributes<HTMLHeadingElement>) => (
+  <h2 className={HEADING_SPACING_CLASS} {...props} />
+);
+const StaticH3 = (props: React.HTMLAttributes<HTMLHeadingElement>) => (
+  <h3 className={HEADING_SPACING_CLASS} {...props} />
+);
+const StaticH4 = (props: React.HTMLAttributes<HTMLHeadingElement>) => (
+  <h4 className={HEADING_SPACING_CLASS} {...props} />
+);
+const StaticH5 = (props: React.HTMLAttributes<HTMLHeadingElement>) => (
+  <h5 className={HEADING_SPACING_CLASS} {...props} />
+);
+const StaticH6 = (props: React.HTMLAttributes<HTMLHeadingElement>) => (
+  <h6 className={HEADING_SPACING_CLASS} {...props} />
+);
 const StaticUl = (props: React.HTMLAttributes<HTMLUListElement>) => (
-  <ul className="list-disc pl-6 3xl:pl-7 4xl:pl-8 space-y-1.5 3xl:space-y-2 4xl:space-y-2.5 mb-3 3xl:mb-4" {...props} />
+  <ul className="list-disc pl-6 3xl:pl-7 4xl:pl-8 space-y-1.5 3xl:space-y-2 4xl:space-y-2.5 mb-3 3xl:mb-4 4xl:mb-5 first:mt-0 last:mb-0" {...props} />
 );
 const StaticOl = (props: React.OlHTMLAttributes<HTMLOListElement>) => (
-  <ol className="list-decimal pl-6 3xl:pl-7 4xl:pl-8 space-y-1.5 3xl:space-y-2 4xl:space-y-2.5 mb-3 3xl:mb-4" {...props} />
+  <ol className="list-decimal pl-6 3xl:pl-7 4xl:pl-8 space-y-1.5 3xl:space-y-2 4xl:space-y-2.5 mb-3 3xl:mb-4 4xl:mb-5 first:mt-0 last:mb-0" {...props} />
 );
 const StaticLi = (props: React.LiHTMLAttributes<HTMLLIElement>) => (
   <li className="leading-relaxed" {...props} />
 );
 const StaticP = ({ children, ...props }: React.HTMLAttributes<HTMLParagraphElement>) => (
-  <p className="mb-2 3xl:mb-3 last:mb-0 leading-relaxed" {...props}><GlossaryHydrator>{children}</GlossaryHydrator></p>
+  <p className="mb-3 3xl:mb-4 4xl:mb-5 last:mb-0 leading-relaxed" {...props}><GlossaryHydrator>{children}</GlossaryHydrator></p>
 );
 const StaticStrong = (props: React.HTMLAttributes<HTMLElement>) => (
   <strong className="font-semibold" {...props} />
@@ -53,7 +72,7 @@ const StaticImg = ({ src = '', alt = '', ...imgProps }: MarkdownImgRendererProps
   );
 };
 const StaticTable = ({ children }: React.TableHTMLAttributes<HTMLTableElement>) => (
-  <div className="my-5 3xl:my-7 4xl:my-9 overflow-x-auto rounded-xl border border-border-ui shadow-card-sm">
+  <div className="my-5 3xl:my-7 4xl:my-9 first:mt-0 last:mb-0 overflow-x-auto rounded-xl border border-border-ui shadow-card-sm">
     <table className="w-full border-collapse text-sm 3xl:text-base 4xl:text-lg">{children}</table>
   </div>
 );
@@ -73,9 +92,15 @@ const StaticTd = (props: React.TdHTMLAttributes<HTMLTableCellElement>) => (
   <td className="px-4 3xl:px-5 py-2.5 3xl:py-3 font-inter text-sm 3xl:text-base 4xl:text-lg text-text-secondary leading-normal" {...props} />
 );
 const StaticBlockquote = ({ children }: React.BlockquoteHTMLAttributes<HTMLQuoteElement>) => (
-  <blockquote className="my-6 3xl:my-8 rounded-lg border border-border-ui bg-surface-card/50 px-5 3xl:px-6 py-4 3xl:py-5 text-text-secondary shadow-card-sm text-sm 3xl:text-base 4xl:text-lg italic leading-relaxed [&>p]:mb-0 [&>p:last-child]:mb-0">
+  <blockquote className="my-6 3xl:my-8 first:mt-0 last:mb-0 rounded-lg border border-border-ui bg-surface-card/50 px-5 3xl:px-6 py-4 3xl:py-5 text-text-secondary shadow-card-sm text-sm 3xl:text-base 4xl:text-lg italic leading-relaxed [&>p]:mb-0 [&>p:last-child]:mb-0">
     {children}
   </blockquote>
+);
+// Answers get spacing, not a rule line — models emit `---` between sections.
+const StaticHr = () => (
+  <div className="relative my-4 md:my-5 3xl:my-6 4xl:my-7 first:mt-0 last:mb-0">
+    <hr className="sr-only" />
+  </div>
 );
 
 const REMARK_PLUGINS = [remarkGfm];
@@ -102,6 +127,12 @@ export const ChatMarkdownContent: React.FC<ChatMarkdownContentProps> = ({
 }) => {
   // Only renderers that depend on props need to live inside the component
   const components = useMemo<Components>(() => ({
+    h1: StaticH1,
+    h2: StaticH2,
+    h3: StaticH3,
+    h4: StaticH4,
+    h5: StaticH5,
+    h6: StaticH6,
     ul: StaticUl,
     ol: StaticOl,
     li: StaticLi,
@@ -115,6 +146,7 @@ export const ChatMarkdownContent: React.FC<ChatMarkdownContentProps> = ({
     th: StaticTh,
     td: StaticTd,
     blockquote: StaticBlockquote,
+    hr: StaticHr,
     code: (props) => {
       const { children, className, ...rest } = props;
       const text = String(children ?? '');
@@ -129,7 +161,7 @@ export const ChatMarkdownContent: React.FC<ChatMarkdownContentProps> = ({
       }
 
       return (
-        <div className="relative group">
+        <div className="relative group my-4 3xl:my-5 4xl:my-6 first:mt-0 last:mb-0">
           <button
             type="button"
             onClick={() => copyText(text)}
@@ -139,7 +171,7 @@ export const ChatMarkdownContent: React.FC<ChatMarkdownContentProps> = ({
           >
             <Copy className="h-3.5 w-3.5 3xl:h-4 3xl:w-4 4xl:h-5 4xl:w-5" />
           </button>
-          <pre className={className}>
+          <pre className={className ? `mb-0 ${className}` : 'mb-0'}>
             <code {...rest}>{children}</code>
           </pre>
         </div>
@@ -187,7 +219,7 @@ export const ChatMarkdownContent: React.FC<ChatMarkdownContentProps> = ({
       if (!safeHref) {
         return <span className="text-text-secondary underline decoration-dotted">{children}</span>;
       }
-      let isExternal = false;
+      let isExternal: boolean;
       if (safeHref.startsWith('/') && !safeHref.startsWith('//')) {
         isExternal = false;
       } else if (typeof window !== 'undefined') {

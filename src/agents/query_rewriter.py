@@ -367,13 +367,16 @@ class QueryRewriterAgent:
             # Parse JSON response
             result = self._parse_response(result_text, query)
             logger.debug(
-                "Query rewritten: '%s' -> '%s'", query, result["rewritten_query"]
+                "Query rewritten (input_chars=%d)", len(query),
             )
             
             return result
             
         except Exception as e:
-            logger.warning("Query rewrite failed: %s. Using original query.", e)
+            logger.warning(
+                "Query rewrite failed (%s). Using original query.",
+                type(e).__name__,
+            )
             return {
                 "rewritten_query": query,
                 "sub_queries": [],
@@ -425,7 +428,10 @@ class QueryRewriterAgent:
             return result
             
         except json.JSONDecodeError:
-            logger.warning("Failed to parse rewrite response as JSON: %s", response_text[:100])
+            logger.warning(
+                "Failed to parse rewrite response as JSON (response_chars=%d)",
+                len(response_text),
+            )
             return {
                 "rewritten_query": original_query,
                 "sub_queries": [],

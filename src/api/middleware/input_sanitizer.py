@@ -294,8 +294,10 @@ class OutputSanitizer:
         r"sk-[a-zA-Z0-9]{20,}",  # OpenAI API key pattern
         r"AIza[a-zA-Z0-9_-]{35}",  # Google API key pattern
         
-        # Environment variables (secret-shaped)
-        r"\$\{[A-Z_][A-Z0-9_]*\}|\$[A-Z_][A-Z0-9_]*_[A-Z0-9_]*",
+        # Environment variables (secret-shaped). The bare-$VAR branch requires
+        # a real suffix after the underscore (+ not *) so LaTeX-style math such
+        # as "$M_{pu}$" is not redacted as "$M_".
+        r"\$\{[A-Z_][A-Z0-9_]*\}|\$[A-Z_][A-Z0-9_]*_[A-Z0-9_]+",
 
         # Model-internal delimiter leakage
         r"<<SYS>>.*<</SYS>>",

@@ -109,10 +109,9 @@ class WebRouteHandler:
             ))
 
             sources = [(s.get("title") or s.get("url") or "web") for s in result.get("sources", [])]
-            # Mark web search failures/timeouts as error fallback so the frontend
-            # treats the answer as a failed response (no recommendations, retry UI).
+            # Flag web search failures/timeouts so the frontend treats the answer
+            # as a failed response (no recommendations, retry UI).
             if search_failed:
-                sources = ["error_fallback"]
                 web_citations = []
             else:
                 web_citations = self.citation_manager.extract_citations_from_web_results(result)
@@ -126,6 +125,7 @@ class WebRouteHandler:
             response = {
                 "answer": result.get("answer", ""),
                 "sources": sources if sources else ["web_search"],
+                "error_fallback": bool(search_failed),
                 "web_sources": [] if search_failed else result.get("sources", []),
                 "citations": web_citations,
                 "quiz": result.get("quiz"),
@@ -153,7 +153,8 @@ class WebRouteHandler:
             
             return {
                 "answer": WEB_RETRIEVAL_FAILED_ANSWER,
-                "sources": ["error_fallback"],
+                "sources": ["web_search"],
+                "error_fallback": True,
                 "web_sources": [],
                 "citations": [],
                 "quiz": None,
@@ -290,8 +291,15 @@ class WebRouteHandler:
 
         if web_failed:
             step_status = "fallback"
+            answer = result.get("answer", "")
+            if is_refusal(answer):
+                summary = "The question is outside the supported topic."
+            elif is_non_answer(answer):
+                summary = "The web search did not return a usable answer."
+            else:
+                summary = "Kept the knowledge base answer."
             step_details = {
-                "reason": "Web supplementation failed, used KB fallback",
+                "summary": summary,
                 "error": error_msg,
                 "timed_out": web_timed_out,
                 "timeout_ms": web_timeout_ms,

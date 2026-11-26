@@ -11,6 +11,7 @@ import asyncio
 from loguru import logger
 
 from .base_rag_client import BaseRAGClient
+from .fallback_answers import is_error_fallback_result
 from .prompts import (
     MAX_QUERY_LENGTH,
     get_system_instruction,
@@ -105,7 +106,9 @@ class StreamingRAGWrapper:
             cached_result = await query_cache.get_result(query, context_fingerprint=context_fingerprint)
             if cached_result is not None:
                 cached_answer = str(cached_result.get("answer", "") or "") if isinstance(cached_result, dict) else ""
-                if self._base._should_cache_answer(cached_answer):
+                if self._base._should_cache_answer(
+                    cached_answer, error_fallback=is_error_fallback_result(cached_result)
+                ):
                     logger.debug("Serving streaming query from cache")
                     yield {"type": "token", "chunk": cached_answer}
                     yield {"type": "final", "result": cached_result}

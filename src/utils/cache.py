@@ -130,6 +130,24 @@ class QueryCache:
             sqlite = await self._get_sqlite()
             result = await sqlite.get(key, "query")
             if result is not None:
+                # Normalize reasoning steps cached by an older deploy to the
+                # current shape (details.kind/sources, current titles). This
+                # is one of exactly two legacy normalizers — the other is
+                # KIND_BY_NAME in the frontend's agentReasoning.ts, which
+                # covers chat_turns history rows that bypass this cache path.
+                # Do not add a third normalization point.
+                if isinstance(result, dict) and "reasoning_steps" in result:
+                    from ..agents.reasoning_formatter import upgrade_reasoning_steps
+
+                    result["reasoning_steps"] = upgrade_reasoning_steps(
+                        result["reasoning_steps"]
+                    )
+                # Legacy rows stored a sentinel in sources instead of the
+                # typed flag; lift it so stale fallbacks still fail to serve.
+                if isinstance(result, dict) and "error_fallback" in (
+                    result.get("sources") or []
+                ):
+                    result["error_fallback"] = True
                 return result
         except Exception as e:
             logger.debug(f"SQLite cache get failed: {e}")

@@ -1,7 +1,6 @@
 import { RecommendationType } from '@/components/chat/RecommendationCard';
 import { CitationResponse, ResponseMetadata, QuizResponse } from '@/services/cora/types';
 import { AgentReasoningStep } from '@/types/reasoning';
-
 export type { AgentReasoningStep };
 
 /**

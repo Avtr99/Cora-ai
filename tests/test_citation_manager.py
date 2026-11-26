@@ -702,17 +702,18 @@ class TestCitationSelection:
         assert result["citations"] == []
         assert result["sources"] == []
 
-    def test_finalize_preserves_error_source_marker(self):
+    def test_finalize_preserves_error_fallback_sources(self):
         """Error fallback sources are kept when nothing is cited."""
         result = {
             "answer": NO_ANSWER_FOUND,
             "citations": [],
-            "sources": ["error_fallback"],
+            "sources": ["web_search"],
+            "error_fallback": True,
         }
 
         self.manager.finalize(result, "question")
 
-        assert result["sources"] == ["error_fallback"]
+        assert result["sources"] == ["web_search"]
 
     def test_finalize_suppression_strips_all_markers(self):
         """Conversational queries suppress all citations and markers."""

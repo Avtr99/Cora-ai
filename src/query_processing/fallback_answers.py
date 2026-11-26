@@ -8,7 +8,6 @@ All layers (caching, web supplementation, cache serving) import from this
 module to avoid behavioural drift between them.
 """
 
-from typing import List, Optional
 
 # ---------------------------------------------------------------------------
 # Canonical user-facing fallback messages.
@@ -75,14 +74,6 @@ _NON_ANSWER_PREFIXES_LOWER: tuple[str, ...] = tuple(
     prefix.lower() for prefix in NON_ANSWER_PREFIXES
 )
 
-# Backend markers that indicate a failed/error response.
-_ERROR_SOURCE_MARKERS: set[str] = {
-    "error_fallback",
-    "web_search_failed",
-    "web_timeout_fallback",
-}
-
-
 # User-facing refusal for queries outside the assistant's domain. The scope
 # gate (web_search.py) and the KB system prompt (prompts.py) share this text
 # via scope_refusal_answer() — generation and detection cannot drift apart.
@@ -142,28 +133,27 @@ def is_non_answer(answer: str) -> bool:
     return any(normalized.startswith(prefix) for prefix in _NON_ANSWER_PREFIXES_LOWER)
 
 
-def has_error_source_marker(sources: Optional[List[str]]) -> bool:
-    return bool(
-        sources
-        and any(isinstance(source, str) and source in _ERROR_SOURCE_MARKERS for source in sources)
-    )
+def is_error_fallback_result(result) -> bool:
+    """True when a result dict carries the typed error-fallback flag."""
+    return bool(isinstance(result, dict) and result.get("error_fallback"))
 
 
-def is_cacheable_answer(answer: str, sources: Optional[List[str]] = None) -> bool:
+def is_cacheable_answer(answer: str, error_fallback: bool = False) -> bool:
     """Return True if the answer should be persisted in cache.
 
     Inverse of :func:`is_non_answer` — excludes empty and fallback answers,
-    plus any response whose sources are flagged as an error fallback.
+    plus any result flagged as an error fallback.
 
     Args:
         answer: Raw answer text from the model.
-        sources: Optional list of source identifiers from the response.
+        error_fallback: The result dict's typed failure flag (route handlers
+            set it on generation/search failures).
 
     Returns:
         True if the answer is safe to cache.
     """
     if is_non_answer(answer):
         return False
-    if has_error_source_marker(sources):
+    if error_fallback:
         return False
     return True

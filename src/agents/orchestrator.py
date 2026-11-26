@@ -43,7 +43,7 @@ from .conversational_handler import ConversationalHandler
 from ..config import get_settings
 from ..citations import CitationManager
 from ..query_processing.filter_extractor import extract_filters
-from ..query_processing.fallback_answers import is_cacheable_answer
+from ..query_processing.fallback_answers import is_cacheable_answer, is_error_fallback_result
 from ..query_processing.llm_provider import LLMClient
 
 logger = logging.getLogger(__name__)
@@ -269,7 +269,9 @@ class RAGOrchestrator:
         persist_to_cache = getattr(self.answer_generator, "persist_to_cache", None)
         if persist_to_cache is None:
             return
-        if not is_cacheable_answer(result.get("answer", ""), result.get("sources")):
+        if not is_cacheable_answer(
+            result.get("answer", ""), error_fallback=is_error_fallback_result(result)
+        ):
             return
         try:
             await persist_to_cache(query, result)

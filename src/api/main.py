@@ -43,6 +43,7 @@ from .chat_routes import router as chat_router
 from .account_routes import router as account_router
 from .auth.session_auth import current_user_id
 from ..config import get_settings
+from ..db.chats import ChatNotFound
 from ..version import __version__
 from .query_history import open_turn
 from .query_routes import Query as QueryModel, Response as QueryResponse, process_query_core
@@ -176,7 +177,10 @@ async def process_query(query: Query, request: Request):
         
     except HTTPException:
         raise
-    
+
+    except ChatNotFound:
+        raise HTTPException(status_code=404, detail="Chat not found")
+
     except Exception as e:
         error_id = str(uuid.uuid4())[:8]
         logger.exception(f"Error processing query [error_id={error_id}]: {e}")
@@ -226,7 +230,9 @@ async def enqueue_query_async(query: Query, request: Request):
     manager = get_async_query_job_manager()
     try:
         return await manager.enqueue(
-            query.model_dump(), user_id=current_user_id(request)
+            query.model_dump(),
+            user_id=current_user_id(request),
+            caller=request.client.host if request.client else None,
         )
     except ValueError as exc:
         raise HTTPException(status_code=413, detail="Request payload too large or invalid") from exc

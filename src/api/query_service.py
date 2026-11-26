@@ -20,7 +20,7 @@ from .lifespan import (
     get_retriever,
 )
 from .middleware import ThreatLevel, get_input_sanitizer, get_output_sanitizer
-from .query_history import TurnContext, close_turn, format_history_string
+from .query_history import TurnContext, close_turn, format_history_string, is_storable
 from .query_models import Query, Response
 from .query_sanitization import (
     log_blocked_threat,
@@ -209,11 +209,10 @@ async def process_query_core(
         quiz=sanitized_quiz,
         suggested_prompts=sanitized_suggested_prompts,
         truncated=processed_results.get("truncated", False),
+        error_fallback=not is_storable(processed_results),
         config_version=config_version,
     )
 
-    # Store the turn from the raw result's failure shape, not the
-    # sanitized response. ChatNotFound propagates.
-    await close_turn(ctx, query.text, response, processed_results)
+    await close_turn(ctx, query.text, response)
 
     return response

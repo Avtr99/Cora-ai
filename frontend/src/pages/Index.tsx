@@ -126,7 +126,7 @@ const Index: React.FC = () => {
     // document body becomes scrollable and the sidebar (inside main) scrolls
     // off-screen alongside the chat content. h-dvh eliminates that whole-page
     // scroll bug. Desktop is unaffected because dvh === vh without UA chrome.
-    <main className="bg-surface-base h-dvh flex flex-col overflow-hidden [--sidebar-width:224px] [--sidebar-collapsed-width:60px] [--composer-bottom:1rem] 3xl:[--sidebar-width:272px] 3xl:[--sidebar-collapsed-width:68px] 3xl:[--composer-bottom:1.5rem] 4xl:[--sidebar-width:336px] 4xl:[--sidebar-collapsed-width:80px] 4xl:[--composer-bottom:2rem]">
+    <main className="bg-surface-base h-dvh flex flex-col overflow-hidden [--sidebar-width:224px] [--sidebar-collapsed-width:60px] [--composer-bottom:1rem] 3xl:[--sidebar-width:280px] 3xl:[--sidebar-collapsed-width:68px] 3xl:[--composer-bottom:1.5rem] 4xl:[--sidebar-width:340px] 4xl:[--sidebar-collapsed-width:80px] 4xl:[--composer-bottom:2rem]">
       {/* Main Page Heading - Visually Hidden but accessible to screen readers */}
       <h1 className="sr-only">Cora - Voluntary Carbon Market AI Assistant</h1>
 

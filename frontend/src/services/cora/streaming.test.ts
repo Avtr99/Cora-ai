@@ -184,6 +184,112 @@ describe('queryCoraStream', () => {
     );
   });
 
+  it('throws CoraStreamError with partial reasoning steps on SSE error event', async () => {
+    const mockFetch = vi.mocked(globalThis.fetch);
+    const chunks = [
+      'event: status\ndata: {"event":"status","status":"processing"}\n\n',
+      'event: error\ndata: {"event":"error","error_id":"abc12345","message":"I encountered an error processing your query.","reasoning_steps":[{"name":"Query Routing","status":"completed","duration_ms":5,"details":{"title":"Route the question","kind":"route"}},{"name":"Answer Generation","status":"failed","duration_ms":3,"details":{"title":"Compose the answer","kind":"compose"}}]}\n\n',
+    ];
+
+    mockFetch.mockResolvedValueOnce(
+      new Response(createSSEStream(chunks), {
+        status: 200,
+        headers: { 'Content-Type': 'text/event-stream' },
+      })
+    );
+
+    const onError = vi.fn();
+    let caught: unknown;
+    try {
+      await queryCoraStream('Hello', undefined, undefined, { onError });
+    } catch (error) {
+      caught = error;
+    }
+
+    const { CoraStreamError } = await import('./errors');
+    const { buildAgentReasoning } = await import('./agentReasoning');
+    expect(caught).toBeInstanceOf(CoraStreamError);
+    const streamError = caught as InstanceType<typeof CoraStreamError>;
+    expect(streamError.errorId).toBe('abc12345');
+    expect(streamError.message).toBe('I encountered an error processing your query.');
+    // The raw partial steps are handed to buildAgentReasoning (mocked to [] in
+    // this file); whatever it returns is attached to the error.
+    expect(buildAgentReasoning).toHaveBeenCalledWith({
+      reasoning_steps: expect.arrayContaining([
+        expect.objectContaining({ name: 'Query Routing', status: 'completed' }),
+        expect.objectContaining({ name: 'Answer Generation', status: 'failed' }),
+      ]),
+    });
+    expect(streamError.reasoningSteps).toEqual([]);
+    expect(onError).toHaveBeenCalledWith('abc12345', 'I encountered an error processing your query.');
+  });
+
+  it('throws CoraStreamError without reasoningSteps when the event has none', async () => {
+    const mockFetch = vi.mocked(globalThis.fetch);
+    const chunks = [
+      'event: error\ndata: {"event":"error","error_id":"deadbeef","message":"Service initializing"}\n\n',
+    ];
+
+    mockFetch.mockResolvedValueOnce(
+      new Response(createSSEStream(chunks), {
+        status: 200,
+        headers: { 'Content-Type': 'text/event-stream' },
+      })
+    );
+
+    let caught: unknown;
+    try {
+      await queryCoraStream('Hello');
+    } catch (error) {
+      caught = error;
+    }
+
+    const { CoraStreamError } = await import('./errors');
+    expect(caught).toBeInstanceOf(CoraStreamError);
+    const streamError = caught as InstanceType<typeof CoraStreamError>;
+    expect(streamError.errorId).toBe('deadbeef');
+    expect(streamError.reasoningSteps).toBeUndefined();
+  });
+
+  it('rejects with CoraStreamError when SSE emits partial tokens then an error event', async () => {
+    const mockFetch = vi.mocked(globalThis.fetch);
+    const chunks = [
+      'data: {"event":"status","status":"generating"}\n\n',
+      'data: {"event":"token","chunk":"Partial streamed text before provider crash"}\n\n',
+      'data: {"event":"error","error_id":"midstream1","message":"I encountered an error generating the answer. Please try again."}\n\n',
+    ];
+
+    mockFetch.mockResolvedValueOnce(
+      new Response(createSSEStream(chunks), {
+        status: 200,
+        headers: { 'Content-Type': 'text/event-stream' },
+      })
+    );
+
+    const onToken = vi.fn();
+    const onResult = vi.fn();
+    const onDone = vi.fn();
+    const onError = vi.fn();
+
+    const { CoraStreamError } = await import('./errors');
+    await expect(
+      queryCoraStream('Explain VM0048', undefined, undefined, {
+        onToken,
+        onResult,
+        onDone,
+        onError,
+      })
+    ).rejects.toBeInstanceOf(CoraStreamError);
+
+    expect(onToken).toHaveBeenCalledWith('Partial streamed text before provider crash');
+    expect(onResult).not.toHaveBeenCalled();
+    expect(onDone).not.toHaveBeenCalled();
+    expect(onError).toHaveBeenCalledWith(
+      'midstream1',
+      'I encountered an error generating the answer. Please try again.'
+    );
+  });
+
   it('handles malformed SSE events without crashing', async () => {
     const mockFetch = vi.mocked(globalThis.fetch);
     const chunks = [

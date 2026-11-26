@@ -29,6 +29,8 @@ export const ChatMessageItem = React.memo(({
     }
   }, [measure]);
 
+  const isUser = message.sender === 'user';
+
   return (
     <div
       data-index={index}
@@ -43,9 +45,13 @@ export const ChatMessageItem = React.memo(({
         backfaceVisibility: 'hidden',
         contain: 'layout paint',
       }}
-      className="pb-6 3xl:pb-8 4xl:pb-10"
+      className={
+        isUser
+          ? 'pb-2 3xl:pb-2.5 4xl:pb-3'
+          : 'pb-7 md:pb-8 3xl:pb-10 4xl:pb-12'
+      }
     >
-      <div className={isHighlighted ? 'pt-4' : ''}>
+      <div className={isHighlighted ? 'pt-3 md:pt-4 3xl:pt-5 4xl:pt-6' : ''}>
         <ChatMessage message={message} />
       </div>
     </div>
